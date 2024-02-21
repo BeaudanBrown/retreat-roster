@@ -1,5 +1,11 @@
+{{ define "root" }}
 <div>
-	{{ range . }}
-	{{ template "rosterDay" . }}
-	{{ end }}
+	<table style="border: 1px solid black;">
+		<thead>
+		</thead>
+		{{ range . }}
+		{{ template "rosterDay" . }}
+		{{ end }}
+	</table>
 </div>
+{{ end }}

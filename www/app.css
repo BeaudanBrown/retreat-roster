@@ -1,0 +1,17 @@
+table, th, td {
+  border: 1px solid black;
+  border-collapse: collapse; /* Ensure borders collapse into a single border */
+}
+td {
+		padding: 0; /* Remove padding inside the td to ensure the select occupies the full cell */
+}
+
+tr {
+  height: 30px; /* Desired fixed height for each row */
+}
+
+select {
+		width: 100%; /* Make the select fill the full width of the td */
+		height: 100%; /* To make the select fill the height, ensure there is a specific height set on the td or table */
+		box-sizing: border-box; /* Ensures padding and border are included in the width and height */
+}

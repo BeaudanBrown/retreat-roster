@@ -1,19 +1,50 @@
 {{ define "rosterDay" }}
-<div id='d-{{.DayName}}'>
-	<button hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"day":"{{.DayName}}", "action":"-"}' hx-target='#d-{{.DayName}}'>-</button>
-	<button hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"day":"{{.DayName}}", "action":"+"}' hx-target='#d-{{.DayName}}'>+</button>
-	<table>
-		<thead>
-		</thead>
-		<tbody>
-			{{range .Rows}}
-			<tr>
-				<td>
-					{{.Early.Name}}
-				</td>
-			</tr>
-			{{end}}
-		</tbody>
-	</table>
-</div>
-{{ end }}
+<tbody id='d-{{.DayName}}' style='background-color: {{.Colour}}'>
+	{{ $dayName := .DayName }}
+	{{ $date := .Date }}
+	{{ $staff := .AvailableStaff }}
+	{{range $index, $value := .Rows}}
+	<tr>
+		<td>
+    {{if eq $index 0}}
+			{{$dayName}}
+			<button hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"day":"{{$dayName}}", "action":"-"}' hx-swap='outerHTML' hx-target='#d-{{$dayName}}'>-</button>
+			<button hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"day":"{{$dayName}}", "action":"+"}' hx-swap='outerHTML' hx-target='#d-{{$dayName}}'>+</button>
+    {{else if eq $index 1}}
+			{{$date.Format "02/01"}}
+		{{end}}
+		</td>
+		<td></td>
+		<td>
+			<select name="early">
+				<option value=""></option>
+				{{ range $staff }}
+				<option value="{{.Name}}">{{.Name}}</option>
+				{{ end }}
+			</select>
+		</td>
+		<td></td>
+		<td></td>
+		<td>
+			<select name="early">
+				<option value=""></option>
+				{{ range $staff }}
+				<option value="{{.Name}}">{{.Name}}</option>
+				{{ end }}
+			</select>
+		</td>
+		<td></td>
+		<td></td>
+		<td>
+			<select name="early">
+				<option value=""></option>
+				{{ range $staff }}
+				<option value="{{.Name}}">{{.Name}}</option>
+				{{ end }}
+			</select>
+		</td>
+		<td></td>
+	</tr>
+	{{end}}
+</tbody>
+{{end}}
