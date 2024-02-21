@@ -1,0 +1,19 @@
+{{ define "rosterDay" }}
+<div id='d-{{.DayName}}'>
+	<button hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"day":"{{.DayName}}", "action":"-"}' hx-target='#d-{{.DayName}}'>-</button>
+	<button hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"day":"{{.DayName}}", "action":"+"}' hx-target='#d-{{.DayName}}'>+</button>
+	<table>
+		<thead>
+		</thead>
+		<tbody>
+			{{range .Rows}}
+			<tr>
+				<td>
+					{{.Early.Name}}
+				</td>
+			</tr>
+			{{end}}
+		</tbody>
+	</table>
+</div>
+{{ end }}
