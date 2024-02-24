@@ -22,12 +22,42 @@ type Server struct {
 }
 
 type ServerDisc struct {
-	Days  []RosterDay   `json:"days"`
-	Staff []StaffMember `json:"staff"`
+	Days  []*RosterDay   `json:"days"`
+	Staff []*StaffMember `json:"staff"`
 }
 
 type StaffMember struct {
+	ID   uuid.UUID
 	Name string
+}
+
+type RosterDayTmp struct {
+	RosterDay
+	Colour         string
+	AvailableStaff []StaffMember
+}
+
+type RosterDay struct {
+	ID             uuid.UUID
+	DayName        string
+	Rows           []*Row
+	Date           time.Time
+	Staff          []*StaffMember
+	Colour         string
+	AvailableStaff []*StaffMember
+}
+
+type Row struct {
+	ID     uuid.UUID
+	Early  *Slot
+	Middle *Slot
+	Late   *Slot
+}
+
+type Slot struct {
+	ID            uuid.UUID
+	StartTime     string
+	AssignedStaff *uuid.UUID
 }
 
 func SaveState(s *Server) error {
@@ -67,6 +97,23 @@ func LoadState(filename string) (*Server, error) {
 	return &state, nil
 }
 
+func newRow() *Row {
+	return &Row{
+		ID:     uuid.New(),
+		Early:  newSlot(),
+		Middle: newSlot(),
+		Late:   newSlot(),
+	}
+}
+
+func newSlot() *Slot {
+	return &Slot{
+		ID:            uuid.New(),
+		StartTime:     "12PM",
+		AssignedStaff: nil,
+	}
+}
+
 func newState() *Server {
 	dayNames := []string{"Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Monday"}
 	today := time.Now()
@@ -76,20 +123,24 @@ func newState() *Server {
 	}
 	nextTuesday := today.AddDate(0, 0, daysUntilTuesday)
 
-	var Days []RosterDay
+	var Days []*RosterDay
 
-	staff := []StaffMember{
+	staff := []*StaffMember{
 		{
 			Name: "Beaudan",
+			ID:   uuid.New(),
 		},
 		{
 			Name: "Jamie",
+			ID:   uuid.New(),
 		},
 		{
 			Name: "Kerryn",
+			ID:   uuid.New(),
 		},
 		{
 			Name: "James",
+			ID:   uuid.New(),
 		},
 	}
 
@@ -102,12 +153,12 @@ func newState() *Server {
 		} else {
 			colour = "#ffffff"
 		}
-		Days = append(Days, RosterDay{
+		Days = append(Days, &RosterDay{
 			ID:      uuid.New(), // Generates a new UUID
 			DayName: dayName,
-			Rows: []Row{
-				{},
-				{},
+			Rows: []*Row{
+				newRow(),
+				newRow(),
 			},
 			Date:           date,
 			Colour:         colour,
@@ -136,31 +187,11 @@ func main() {
 	log.Println(http.ListenAndServe(":6969", nil))
 }
 
-type RosterDayTmp struct {
-	RosterDay
-	Colour         string
-	AvailableStaff []StaffMember
-}
-
-type RosterDay struct {
-	ID             uuid.UUID
-	DayName        string
-	Rows           []Row
-	Date           time.Time
-	Staff          []StaffMember
-	Colour         string
-	AvailableStaff []StaffMember
-}
-
-type Row struct {
-	Early  Slot
-	Middle Slot
-	Late   Slot
-}
-
-type Slot struct {
-	StartTime time.Time
-	Name      string
+func (s *Slot) HasThisStaff(staffId uuid.UUID) bool {
+	if s.AssignedStaff != nil && *s.AssignedStaff == staffId {
+		return true
+	}
+	return false
 }
 
 func (s *Server) Handle(w http.ResponseWriter, r *http.Request) {
@@ -202,14 +233,93 @@ func (s *Server) HandlePostRequest(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/modifyRows":
 		s.HandleModifyRows(w, r)
+	case "/modifySlot":
+		s.HandleModifySlot(w, r)
 	default:
 		http.NotFound(w, r)
 	}
 }
 
+func (s *Server) GetStaffByID(staffID uuid.UUID) *StaffMember {
+	for i := range s.Staff {
+		if s.Staff[i].ID == staffID {
+			return s.Staff[i]
+		}
+	}
+	return nil
+}
+
+func (s *Server) GetSlotByID(slotID uuid.UUID) *Slot {
+	for i := range s.Days {
+		day := s.Days[i]
+		for j := range day.Rows {
+			row := day.Rows[j]
+			if row.Early.ID == slotID {
+				return row.Early
+			}
+			if row.Middle.ID == slotID {
+				return row.Middle
+			}
+			if row.Late.ID == slotID {
+				return row.Late
+			}
+		}
+	}
+	return nil
+}
+
+func (s *Server) GetDayByID(dayID uuid.UUID) *RosterDay {
+	for i := range s.Days {
+		if s.Days[i].ID == dayID {
+			return s.Days[i]
+		}
+	}
+	return nil
+}
+
+func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		log.Printf("Error parsing form: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	slotIDStr := r.FormValue("slotID")
+	staffIDStr := r.FormValue("staffID")
+	slotID, err := uuid.Parse(slotIDStr)
+	if err != nil {
+		log.Printf("Invalid SlotID: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	staffID, err := uuid.Parse(staffIDStr)
+	if err != nil {
+		log.Printf("Invalid StaffID: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Modify %v slot id: %v, staffid: %v", slotID, slotID, staffID)
+	slot := s.GetSlotByID(slotID)
+	if slot == nil {
+		log.Printf("Invalid slotID: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	member := s.GetStaffByID(staffID)
+	if slot == nil {
+		log.Printf("Invalid staffID: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	slot.AssignedStaff = &member.ID
+	SaveState(s)
+}
+
 type ModifyRows struct {
 	Action string `json:"action"`
-	Day    string `json:"day"`
+	DayID  string `json:"dayID"`
 }
 
 func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
@@ -228,12 +338,18 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	dayID, err := uuid.Parse(reqBody.DayID)
+	if err != nil {
+		log.Printf("Invalid dayID: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	for i := range s.Days {
-		if s.Days[i].DayName == reqBody.Day {
+		if s.Days[i].ID == dayID {
 			// Found the day, modifying its value
-			log.Printf("Found: %v", s.Days[i].DayName)
 			if reqBody.Action == "+" {
-				s.Days[i].Rows = append(s.Days[i].Rows, Row{})
+				s.Days[i].Rows = append(s.Days[i].Rows, newRow())
 			} else {
 				if len(s.Days[i].Rows) > 2 {
 					s.Days[i].Rows = s.Days[i].Rows[:len(s.Days[i].Rows)-1]
