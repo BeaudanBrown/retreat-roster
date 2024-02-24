@@ -7,24 +7,67 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
 )
 
+const STATE_FILE = "./state.json"
+
 type Server struct {
 	CacheBust string
 	Templates *template.Template
-	Days      []RosterDay
-	Staff     []StaffMember
+	ServerDisc
+}
+
+type ServerDisc struct {
+	Days  []RosterDay   `json:"days"`
+	Staff []StaffMember `json:"staff"`
 }
 
 type StaffMember struct {
 	Name string
 }
 
-func main() {
-	templates := template.Must(template.ParseGlob("./www/*.html"))
+func SaveState(s *Server) error {
+	data, err := json.Marshal(s.ServerDisc)
+	if err != nil {
+		return err
+	}
+	log.Println("Saving state")
+	if err := os.WriteFile(STATE_FILE, data, 0666); err != nil {
+		return err
+	}
+	return nil
+}
+
+func LoadState(filename string) (*Server, error) {
+	if _, err := os.Stat(filename); err != nil {
+		if os.IsNotExist(err) {
+			// The file does not exist, return a new state
+			newState := newState()
+			SaveState(newState)
+			return newState, nil
+		}
+		return nil, err
+	}
+
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	var state Server
+	if err := json.Unmarshal(data, &state); err != nil {
+		return nil, err
+	}
+	log.Println("Loaded state")
+	state.CacheBust = fmt.Sprintf("%v", time.Now().UnixNano())
+	state.Templates = template.Must(template.ParseGlob("./www/*.html"))
+	return &state, nil
+}
+
+func newState() *Server {
 	dayNames := []string{"Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Monday"}
 	today := time.Now()
 	daysUntilTuesday := int(time.Tuesday - today.Weekday())
@@ -72,11 +115,22 @@ func main() {
 		})
 	}
 
+	templates := template.Must(template.ParseGlob("./www/*.html"))
 	s := &Server{
 		CacheBust: fmt.Sprintf("%v", time.Now().UnixNano()),
 		Templates: templates,
-		Days:      Days,
-		Staff:     staff,
+		ServerDisc: ServerDisc{
+			Days:  Days,
+			Staff: staff,
+		},
+	}
+	return s
+}
+
+func main() {
+	s, err := LoadState(STATE_FILE)
+	if err != nil {
+		log.Fatalf("Error loading state: %v", err)
 	}
 	http.HandleFunc("/", s.Handle)
 	log.Println(http.ListenAndServe(":6969", nil))
@@ -194,4 +248,5 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+	SaveState(s)
 }
