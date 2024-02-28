@@ -1,122 +1,72 @@
 {{ define "rosterDay" }}
-<tbody id='d-{{.ID}}' style='background-color: {{.Colour}}'>
+<div id='d-{{.ID}}' class="day" style='background-color: {{.Colour}};'>
 	{{ $dayName := .DayName }}
 	{{ $dayID := .ID }}
 	{{ $date := .Date }}
 	{{ $staff := .AvailableStaff }}
 	{{range $index, $row := .Rows}}
-	<tr>
-		<td>
-    {{if eq $index 0}}
-			{{$dayName}}
-			<button hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"dayID":"{{$dayID}}", "action":"-"}' hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>-</button>
-			<button hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"dayID":"{{$dayID}}", "action":"+"}' hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>+</button>
-    {{else if eq $index 1}}
-			{{$date.Format "02/01"}}
-		{{end}}
-		</td>
-		<td></td>
-		<td>
-			<form hx-post="/modifySlot" hx-trigger="change from:#r-{{ $row.Early.ID }}" hx-swap="none">
-			<input type="hidden" name="dayID" value="{{ $dayID }}" />
-			<input type="hidden" name="slotID" value="{{ $row.Early.ID }}" />
-				<select id="r-{{ $row.Early.ID }}" name="staffID">
-					<option value=""></option>
-					{{ range $staff }}
-					<option value="{{.ID}}" {{if $row.Early.HasThisStaff .ID}}selected{{end}}>{{.Name}}</option>
-					{{ end }}
-				</select>
-			</form>
-		</td>
-		<td></td>
-		<td></td>
-		<td>
-			<form hx-post="/modifySlot" hx-trigger="change from:#r-{{ $row.Middle.ID }}" hx-swap="none">
-			<input type="hidden" name="dayID" value="{{ $dayID }}" />
-			<input type="hidden" name="slotID" value="{{ $row.Middle.ID }}" />
-				<select id="r-{{ $row.Middle.ID }}" name="staffID">
-					<option value=""></option>
-					{{ range $staff }}
-					<option value="{{.ID}}" {{if $row.Middle.HasThisStaff .ID}}selected{{end}}>{{.Name}}</option>
-					{{ end }}
-				</select>
-			</form>
-		</td>
-		<td></td>
-		<td></td>
-		<td>
-			<form hx-post="/modifySlot" hx-trigger="change from:#r-{{ $row.Late.ID }}" hx-swap="none">
-			<input type="hidden" name="dayID" value="{{ $dayID }}" />
-			<input type="hidden" name="slotID" value="{{ $row.Late.ID }}" />
-				<select id="r-{{ $row.Late.ID }}" name="staffID">
-					<option value=""></option>
-					{{ range $staff }}
-					<option value="{{.ID}}" {{if $row.Late.HasThisStaff .ID}}selected{{end}}>{{.Name}}</option>
-					{{ end }}
-				</select>
-			</form>
-		</td>
-		<td></td>
-	</tr>
+	<div class="row">
+		<div class="col dayCol">
+			{{if eq $index 0}}
+				{{$dayName}}
+				<button hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"dayID":"{{$dayID}}", "action":"-"}' hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>-</button>
+				<button hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"dayID":"{{$dayID}}", "action":"+"}' hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>+</button>
+			{{else if eq $index 1}}
+				{{$date.Format "02/01"}}
+			{{end}}
+		</div>
+		<div class="col timeCol">
+				<input type="text" placeholder="Start time" id="t-{{$row.Early.ID}}" />
+		</div>
+		<div class="col staffCol">
+				<form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Early.ID }}" hx-swap="none">
+				<input type="hidden" name="dayID" value="{{ $dayID }}" />
+				<input type="hidden" name="slotID" value="{{ $row.Early.ID }}" />
+					<select id="s-{{ $row.Early.ID }}" name="staffID">
+						<option value=""></option>
+						{{ range $staff }}
+						<option value="{{.ID}}" {{if $row.Early.HasThisStaff .ID}}selected{{end}}>{{.Name}}</option>
+						{{ end }}
+					</select>
+				</form>
+		</div>
+		<div class="col flagCol">
+		</div>
+		<div class="col timeCol">
+				<input type="text" placeholder="Start time" id="t-{{$row.Middle.ID}}" />
+		</div>
+		<div class="col staffCol">
+				<form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Middle.ID }}" hx-swap="none">
+				<input type="hidden" name="dayID" value="{{ $dayID }}" />
+				<input type="hidden" name="slotID" value="{{ $row.Middle.ID }}" />
+					<select id="s-{{ $row.Middle.ID }}" name="staffID">
+						<option value=""></option>
+						{{ range $staff }}
+						<option value="{{.ID}}" {{if $row.Middle.HasThisStaff .ID}}selected{{end}}>{{.Name}}</option>
+						{{ end }}
+					</select>
+				</form>
+		</div>
+		<div class="col flagCol">
+		</div>
+		<div class="col timeCol">
+				<input type="text" placeholder="Start time" id="t-{{$row.Late.ID}}" />
+		</div>
+		<div class="col staffCol">
+				<form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Late.ID }}" hx-swap="none">
+				<input type="hidden" name="dayID" value="{{ $dayID }}" />
+				<input type="hidden" name="slotID" value="{{ $row.Late.ID }}" />
+					<select id="s-{{ $row.Late.ID }}" name="staffID">
+						<option value=""></option>
+						{{ range $staff }}
+						<option value="{{.ID}}" {{if $row.Late.HasThisStaff .ID}}selected{{end}}>{{.Name}}</option>
+						{{ end }}
+					</select>
+				</form>
+		</div>
+		<div class="col flagCol">
+		</div>
+	</div>
 	{{end}}
-</tbody>
+</div>
 {{end}}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
