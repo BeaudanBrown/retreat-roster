@@ -4,9 +4,33 @@ select {
 	box-sizing: border-box; /* Ensures padding and border are included in the width and height */
 }
 
+form {
+	width: 100%;
+	height: 100%;
+	border: none; /* Removes the border */
+	padding: 0; /* Optional: Adjusts padding */
+	margin: 0; /* Removes default margin */
+	box-sizing: border-box; /* Include padding and border in the element's width and height */
+}
+
+select {
+	text-align: right;
+	width: 100%;
+	height: 100%;
+	border: none; /* Removes the border */
+	padding: 0; /* Optional: Adjusts padding */
+	margin: 0; /* Removes default margin */
+	box-sizing: border-box; /* Include padding and border in the element's width and height */
+}
+
 div input[type="text"] {
-	width: 80%;
-	box-sizing: border-box; /* Ensures padding and border are included in the width */
+	text-align: right;
+	width: 100%;
+	height: 100%;
+	border: none; /* Removes the border */
+	padding: 0; /* Optional: Adjusts padding */
+	margin: 0; /* Removes default margin */
+	box-sizing: border-box; /* Include padding and border in the element's width and height */
 }
 
 .roster-container {
@@ -15,13 +39,13 @@ div input[type="text"] {
 	align-items: center;
 }
 
-.dayCol, .timeCol, .staffCol, .flagCol {
+.dayCell, .timeCell, .staffCell, .flagCell {
 	min-width: 0; /* This helps in preventing overflow and ensuring flex-shrink works */
 	max-width: 100%; /* Ensures columns don't grow beyond their parent's size */
 }
 
 .day {
-	width: 50%;
+	width: 30%;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -34,20 +58,25 @@ div input[type="text"] {
 	border-right: 1px solid black;
 }
 
-.dayCol {
-	flex: 4;
-}
-
-.timeCol {
-	flex: 2;
-}
-
-.staffCol {
+.dayCell {
 	flex: 3;
 }
 
-.flagCol {
+.timeCell {
 	flex: 1;
+}
+
+.staffCell {
+	flex: 2;
+}
+
+.flagCell {
+	flex: 0.5;
+}
+
+.rosterCell {
+	display: flex;
+	justify-content: center;
 }
 
 .row > div {

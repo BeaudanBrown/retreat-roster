@@ -235,6 +235,8 @@ func (s *Server) HandlePostRequest(w http.ResponseWriter, r *http.Request) {
 		s.HandleModifyRows(w, r)
 	case "/modifySlot":
 		s.HandleModifySlot(w, r)
+	case "/modifyTimeSlot":
+		s.HandleModifyTimeSlot(w, r)
 	default:
 		http.NotFound(w, r)
 	}
@@ -275,6 +277,32 @@ func (s *Server) GetDayByID(dayID uuid.UUID) *RosterDay {
 		}
 	}
 	return nil
+}
+
+func (s *Server) HandleModifyTimeSlot(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		log.Printf("Error parsing form: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	slotIDStr := r.FormValue("slotID")
+	timeVal := r.FormValue("timeVal")
+	slotID, err := uuid.Parse(slotIDStr)
+	if err != nil {
+		log.Printf("Invalid SlotID: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	log.Printf("Modify %v timeslot id: %v", slotID, timeVal)
+	slot := s.GetSlotByID(slotID)
+	if slot == nil {
+		log.Printf("Invalid slotID: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	slot.StartTime = timeVal
+	SaveState(s)
 }
 
 func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
