@@ -9,11 +9,26 @@ import (
 	"net/http"
 	"os"
 	"time"
+	"context"
 
+	"github.com/joho/godotenv"
 	"github.com/google/uuid"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 const STATE_FILE = "./state.json"
+const SESSION_KEY = "sessionToken"
+
+func googleOauthConfig() *oauth2.Config {
+    return &oauth2.Config{
+        ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+        ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+        RedirectURL:  "http://localhost:6969/auth/callback",
+        Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email"},
+        Endpoint:     google.Endpoint,
+    }
+}
 
 type Server struct {
 	CacheBust string
@@ -28,7 +43,9 @@ type ServerDisc struct {
 
 type StaffMember struct {
 	ID   uuid.UUID
+	GoogleID   string
 	Name string
+	Token *uuid.UUID
 }
 
 type RosterDayTmp struct {
@@ -58,6 +75,10 @@ type Slot struct {
 	ID            uuid.UUID
 	StartTime     string
 	AssignedStaff *uuid.UUID
+}
+
+type GoogleUserInfo struct {
+	ID            string `json:"id"`
 }
 
 func SaveState(s *Server) error {
@@ -109,7 +130,7 @@ func newRow() *Row {
 func newSlot() *Slot {
 	return &Slot{
 		ID:            uuid.New(),
-		StartTime:     "12PM",
+		StartTime:     "",
 		AssignedStaff: nil,
 	}
 }
@@ -179,11 +200,27 @@ func newState() *Server {
 }
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Printf("No .env file found")
+	}
 	s, err := LoadState(STATE_FILE)
 	if err != nil {
 		log.Fatalf("Error loading state: %v", err)
 	}
-	http.HandleFunc("/", s.Handle)
+	http.HandleFunc("/", s.VerifySession(s.HandleIndex))
+
+	http.HandleFunc("/app.css", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./www/app.css")
+	})
+	http.HandleFunc("/root", s.VerifySession(s.HandleRoot))
+	http.HandleFunc("/auth/login", s.handleGoogleLogin)
+	http.HandleFunc("/auth/logout", s.handleGoogleLogout)
+	http.HandleFunc("/auth/callback", s.handleGoogleCallback)
+
+	http.HandleFunc("/modifyRows", s.VerifySession(s.HandleModifyRows))
+	http.HandleFunc("/modifySlot", s.VerifySession(s.HandleModifySlot))
+	http.HandleFunc("/modifyTimeSlot", s.VerifySession(s.HandleModifyTimeSlot))
+
 	log.Println(http.ListenAndServe(":6969", nil))
 }
 
@@ -217,10 +254,22 @@ func (s *Server) HandleGetRequest(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./www/app.css")
 	case "/root":
 		s.HandleRoot(w, r)
+	case "/auth/login":
+		s.handleGoogleLogin(w, r)
+	case "/auth/callback":
+		s.handleGoogleCallback(w, r)
 	default:
 		http.NotFound(w, r)
 	}
 }
+
+func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
+	err := s.Templates.ExecuteTemplate(w, "index", s.CacheBust)
+	if err != nil {
+		log.Fatalf("Error executing template: %v", err)
+	}
+}
+
 
 func (s *Server) HandleRoot(w http.ResponseWriter, r *http.Request) {
 	err := s.Templates.ExecuteTemplate(w, "root", s.Days)
@@ -240,6 +289,15 @@ func (s *Server) HandlePostRequest(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func (s *Server) GetStaffByToken(token uuid.UUID) *StaffMember {
+	for i := range s.Staff {
+		if s.Staff[i].Token == &token {
+			return s.Staff[i]
+		}
+	}
+	return nil
 }
 
 func (s *Server) GetStaffByID(staffID uuid.UUID) *StaffMember {
@@ -335,7 +393,7 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	member := s.GetStaffByID(staffID)
-	if slot == nil {
+	if member == nil {
 		log.Printf("Invalid staffID: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -393,4 +451,127 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	SaveState(s)
+}
+
+func (s *Server) handleGoogleLogout(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_token",
+		Value:    "",
+		Path:     "/",
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite:  http.SameSiteLaxMode,
+	})
+
+	sessionToken, ok := r.Context().Value(SESSION_KEY).(uuid.UUID)
+	if ok {
+		staff := s.GetStaffByToken(sessionToken)
+		if staff != nil {
+			staff.Token = nil
+		}
+		return
+	}
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+func (s *Server) handleGoogleLogin(w http.ResponseWriter, r *http.Request) {
+	url := googleOauthConfig().AuthCodeURL("state", oauth2.AccessTypeOffline, oauth2.ApprovalForce, oauth2.SetAuthURLParam("prompt", "select_account"))
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+}
+
+func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	code := r.URL.Query().Get("code")
+	token, err := googleOauthConfig().Exchange(ctx, code)
+	if err != nil {
+		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token="+token.AccessToken)
+	if err != nil {
+		http.Error(w, "Failed to login: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var userInfo GoogleUserInfo
+	if err = json.NewDecoder(response.Body).Decode(&userInfo); err != nil {
+		http.Error(w, "Error decoding user information: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	sessionIdentifier := uuid.New()
+	expirationTime := token.Expiry // The token's expiration time can be used, or set your own
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_token",
+		Value:    sessionIdentifier.String(),
+		Expires:  expirationTime,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite:  http.SameSiteLaxMode,
+		Path:     "/",
+	})
+
+	found := false
+	for i := range s.Staff {
+		if s.Staff[i].GoogleID == userInfo.ID {
+			found = true
+			s.Staff[i].Token = &sessionIdentifier
+		}
+	}
+
+	if !found {
+		s.Staff = append(s.Staff, &StaffMember{
+			ID:    uuid.New(),
+			GoogleID:    userInfo.ID,
+			Name:  "",
+			Token: &sessionIdentifier,
+		})
+	}
+
+	SaveState(s)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (s *Server) VerifySession(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("session_token")
+		if err != nil {
+			if err == http.ErrNoCookie {
+				http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+			} else {
+				http.Error(w, "Bad Request", http.StatusBadRequest)
+			}
+			return
+		}
+
+		sessionTokenStr := cookie.Value
+
+		// Convert sessionTokenStr (type string) to type uuid.UUID
+		sessionToken, err := uuid.Parse(sessionTokenStr)
+		if err != nil {
+				http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+				return
+		}
+
+		if !s.isValidSession(sessionToken) {
+			http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), SESSION_KEY, sessionToken)
+		reqWithToken := r.WithContext(ctx)
+		handler(w, reqWithToken)
+	}
+}
+
+func (s *Server) isValidSession(token uuid.UUID) bool {
+	for i := range s.Staff {
+		if *s.Staff[i].Token == token {
+			return true
+		}
+	}
+	return false
 }
