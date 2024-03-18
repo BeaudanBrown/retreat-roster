@@ -1,7 +1,9 @@
 {{ define "root" }}
 <div class="roster-container">
-	{{ range . }}
-	{{ template "rosterDay" . }}
+	{{ $staff := .Staff }}
+	{{ range .Days }}
+		{{ $dayStruct := MakeDayStruct . $staff }}
+		{{ template "rosterDay" $dayStruct }}
 	{{ end }}
 	<a href="/auth/logout">Logout</a>
 </div>

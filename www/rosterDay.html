@@ -3,7 +3,7 @@
 	{{ $dayName := .DayName }}
 	{{ $dayID := .ID }}
 	{{ $date := .Date }}
-	{{ $staff := .AvailableStaff }}
+	{{ $staff := .Staff }}
 	{{ $colour := .Colour }}
 	{{range $index, $row := .Rows}}
 	<div class="row">
@@ -31,7 +31,7 @@
 				<select style='background-color: {{$colour}};' id="s-{{ $row.Early.ID }}" name="staffID">
 					<option value=""></option>
 					{{ range $staff }}
-					<option value="{{.ID}}" {{if $row.Early.HasThisStaff .ID}}selected{{end}}>{{.Name}}</option>
+					<option value="{{.ID}}" {{if $row.Early.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
 					{{ end }}
 				</select>
 			</form>
@@ -54,7 +54,7 @@
 				<select style='background-color: {{$colour}};' id="s-{{ $row.Middle.ID }}" name="staffID">
 					<option value=""></option>
 					{{ range $staff }}
-					<option value="{{.ID}}" {{if $row.Middle.HasThisStaff .ID}}selected{{end}}>{{.Name}}</option>
+					<option value="{{.ID}}" {{if $row.Middle.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
 					{{ end }}
 				</select>
 			</form>
@@ -77,7 +77,7 @@
 				<select style='background-color: {{$colour}};' id="s-{{ $row.Late.ID }}" name="staffID">
 					<option value=""></option>
 					{{ range $staff }}
-					<option value="{{.ID}}" {{if $row.Late.HasThisStaff .ID}}selected{{end}}>{{.Name}}</option>
+					<option value="{{.ID}}" {{if $row.Late.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
 					{{ end }}
 				</select>
 			</form>
