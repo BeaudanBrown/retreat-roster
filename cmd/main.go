@@ -21,14 +21,22 @@ const STATE_FILE = "./state.json"
 const SESSION_KEY = "sessionToken"
 
 func googleOauthConfig() *oauth2.Config {
-    return &oauth2.Config{
-        ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
-        ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
-        RedirectURL:  "http://localhost:6969/auth/callback",
-        Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email"},
-        Endpoint:     google.Endpoint,
-    }
+	return &oauth2.Config{
+		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+		ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		RedirectURL:  "http://localhost:6969/auth/callback",
+		Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email"},
+		Endpoint:     google.Endpoint,
+	}
 }
+
+type Highlight int
+
+const (
+	None Highlight = iota
+	Duplicate
+	PrefConflict
+)
 
 type Server struct {
 	CacheBust string
@@ -42,19 +50,40 @@ type ServerDisc struct {
 }
 
 type DayAvailability struct {
+	Name   string
 	Early   bool
 	Mid   bool
 	Late   bool
 }
 
-type WeekAvailability struct {
-	Tuesday	DayAvailability
-	Wednesday	DayAvailability
-	Thursday	DayAvailability
-	Friday	DayAvailability
-	Saturday	DayAvailability
-	Sunday	DayAvailability
-	Monday	DayAvailability
+type ProfileData struct {
+	StaffMember
+	ShowSuccess bool
+	ShowError bool
+}
+
+var emptyAvailability = []DayAvailability{
+	{
+		Name: "Tuesday",
+	},
+	{
+		Name: "Wednesday",
+	},
+	{
+		Name: "Thursday",
+	},
+	{
+		Name: "Friday",
+	},
+	{
+		Name: "Saturday",
+	},
+	{
+		Name: "Sunday",
+	},
+	{
+		Name: "Monday",
+	},
 }
 
 type StaffMember struct {
@@ -63,7 +92,8 @@ type StaffMember struct {
 	FirstName string
 	LastName string
 	Email string
-	Availability WeekAvailability
+	Phone string
+	Availability []DayAvailability
 	Token *uuid.UUID
 }
 
@@ -77,15 +107,16 @@ type RosterDay struct {
 
 type Row struct {
 	ID     uuid.UUID
-	Early  *Slot
-	Middle *Slot
-	Late   *Slot
+	Early  Slot
+	Mid Slot
+	Late   Slot
 }
 
 type Slot struct {
 	ID            uuid.UUID
 	StartTime     string
 	AssignedStaff *uuid.UUID
+	Flag	Highlight
 }
 
 type GoogleUserInfo struct {
@@ -93,6 +124,7 @@ type GoogleUserInfo struct {
 }
 
 func SaveState(s *Server) error {
+	s.CheckFlags()
 	data, err := json.Marshal(s.ServerDisc)
 	if err != nil {
 		return err
@@ -123,11 +155,12 @@ func LoadState(filename string) (*Server, error) {
 	log.Println("Loaded state")
 	state.CacheBust = fmt.Sprintf("%v", time.Now().UnixNano())
 	state.Templates = template.New("").Funcs(template.FuncMap{
-			"MakeDayStruct": MakeDayStruct,
+		"MakeDayStruct": MakeDayStruct,
+		"GetHighlightCol": GetHighlightCol,
 	})
 	state.Templates, err = state.Templates.ParseGlob("./www/*.html")
 	if err != nil {
-			return nil, err
+		return nil, err
 	}
 	return state, nil
 }
@@ -136,13 +169,13 @@ func newRow() *Row {
 	return &Row{
 		ID:     uuid.New(),
 		Early:  newSlot(),
-		Middle: newSlot(),
+		Mid: newSlot(),
 		Late:   newSlot(),
 	}
 }
 
-func newSlot() *Slot {
-	return &Slot{
+func newSlot() Slot {
+	return Slot{
 		ID:            uuid.New(),
 		StartTime:     "",
 		AssignedStaff: nil,
@@ -164,18 +197,22 @@ func newState() *Server {
 		{
 			FirstName: "Beaudan",
 			ID:   uuid.New(),
+			Availability: emptyAvailability,
 		},
 		{
 			FirstName: "Jamie",
 			ID:   uuid.New(),
+			Availability: emptyAvailability,
 		},
 		{
 			FirstName: "Kerryn",
 			ID:   uuid.New(),
+			Availability: emptyAvailability,
 		},
 		{
 			FirstName: "James",
 			ID:   uuid.New(),
+			Availability: emptyAvailability,
 		},
 	}
 
@@ -224,7 +261,8 @@ func main() {
 		http.ServeFile(w, r, "./www/app.css")
 	})
 	http.HandleFunc("/root", s.VerifySession(s.HandleRoot))
-	http.HandleFunc("/profile", s.VerifySession(s.HandleProfile))
+	http.HandleFunc("/profile", s.VerifySession(s.HandleProfileIndex))
+	http.HandleFunc("/profileBody", s.VerifySession(s.HandleProfile))
 	http.HandleFunc("/auth/login", s.handleGoogleLogin)
 	http.HandleFunc("/auth/logout", s.handleGoogleLogout)
 	http.HandleFunc("/auth/callback", s.handleGoogleCallback)
@@ -269,10 +307,27 @@ type DayStruct struct {
 	Staff *[]*StaffMember
 }
 
+func GetHighlightCol(defaultCol string, flag Highlight) string {
+	if flag == Duplicate {
+		return "#FFA07A"
+	}
+	if flag == PrefConflict {
+		return "#FF6666"
+	}
+	return defaultCol
+}
+
 func MakeDayStruct(day RosterDay, staff *[]*StaffMember) DayStruct {
 	return DayStruct{
 		day,
 		staff,
+	}
+}
+
+func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
+	err := s.Templates.ExecuteTemplate(w, "profileIndex", s.CacheBust)
+	if err != nil {
+		log.Fatalf("Error executing template: %v", err)
 	}
 }
 
@@ -284,25 +339,30 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
-    sessionToken, ok := r.Context().Value(SESSION_KEY).(uuid.UUID)
-    if !ok {
-        log.Println("Invalid or missing session token")
-        http.Redirect(w, r, "/login", http.StatusSeeOther)
-        return
-    }
+	sessionToken, ok := r.Context().Value(SESSION_KEY).(uuid.UUID)
+	if !ok {
+		log.Println("Invalid or missing session token")
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
 
-    staff := s.GetStaffByToken(sessionToken)
-    if staff == nil {
-        log.Println("Couldn't find staff with given token")
-        http.Redirect(w, r, "/login", http.StatusSeeOther)
-        return
-    }
+	staff := s.GetStaffByToken(sessionToken)
+	if staff == nil {
+		log.Println("Couldn't find staff with given token")
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
 
-    err := s.Templates.ExecuteTemplate(w, "profile", staff)
-    if err != nil {
-        log.Printf("Error executing template: %v\n", err)
-        http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-    }
+	data := ProfileData{
+		StaffMember: *staff,
+		ShowSuccess: false,
+		ShowError: false,
+	}
+	err := s.Templates.ExecuteTemplate(w, "profile", data)
+	if err != nil {
+		log.Printf("Error executing template: %v\n", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) HandleRoot(w http.ResponseWriter, r *http.Request) {
@@ -349,13 +409,13 @@ func (s *Server) GetSlotByID(slotID uuid.UUID) *Slot {
 		for j := range day.Rows {
 			row := day.Rows[j]
 			if row.Early.ID == slotID {
-				return row.Early
+				return &row.Early
 			}
-			if row.Middle.ID == slotID {
-				return row.Middle
+			if row.Mid.ID == slotID {
+				return &row.Mid
 			}
 			if row.Late.ID == slotID {
-				return row.Late
+				return &row.Late
 			}
 		}
 	}
@@ -403,6 +463,13 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	dayID, err := uuid.Parse(r.FormValue("dayID"))
+	if err != nil {
+		log.Printf("Invalid dayID: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	slotIDStr := r.FormValue("slotID")
 	staffIDStr := r.FormValue("staffID")
 	slotID, err := uuid.Parse(slotIDStr)
@@ -411,30 +478,38 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-
-	staffID, err := uuid.Parse(staffIDStr)
-	if err != nil {
-		log.Printf("Invalid StaffID: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	log.Printf("Modify %v slot id: %v, staffid: %v", slotID, slotID, staffID)
 	slot := s.GetSlotByID(slotID)
 	if slot == nil {
 		log.Printf("Invalid slotID: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	member := s.GetStaffByID(staffID)
-	if member == nil {
-		log.Printf("Invalid staffID: %v", err)
+
+	staffID, err := uuid.Parse(staffIDStr)
+	if err != nil {
+		slot.AssignedStaff = nil
+	} else {
+		log.Printf("Modify %v slot id: %v, staffid: %v", slotID, slotID, staffID)
+		member := s.GetStaffByID(staffID)
+		if member != nil {
+			slot.AssignedStaff = &member.ID
+		}
+	}
+
+	SaveState(s)
+
+	day := s.GetDayByID(dayID)
+	if day == nil {
+		log.Printf("Error executing template: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-
-	slot.AssignedStaff = &member.ID
-	SaveState(s)
+	err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff))
+	if err != nil {
+		log.Printf("Error executing template: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 }
 
 type ModifyRows struct {
@@ -446,27 +521,28 @@ type ModifyProfile struct {
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
 	Email  string `json:"email"`
-	TuesEarly  string `json:"tuesday-early-avail"`
-	TuesMid  string `json:"tuesday-mid-avail"`
-	TuesLate  string `json:"tuesday-late-avail"`
-	WedEarly  string `json:"wednesday-early-avail"`
-	WedMid  string `json:"wednesday-mid-avail"`
-	WedLate  string `json:"wednesday-late-avail"`
-	ThursEarly  string `json:"thursday-early-avail"`
-	ThursMid  string `json:"thursday-mid-avail"`
-	ThursLate  string `json:"thursday-late-avail"`
-	FriEarly  string `json:"friday-early-avail"`
-	FriMid  string `json:"friday-mid-avail"`
-	FriLate  string `json:"friday-late-avail"`
-	SatEarly  string `json:"saturday-early-avail"`
-	SatMid  string `json:"saturday-mid-avail"`
-	SatLate  string `json:"saturday-late-avail"`
-	SunEarly  string `json:"sunday-early-avail"`
-	SunMid  string `json:"sunday-mid-avail"`
-	SunLate  string `json:"sunday-late-avail"`
-	MonEarly  string `json:"monday-early-avail"`
-	MonMid  string `json:"monday-mid-avail"`
-	MonLate  string `json:"monday-late-avail"`
+	Phone  string `json:"phone"`
+	TuesEarly  string `json:"Tuesday-early-avail"`
+	TuesMid  string `json:"Tuesday-mid-avail"`
+	TuesLate  string `json:"Tuesday-late-avail"`
+	WedEarly  string `json:"Wednesday-early-avail"`
+	WedMid  string `json:"Wednesday-mid-avail"`
+	WedLate  string `json:"Wednesday-late-avail"`
+	ThursEarly  string `json:"Thursday-early-avail"`
+	ThursMid  string `json:"Thursday-mid-avail"`
+	ThursLate  string `json:"Thursday-late-avail"`
+	FriEarly  string `json:"Friday-early-avail"`
+	FriMid  string `json:"Friday-mid-avail"`
+	FriLate  string `json:"Friday-late-avail"`
+	SatEarly  string `json:"Saturday-early-avail"`
+	SatMid  string `json:"Saturday-mid-avail"`
+	SatLate  string `json:"Saturday-late-avail"`
+	SunEarly  string `json:"Sunday-early-avail"`
+	SunMid  string `json:"Sunday-mid-avail"`
+	SunLate  string `json:"Sunday-late-avail"`
+	MonEarly  string `json:"Monday-early-avail"`
+	MonMid  string `json:"Monday-mid-avail"`
+	MonLate  string `json:"Monday-late-avail"`
 }
 
 func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
@@ -481,6 +557,7 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 	var reqBody ModifyProfile
 	err = json.Unmarshal(bytes, &reqBody)
 	if err != nil {
+		log.Printf("json: %v", bytes)
 		log.Printf("Error parsing json: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -492,36 +569,132 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 			staff.FirstName = reqBody.FirstName
 			staff.LastName = reqBody.LastName
 			staff.Email = reqBody.Email
+			staff.Phone = reqBody.Phone
 
-			staff.Availability.Tuesday.Early = reqBody.TuesEarly == "on"
-			staff.Availability.Tuesday.Mid = reqBody.TuesMid == "on"
-			staff.Availability.Tuesday.Late = reqBody.TuesLate == "on"
-
-			staff.Availability.Wednesday.Early = reqBody.WedEarly == "on"
-			staff.Availability.Wednesday.Mid = reqBody.WedMid == "on"
-			staff.Availability.Wednesday.Late = reqBody.WedLate == "on"
-
-			staff.Availability.Thursday.Early = reqBody.ThursEarly == "on"
-			staff.Availability.Thursday.Mid = reqBody.ThursMid == "on"
-			staff.Availability.Thursday.Late = reqBody.ThursLate == "on"
-
-			staff.Availability.Friday.Early = reqBody.FriEarly == "on"
-			staff.Availability.Friday.Mid = reqBody.FriMid == "on"
-			staff.Availability.Friday.Late = reqBody.FriLate == "on"
-
-			staff.Availability.Saturday.Early = reqBody.SatEarly == "on"
-			staff.Availability.Saturday.Mid = reqBody.SatMid == "on"
-			staff.Availability.Saturday.Late = reqBody.SatLate == "on"
-
-			staff.Availability.Sunday.Early = reqBody.SunEarly == "on"
-			staff.Availability.Sunday.Mid = reqBody.SunMid == "on"
-			staff.Availability.Sunday.Late = reqBody.SunLate == "on"
-
-			staff.Availability.Monday.Early = reqBody.MonEarly == "on"
-			staff.Availability.Monday.Mid = reqBody.MonMid == "on"
-			staff.Availability.Monday.Late = reqBody.MonLate == "on"
+			staff.Availability = []DayAvailability{
+				{
+					Name: "Tuesday",
+					Early: reqBody.TuesEarly == "on",
+					Mid: reqBody.TuesMid == "on",
+					Late: reqBody.TuesLate == "on",
+				},
+				{
+					Name: "Wednesday",
+					Early: reqBody.WedEarly == "on",
+					Mid: reqBody.WedMid == "on",
+					Late: reqBody.WedLate == "on",
+				},
+				{
+					Name: "Thursday",
+					Early: reqBody.ThursEarly == "on",
+					Mid: reqBody.ThursMid == "on",
+					Late: reqBody.ThursLate == "on",
+				},
+				{
+					Name: "Friday",
+					Early: reqBody.FriEarly == "on",
+					Mid: reqBody.FriMid == "on",
+					Late: reqBody.FriLate == "on",
+				},
+				{
+					Name: "Saturday",
+					Early: reqBody.SatEarly == "on",
+					Mid: reqBody.SatMid == "on",
+					Late: reqBody.SatLate == "on",
+				},
+				{
+					Name: "Sunday",
+					Early: reqBody.SunEarly == "on",
+					Mid: reqBody.SunMid == "on",
+					Late: reqBody.SunLate == "on",
+				},
+				{
+					Name: "Monday",
+					Early: reqBody.MonEarly == "on",
+					Mid: reqBody.MonMid == "on",
+					Late: reqBody.MonLate == "on",
+				},
+			}
+		}
+		data := ProfileData{
+			StaffMember: *staff,
+			ShowSuccess: true,
+			ShowError: false,
 		}
 		SaveState(s)
+		err = s.Templates.ExecuteTemplate(w, "profile", data)
+		if err != nil {
+			log.Printf("Error executing template: %v\n", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	log.Printf("Error executing template: %v\n", err)
+	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+}
+
+func (s *Server) CheckFlags() {
+	for _, day := range s.Days {
+		// Create a new map for each day to track occurrences of staff IDs within that day
+		staffIDOccurrences := make(map[uuid.UUID]int)
+
+		for _, row := range day.Rows {
+			if row.Early.AssignedStaff != nil {
+				staffIDOccurrences[*row.Early.AssignedStaff]++
+			}
+			if row.Mid.AssignedStaff != nil {
+				staffIDOccurrences[*row.Mid.AssignedStaff]++
+			}
+			if row.Late.AssignedStaff != nil {
+				staffIDOccurrences[*row.Late.AssignedStaff]++
+			}
+		}
+
+		for i, row := range day.Rows {
+			row.Early.Flag = None
+			row.Mid.Flag = None
+			row.Late.Flag = None
+
+			if row.Early.AssignedStaff != nil {
+				if staffIDOccurrences[*row.Early.AssignedStaff] > 1 {
+					row.Early.Flag = Duplicate
+				} else {
+					staff := s.GetStaffByID(*row.Early.AssignedStaff)
+					if staff != nil {
+						if !staff.Availability[i].Early {
+							row.Early.Flag = PrefConflict
+						}
+					}
+				}
+			}
+
+			if row.Mid.AssignedStaff != nil {
+				if staffIDOccurrences[*row.Mid.AssignedStaff] > 1 {
+					row.Mid.Flag = Duplicate
+				} else {
+					staff := s.GetStaffByID(*row.Mid.AssignedStaff)
+					if staff != nil {
+						if !staff.Availability[i].Mid {
+							row.Mid.Flag = PrefConflict
+						}
+					}
+				}
+			}
+
+			if row.Late.AssignedStaff != nil {
+				if staffIDOccurrences[*row.Late.AssignedStaff] > 1 {
+					row.Late.Flag = Duplicate
+				} else {
+					staff := s.GetStaffByID(*row.Late.AssignedStaff)
+					if staff != nil {
+						if !staff.Availability[i].Late {
+							row.Late.Flag = PrefConflict
+						}
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -549,8 +722,7 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i := range s.Days {
-			if s.Days[i].ID == dayID {
-			// Found the day, modifying its value
+		if s.Days[i].ID == dayID {
 			if reqBody.Action == "+" {
 				s.Days[i].Rows = append(s.Days[i].Rows, newRow())
 			} else {
@@ -558,6 +730,7 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
 					s.Days[i].Rows = s.Days[i].Rows[:len(s.Days[i].Rows)-1]
 				}
 			}
+			SaveState(s)
 			err := s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*s.Days[i], s.Staff))
 			if err != nil {
 				log.Printf("Error executing template: %v", err)
@@ -567,7 +740,6 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	SaveState(s)
 }
 
 func (s *Server) handleGoogleLogout(w http.ResponseWriter, r *http.Request) {
@@ -620,7 +792,7 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sessionIdentifier := uuid.New()
-	expirationTime := token.Expiry // The token's expiration time can be used, or set your own
+	expirationTime := token.Expiry
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_token",
 		Value:    sessionIdentifier.String(),
@@ -645,6 +817,7 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 			GoogleID:    userInfo.ID,
 			FirstName:  "",
 			Token: &sessionIdentifier,
+			Availability: emptyAvailability,
 		}))
 		s.Staff = &new
 	}
@@ -671,8 +844,8 @@ func (s *Server) VerifySession(handler http.HandlerFunc) http.HandlerFunc {
 		// Convert sessionTokenStr (type string) to type uuid.UUID
 		sessionToken, err := uuid.Parse(sessionTokenStr)
 		if err != nil {
-				http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
-				return
+			http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+			return
 		}
 
 		if !s.isValidSession(sessionToken) {

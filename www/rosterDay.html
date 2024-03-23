@@ -25,10 +25,10 @@
 		</div>
 
 		<div class="rosterCell staffCell">
-			<form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Early.ID }}" hx-swap="none">
+			<form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Early.ID }}" hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>
 				<input type="hidden" name="dayID" value="{{ $dayID }}" />
 				<input type="hidden" name="slotID" value="{{ $row.Early.ID }}" />
-				<select style='background-color: {{$colour}};' id="s-{{ $row.Early.ID }}" name="staffID">
+				<select style='background-color: {{ GetHighlightCol $colour $row.Early.Flag }};' id="s-{{ $row.Early.ID }}" name="staffID">
 					<option value=""></option>
 					{{ range $staff }}
 					<option value="{{.ID}}" {{if $row.Early.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
@@ -42,19 +42,19 @@
 
 		<div class="rosterCell timeCell">
 			<form hx-post="/modifyTimeSlot" hx-trigger="keyup delay:1500ms" hx-swap="none">
-				<input style='background-color: {{$colour}};' name="timeVal" type="text" id="t-{{$row.Middle.ID}}" value="{{$row.Middle.StartTime}}" onfocus="this.select();" onclick="this.select();" />
-				<input type="hidden" name="slotID" value="{{ $row.Middle.ID }}" />
+				<input style='background-color: {{$colour}};' name="timeVal" type="text" id="t-{{$row.Mid.ID}}" value="{{$row.Mid.StartTime}}" onfocus="this.select();" onclick="this.select();" />
+				<input type="hidden" name="slotID" value="{{ $row.Mid.ID }}" />
 			</form>
 		</div>
 
 		<div class="rosterCell staffCell">
-			<form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Middle.ID }}" hx-swap="none">
+			<form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Mid.ID }}" hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>
 				<input type="hidden" name="dayID" value="{{ $dayID }}" />
-				<input type="hidden" name="slotID" value="{{ $row.Middle.ID }}" />
-				<select style='background-color: {{$colour}};' id="s-{{ $row.Middle.ID }}" name="staffID">
+				<input type="hidden" name="slotID" value="{{ $row.Mid.ID }}" />
+				<select style='background-color: {{ GetHighlightCol $colour $row.Mid.Flag }};' id="s-{{ $row.Mid.ID }}" name="staffID">
 					<option value=""></option>
 					{{ range $staff }}
-					<option value="{{.ID}}" {{if $row.Middle.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
+					<option value="{{.ID}}" {{if $row.Mid.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
 					{{ end }}
 				</select>
 			</form>
@@ -71,10 +71,10 @@
 		</div>
 
 		<div class="rosterCell staffCell">
-			<form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Late.ID }}" hx-swap="none">
+			<form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Late.ID }}" hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>
 				<input type="hidden" name="dayID" value="{{ $dayID }}" />
 				<input type="hidden" name="slotID" value="{{ $row.Late.ID }}" />
-				<select style='background-color: {{$colour}};' id="s-{{ $row.Late.ID }}" name="staffID">
+				<select style='background-color: {{ GetHighlightCol $colour $row.Late.Flag }};' id="s-{{ $row.Late.ID }}" name="staffID">
 					<option value=""></option>
 					{{ range $staff }}
 					<option value="{{.ID}}" {{if $row.Late.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>

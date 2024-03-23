@@ -1,96 +1,39 @@
 {{ define "profile" }}
-<html>
-    <head>
-        <base href="/">
-        <title>Retreat Profile</title>
-        <!-- <link rel="stylesheet" href="app.css?v={{ . }}"> -->
-        <link rel="shortcut icon" type="image/png" href="favicon.png" />
-        <meta content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=0" name="viewport">
-        <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-        <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
-    </head>
-    <body>
-			<div class="profile-container">
-				<a href="/auth/logout">Logout</a>
-				<form hx-ext='json-enc' hx-post="/modifyProfile" hx-swap="none">
-					<div>
-						<label for="firstName">First Name:</label>
-						<input type="text" id="firstName" name="firstName" value="{{.FirstName}}" required>
-					</div>
-					<div>
-						<label for="lastName">Last Name:</label>
-						<input type="text" id="lastName" name="lastName" value="{{.LastName}}" required>
-					</div>
-					<div>
-						<label for="email">Email:</label>
-						<input type="email" id="email" name="email" value="{{.Email}}" required>
-					</div>
-					<label>Tuesday</label>
-					<div>
-						<input type="checkbox" name="tuesday-early-avail" id="tuesday-early-avail" {{ if .Availability.Tuesday.Early }}checked{{end}}>
-						<label for="tuesday-early-avail">Early</label>
-						<input type="checkbox" name="tuesday-mid-avail" id="tuesday-mid-avail" {{ if .Availability.Tuesday.Mid }}checked{{end}}>
-						<label for="tuesday-mid-avail">Mid</label>
-						<input type="checkbox" name="tuesday-late-avail" id="tuesday-late-avail" {{ if .Availability.Tuesday.Late }}checked{{end}}>
-						<label for="tuesday-late-avail">Late</label>
-					</div>
-					<label>Wednesday</label>
-					<div>
-						<input type="checkbox" name="wednesday-early-avail" id="wednesday-early-avail" {{ if .Availability.Wednesday.Early }}checked{{end}}>
-						<label for="wednesday-early-avail">Early</label>
-						<input type="checkbox" name="wednesday-mid-avail" id="wednesday-mid-avail" {{ if .Availability.Wednesday.Mid }}checked{{end}}>
-						<label for="wednesday-mid-avail">Mid</label>
-						<input type="checkbox" name="wednesday-late-avail" id="wednesday-late-avail" {{ if .Availability.Wednesday.Late }}checked{{end}}>
-						<label for="wednesday-late-avail">Late</label>
-					</div>
-					<label>Thursday</label>
-					<div>
-						<input type="checkbox" name="thursday-early-avail" id="thursday-early-avail" {{ if .Availability.Thursday.Early }}checked{{end}}>
-						<label for="thursday-early-avail">Early</label>
-						<input type="checkbox" name="thursday-mid-avail" id="thursday-mid-avail" {{ if .Availability.Thursday.Mid }}checked{{end}}>
-						<label for="thursday-mid-avail">Mid</label>
-						<input type="checkbox" name="thursday-late-avail" id="thursday-late-avail" {{ if .Availability.Thursday.Late }}checked{{end}}>
-						<label for="thursday-late-avail">Late</label>
-					</div>
-					<label>Friday</label>
-					<div>
-						<input type="checkbox" name="friday-early-avail" id="friday-early-avail" {{ if .Availability.Friday.Early }}checked{{end}}>
-						<label for="friday-early-avail">Early</label>
-						<input type="checkbox" name="friday-mid-avail" id="friday-mid-avail" {{ if .Availability.Friday.Mid }}checked{{end}}>
-						<label for="friday-mid-avail">Mid</label>
-						<input type="checkbox" name="friday-late-avail" id="friday-late-avail" {{ if .Availability.Friday.Late }}checked{{end}}>
-						<label for="friday-late-avail">Late</label>
-					</div>
-					<label>Saturday</label>
-					<div>
-						<input type="checkbox" name="saturday-early-avail" id="saturday-early-avail" {{ if .Availability.Saturday.Early }}checked{{end}}>
-						<label for="saturday-early-avail">Early</label>
-						<input type="checkbox" name="saturday-mid-avail" id="saturday-mid-avail" {{ if .Availability.Saturday.Mid }}checked{{end}}>
-						<label for="saturday-mid-avail">Mid</label>
-						<input type="checkbox" name="saturday-late-avail" id="saturday-late-avail" {{ if .Availability.Saturday.Late }}checked{{end}}>
-						<label for="saturday-late-avail">Late</label>
-					</div>
-					<label>Sunday</label>
-					<div>
-						<input type="checkbox" name="sunday-early-avail" id="sunday-early-avail" {{ if .Availability.Sunday.Early }}checked{{end}}>
-						<label for="sunday-early-avail">Early</label>
-						<input type="checkbox" name="sunday-mid-avail" id="sunday-mid-avail" {{ if .Availability.Sunday.Mid }}checked{{end}}>
-						<label for="sunday-mid-avail">Mid</label>
-						<input type="checkbox" name="sunday-late-avail" id="sunday-late-avail" {{ if .Availability.Sunday.Late }}checked{{end}}>
-						<label for="sunday-late-avail">Late</label>
-					</div>
-					<label>Monday</label>
-					<div>
-						<input type="checkbox" name="monday-early-avail" id="monday-early-avail" {{ if .Availability.Monday.Early }}checked{{end}}>
-						<label for="monday-early-avail">Early</label>
-						<input type="checkbox" name="monday-mid-avail" id="monday-mid-avail" {{ if .Availability.Monday.Mid }}checked{{end}}>
-						<label for="monday-mid-avail">Mid</label>
-						<input type="checkbox" name="monday-late-avail" id="monday-late-avail" {{ if .Availability.Monday.Late }}checked{{end}}>
-						<label for="monday-late-avail">Late</label>
-					</div>
-					<button type="submit">Update Profile</button>
+<div id="profile">
+		<a href="/auth/logout">Logout</a>
+		<section class="user-profile">
+				<h1>Update Your Profile</h1>
+				<form hx-ext='json-enc' hx-post="/modifyProfile" hx-swap="outerHTML" hx-target="#profile">
+						<fieldset>
+								<legend>Personal Information</legend>
+								<label for="firstName">First Name:</label>
+								<input type="text" id="firstName" name="firstName" value="{{.FirstName}}" required>
+								<label for="lastName">Last Name:</label>
+								<input type="text" id="lastName" name="lastName" value="{{.LastName}}" required>
+								<label for="email">Email:</label>
+								<input type="email" id="email" name="email" value="{{.Email}}" required>
+								<label for="phone">Phone:</label>
+								<input type="tel" id="phone" name="phone" value="{{.Phone}}" required>
+						</fieldset>
+						<fieldset>
+								<legend>Availability</legend>
+								{{ range .Availability }}
+										<div class="availability">
+												<span>{{ .Name }}</span>
+												<label><input type="checkbox" name="{{.Name}}-early-avail" id="{{.Name}}-early-avail" {{ if .Early }}checked{{ end }}> Early</label>
+												<label><input type="checkbox" name="{{.Name}}-mid-avail" id="{{.Name}}-mid-avail" {{ if .Mid }}checked{{ end }}> Mid</label>
+												<label><input type="checkbox" name="{{.Name}}-late-avail" id="{{.Name}}-late-avail" {{ if .Late }}checked{{ end }}> Late</label>
+										</div>
+								{{ end }}
+						</fieldset>
+						<button type="submit">Save Changes</button>
+						{{if .ShowSuccess }}
+							<div id="success-message">Success!</div>
+						{{end}}
+						{{if .ShowError }}
+							<div id="success-message">Error!</div>
+						{{end}}
 				</form>
-			</div>
-    </body>
-</html>
+		</section>
+</div>
 {{ end }}
