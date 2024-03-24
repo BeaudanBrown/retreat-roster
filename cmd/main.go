@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,6 +37,7 @@ const (
 	None Highlight = iota
 	Duplicate
 	PrefConflict
+	LeaveConflict
 )
 
 type Server struct {
@@ -45,6 +47,7 @@ type Server struct {
 }
 
 type ServerDisc struct {
+	StartDate  time.Time   `json:"startDate"`
 	Days  []*RosterDay   `json:"days"`
 	Staff *[]*StaffMember `json:"staff"`
 }
@@ -54,6 +57,35 @@ type DayAvailability struct {
 	Early   bool
 	Mid   bool
 	Late   bool
+}
+
+type CustomDate struct {
+    time.Time
+}
+
+func (cd *CustomDate) UnmarshalJSON(input []byte) error {
+    strInput := strings.Trim(string(input), `"`)
+
+    // Try parsing the date in the expected formats
+    formats := []string{"2006-01-02", "2006-01-02T15:04:05Z"}
+    var parseErr error
+    for _, format := range formats {
+        var newTime time.Time
+        newTime, parseErr = time.Parse(format, strInput)
+        if parseErr == nil {
+            cd.Time = newTime
+            return nil
+        }
+    }
+
+    // If none of the formats worked, return the last error
+    return parseErr
+}
+
+type LeaveRequest struct {
+	Reason string	`json:"reason"`
+	StartDate CustomDate	`json:"start-date"`
+	EndDate CustomDate	`json:"end-date"`
 }
 
 type ProfileData struct {
@@ -95,14 +127,15 @@ type StaffMember struct {
 	Phone string
 	Availability []DayAvailability
 	Token *uuid.UUID
+	LeaveRequests	[]LeaveRequest
 }
 
 type RosterDay struct {
 	ID             uuid.UUID
 	DayName        string
 	Rows           []*Row
-	Date           time.Time
 	Colour         string
+	Offset         int
 }
 
 type Row struct {
@@ -218,7 +251,6 @@ func newState() *Server {
 
 	// Loop over dayNames to fill Days slice
 	for i, dayName := range dayNames {
-		date := nextTuesday.AddDate(0, 0, i)
 		var colour string
 		if i%2 == 0 {
 			colour = "#b7b7b7"
@@ -232,8 +264,8 @@ func newState() *Server {
 				newRow(),
 				newRow(),
 			},
-			Date:           date,
 			Colour:         colour,
+			Offset:         i,
 		})
 	}
 
@@ -242,6 +274,7 @@ func newState() *Server {
 		ServerDisc: ServerDisc{
 			Days:  Days,
 			Staff: &staff,
+			StartDate: nextTuesday,
 		},
 	}
 	return s
@@ -261,12 +294,14 @@ func main() {
 		http.ServeFile(w, r, "./www/app.css")
 	})
 	http.HandleFunc("/root", s.VerifySession(s.HandleRoot))
+	http.HandleFunc("/submitLeave", s.VerifySession(s.HandleSubmitLeave))
 	http.HandleFunc("/profile", s.VerifySession(s.HandleProfileIndex))
 	http.HandleFunc("/profileBody", s.VerifySession(s.HandleProfile))
 	http.HandleFunc("/auth/login", s.handleGoogleLogin)
 	http.HandleFunc("/auth/logout", s.handleGoogleLogout)
 	http.HandleFunc("/auth/callback", s.handleGoogleCallback)
 
+	http.HandleFunc("/shiftWindow", s.VerifySession(s.HandleShiftWindow))
 	http.HandleFunc("/modifyProfile", s.VerifySession(s.HandleModifyProfile))
 	http.HandleFunc("/modifyRows", s.VerifySession(s.HandleModifyRows))
 	http.HandleFunc("/modifySlot", s.VerifySession(s.HandleModifySlot))
@@ -285,6 +320,7 @@ func (s *Slot) HasThisStaff(staffId uuid.UUID) bool {
 type DayStruct struct {
 	RosterDay
 	Staff *[]*StaffMember
+	Date time.Time
 }
 
 func GetHighlightCol(defaultCol string, flag Highlight) string {
@@ -292,16 +328,54 @@ func GetHighlightCol(defaultCol string, flag Highlight) string {
 		return "#FFA07A"
 	}
 	if flag == PrefConflict {
-		return "#FF6666"
+		return "#FF9999"
+	}
+	if flag == LeaveConflict {
+		return "#CC3333"
 	}
 	return defaultCol
 }
 
-func MakeDayStruct(day RosterDay, staff *[]*StaffMember) DayStruct {
+func MakeDayStruct(day RosterDay, staff *[]*StaffMember, startDate time.Time) DayStruct {
+	date := startDate.AddDate(0, 0, day.Offset)
 	return DayStruct{
 		day,
 		staff,
+		date,
 	}
+}
+
+func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
+	log.Println("Submit leave request")
+	sessionToken, ok := r.Context().Value(SESSION_KEY).(uuid.UUID)
+	if !ok {
+		log.Println("Invalid or missing session token")
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	bytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Error reading body: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var leaveReq LeaveRequest
+	err = json.Unmarshal(bytes, &leaveReq)
+	if err != nil {
+		log.Printf("json: %v", bytes)
+		log.Printf("Error parsing json: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	staff := s.GetStaffByToken(sessionToken)
+	if staff == nil {
+		log.Println("Couldn't find staff with given token")
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	staff.LeaveRequests = append(staff.LeaveRequests, leaveReq)
+	SaveState(s)
 }
 
 func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
@@ -484,7 +558,7 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff))
+	err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate))
 	if err != nil {
 		log.Printf("Error executing template: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
@@ -635,12 +709,19 @@ func (s *Server) CheckFlags() {
 			row.Early.Flag = None
 			row.Mid.Flag = None
 			row.Late.Flag = None
+			date := s.StartDate.AddDate(0, 0, day.Offset)
 
 			if row.Early.AssignedStaff != nil {
 				if staffIDOccurrences[*row.Early.AssignedStaff] > 1 {
 					row.Early.Flag = Duplicate
 				} else {
 					staff := s.GetStaffByID(*row.Early.AssignedStaff)
+					for _, req := range staff.LeaveRequests {
+						if !req.StartDate.After(date) && req.EndDate.After(date) {
+							row.Early.Flag = LeaveConflict
+							break
+						}
+					}
 					if staff != nil {
 						if !staff.Availability[i].Early {
 							row.Early.Flag = PrefConflict
@@ -655,6 +736,12 @@ func (s *Server) CheckFlags() {
 				} else {
 					staff := s.GetStaffByID(*row.Mid.AssignedStaff)
 					if staff != nil {
+						for _, req := range staff.LeaveRequests {
+							if !req.StartDate.After(date) && req.EndDate.After(date) {
+								row.Early.Flag = LeaveConflict
+								break
+							}
+						}
 						if !staff.Availability[i].Mid {
 							row.Mid.Flag = PrefConflict
 						}
@@ -667,6 +754,12 @@ func (s *Server) CheckFlags() {
 					row.Late.Flag = Duplicate
 				} else {
 					staff := s.GetStaffByID(*row.Late.AssignedStaff)
+					for _, req := range staff.LeaveRequests {
+						if !req.StartDate.After(date) && req.EndDate.After(date) {
+							row.Early.Flag = LeaveConflict
+							break
+						}
+					}
 					if staff != nil {
 						if !staff.Availability[i].Late {
 							row.Late.Flag = PrefConflict
@@ -677,6 +770,48 @@ func (s *Server) CheckFlags() {
 		}
 	}
 }
+
+type ShiftWindow struct {
+	Action string `json:"action"`
+}
+
+
+func (s *Server) HandleShiftWindow(w http.ResponseWriter, r *http.Request) {
+	bytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Error reading body: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var reqBody ShiftWindow
+	err = json.Unmarshal(bytes, &reqBody)
+	if err != nil {
+		log.Printf("Error parsing json: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	switch reqBody.Action {
+	case "+":
+		s.StartDate = s.StartDate.AddDate(0, 0, 7)
+	case "-":
+		s.StartDate = s.StartDate.AddDate(0, 0, -7)
+	default:
+		today := time.Now()
+		daysUntilTuesday := int(time.Tuesday - today.Weekday())
+		if daysUntilTuesday <= 0 {
+			daysUntilTuesday += 7
+		}
+		s.StartDate = today.AddDate(0, 0, daysUntilTuesday)
+	}
+	SaveState(s)
+	err = s.Templates.ExecuteTemplate(w, "root", s)
+	if err != nil {
+		log.Fatalf("Error executing template: %v", err)
+	}
+}
+
 
 func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
 	bytes, err := io.ReadAll(r.Body)
@@ -711,7 +846,7 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			SaveState(s)
-			err := s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*s.Days[i], s.Staff))
+			err := s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*s.Days[i], s.Staff, s.StartDate))
 			if err != nil {
 				log.Printf("Error executing template: %v", err)
 				w.WriteHeader(http.StatusBadRequest)

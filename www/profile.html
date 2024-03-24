@@ -1,39 +1,63 @@
 {{ define "profile" }}
 <div id="profile">
+	<div id="buttons">
 		<a href="/auth/logout">Logout</a>
-		<section class="user-profile">
-				<h1>Update Your Profile</h1>
-				<form hx-ext='json-enc' hx-post="/modifyProfile" hx-swap="outerHTML" hx-target="#profile">
-						<fieldset>
-								<legend>Personal Information</legend>
-								<label for="firstName">First Name:</label>
-								<input type="text" id="firstName" name="firstName" value="{{.FirstName}}" required>
-								<label for="lastName">Last Name:</label>
-								<input type="text" id="lastName" name="lastName" value="{{.LastName}}" required>
-								<label for="email">Email:</label>
-								<input type="email" id="email" name="email" value="{{.Email}}" required>
-								<label for="phone">Phone:</label>
-								<input type="tel" id="phone" name="phone" value="{{.Phone}}" required>
-						</fieldset>
-						<fieldset>
-								<legend>Availability</legend>
-								{{ range .Availability }}
-										<div class="availability">
-												<span>{{ .Name }}</span>
-												<label><input type="checkbox" name="{{.Name}}-early-avail" id="{{.Name}}-early-avail" {{ if .Early }}checked{{ end }}> Early</label>
-												<label><input type="checkbox" name="{{.Name}}-mid-avail" id="{{.Name}}-mid-avail" {{ if .Mid }}checked{{ end }}> Mid</label>
-												<label><input type="checkbox" name="{{.Name}}-late-avail" id="{{.Name}}-late-avail" {{ if .Late }}checked{{ end }}> Late</label>
-										</div>
-								{{ end }}
-						</fieldset>
-						<button type="submit">Save Changes</button>
-						{{if .ShowSuccess }}
-							<div id="success-message">Success!</div>
-						{{end}}
-						{{if .ShowError }}
-							<div id="success-message">Error!</div>
-						{{end}}
-				</form>
-		</section>
+		<a href="/timeoff">Request Leave</a>
+	</div>
+	<section class="user-profile">
+		<h1>Update Your Profile</h1>
+		<form hx-ext='json-enc' hx-post="/modifyProfile" hx-swap="outerHTML" hx-target="#profile">
+			<fieldset>
+				<legend>Personal Information</legend>
+				<label for="firstName">First Name:</label>
+				<input type="text" id="firstName" name="firstName" value="{{.FirstName}}" required>
+				<label for="lastName">Last Name:</label>
+				<input type="text" id="lastName" name="lastName" value="{{.LastName}}" required>
+				<label for="email">Email:</label>
+				<input type="email" id="email" name="email" value="{{.Email}}" required>
+				<label for="phone">Phone:</label>
+				<input type="tel" id="phone" name="phone" value="{{.Phone}}" required>
+			</fieldset>
+			<fieldset>
+				<legend>Availability</legend>
+				{{ range .Availability }}
+				<div class="availability">
+					<span>{{ .Name }}</span>
+					<label><input type="checkbox" name="{{.Name}}-early-avail" id="{{.Name}}-early-avail" {{ if .Early }}checked{{ end }}> Early</label>
+					<label><input type="checkbox" name="{{.Name}}-mid-avail" id="{{.Name}}-mid-avail" {{ if .Mid }}checked{{ end }}> Mid</label>
+					<label><input type="checkbox" name="{{.Name}}-late-avail" id="{{.Name}}-late-avail" {{ if .Late }}checked{{ end }}> Late</label>
+				</div>
+				{{ end }}
+			</fieldset>
+			<button type="submit">Save Changes</button>
+			{{if .ShowSuccess }}
+			<div id="success-message">Success!</div>
+			{{end}}
+			{{if .ShowError }}
+			<div id="success-message">Error!</div>
+			{{end}}
+		</form>
+	</section>
+	<section class="timeoff">
+		<h1>Request Time off</h1>
+		<form hx-ext='json-enc' hx-post="/submitLeave" hx-swap="outerHTML" hx-target="#profile">
+			<fieldset>
+				<legend>Submit Leave Request</legend>
+				<label for="reason">Reason for leave:</label>
+				<input type="text" id="reason" name="reason" required>
+        <label for="start-date">First date you will be unavailable:</label>
+        <input type="date" id="start-date" name="start-date" required>
+        <label for="end-date">First date you will available to work:</label>
+        <input type="date" id="end-date" name="end-date" required>
+			</fieldset>
+			<button type="submit">Submit leave request</button>
+			{{if .ShowSuccess }}
+			<div id="leave-success-message">Success!</div>
+			{{end}}
+			{{if .ShowError }}
+			<div id="leave-success-message">Error!</div>
+			{{end}}
+		</form>
+	</section>
 </div>
 {{ end }}
