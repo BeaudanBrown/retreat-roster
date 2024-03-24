@@ -30,10 +30,10 @@
 				{{ end }}
 			</fieldset>
 			<button type="submit">Save Changes</button>
-			{{if .ShowSuccess }}
+			{{if .ShowUpdateSuccess }}
 			<div id="success-message">Success!</div>
 			{{end}}
-			{{if .ShowError }}
+			{{if .ShowUpdateError }}
 			<div id="success-message">Error!</div>
 			{{end}}
 		</form>
@@ -51,11 +51,11 @@
         <input type="date" id="end-date" name="end-date" required>
 			</fieldset>
 			<button type="submit">Submit leave request</button>
-			{{if .ShowSuccess }}
+			{{if .ShowLeaveSuccess }}
 			<div id="leave-success-message">Success!</div>
 			{{end}}
-			{{if .ShowError }}
-			<div id="leave-success-message">Error!</div>
+			{{if .ShowLeaveError }}
+			<div id="leave-success-message">Invalid dates!</div>
 			{{end}}
 		</form>
 	</section>

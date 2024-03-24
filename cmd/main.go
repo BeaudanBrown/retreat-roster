@@ -90,8 +90,10 @@ type LeaveRequest struct {
 
 type ProfileData struct {
 	StaffMember
-	ShowSuccess bool
-	ShowError bool
+	ShowUpdateSuccess bool
+	ShowUpdateError bool
+	ShowLeaveSuccess bool
+	ShowLeaveError bool
 }
 
 var emptyAvailability = []DayAvailability{
@@ -374,8 +376,24 @@ func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
+	data := ProfileData{
+		StaffMember: *staff,
+		ShowUpdateSuccess: false,
+		ShowUpdateError: false,
+		ShowLeaveSuccess: true,
+		ShowLeaveError: false,
+	}
+	if leaveReq.StartDate.After(leaveReq.EndDate.Time) {
+		data.ShowLeaveError = true
+		data.ShowLeaveSuccess = false
+	}
 	staff.LeaveRequests = append(staff.LeaveRequests, leaveReq)
 	SaveState(s)
+	err = s.Templates.ExecuteTemplate(w, "profile", data)
+	if err != nil {
+		log.Printf("Error executing template: %v\n", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
@@ -409,8 +427,6 @@ func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
 
 	data := ProfileData{
 		StaffMember: *staff,
-		ShowSuccess: false,
-		ShowError: false,
 	}
 	err := s.Templates.ExecuteTemplate(w, "profile", data)
 	if err != nil {
@@ -672,8 +688,7 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 		}
 		data := ProfileData{
 			StaffMember: *staff,
-			ShowSuccess: true,
-			ShowError: false,
+			ShowUpdateSuccess: true,
 		}
 		SaveState(s)
 		err = s.Templates.ExecuteTemplate(w, "profile", data)
