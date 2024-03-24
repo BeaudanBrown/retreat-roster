@@ -17,14 +17,14 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
-const STATE_FILE = "./state.json"
+const STATE_FILE = "./data/state.json"
 const SESSION_KEY = "sessionToken"
 
 func googleOauthConfig() *oauth2.Config {
 	return &oauth2.Config{
 		ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
-		RedirectURL:  "http://localhost:6969/auth/callback",
+		RedirectURL:  os.Getenv("REDIRECT_URL"),
 		Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email"},
 		Endpoint:     google.Endpoint,
 	}
@@ -280,26 +280,6 @@ func (s *Slot) HasThisStaff(staffId uuid.UUID) bool {
 		return true
 	}
 	return false
-}
-
-func (s *Server) HandleGetRequest(w http.ResponseWriter, r *http.Request) {
-	switch r.URL.Path {
-	case "/":
-		err := s.Templates.ExecuteTemplate(w, "index", s.CacheBust)
-		if err != nil {
-			log.Fatalf("Error executing template: %v", err)
-		}
-	case "/app.css":
-		http.ServeFile(w, r, "./www/app.css")
-	case "/root":
-		s.HandleRoot(w, r)
-	case "/auth/login":
-		s.handleGoogleLogin(w, r)
-	case "/auth/callback":
-		s.handleGoogleCallback(w, r)
-	default:
-		http.NotFound(w, r)
-	}
 }
 
 type DayStruct struct {

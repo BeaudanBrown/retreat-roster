@@ -1,0 +1,18 @@
+BINARY_NAME=main
+DIST_FOLDER=./dist
+
+.PHONY: build
+
+build:
+	@echo "Building static binary..."
+	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o $(DIST_FOLDER)/$(BINARY_NAME) ./cmd/main.go
+
+docker:
+	@echo "Building dockerfile..."
+	docker build -t retreat-roster .
+
+.PHONY: clean
+
+clean:
+	@echo "Cleaning up..."
+	rm -rf $(DIST_FOLDER)/$(BINARY_NAME)

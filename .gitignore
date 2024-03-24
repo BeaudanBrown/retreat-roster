@@ -1,2 +1,4 @@
+dist
 state.json
 .env
+.prodenv
