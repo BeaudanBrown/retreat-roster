@@ -1,90 +1,117 @@
 select {
-	width: 100%; /* Make the select fill the full width of the td */
-	height: 100%; /* To make the select fill the height, ensure there is a specific height set on the td or table */
-	box-sizing: border-box; /* Ensures padding and border are included in the width and height */
+  width: 100%; /* Make the select fill the full width of the td */
+  height: 100%; /* To make the select fill the height, ensure there is a specific height set on the td or table */
+  box-sizing: border-box; /* Ensures padding and border are included in the width and height */
 }
 
 form {
-	width: 100%;
-	height: 100%;
-	border: none; /* Removes the border */
-	padding: 0; /* Optional: Adjusts padding */
-	margin: 0; /* Removes default margin */
-	box-sizing: border-box; /* Include padding and border in the element's width and height */
+  width: 100%;
+  height: 100%;
+  border: none; /* Removes the border */
+  padding: 0; /* Optional: Adjusts padding */
+  margin: 0; /* Removes default margin */
+  box-sizing: border-box; /* Include padding and border in the element's width and height */
 }
 
 select {
-	text-align: right;
-	width: 100%;
-	height: 100%;
-	border: none; /* Removes the border */
-	padding: 0; /* Optional: Adjusts padding */
-	margin: 0; /* Removes default margin */
-	box-sizing: border-box; /* Include padding and border in the element's width and height */
+  text-align: right;
+  width: 100%;
+  height: 100%;
+  border: none; /* Removes the border */
+  padding: 0; /* Optional: Adjusts padding */
+  margin: 0; /* Removes default margin */
+  box-sizing: border-box; /* Include padding and border in the element's width and height */
 }
 
-div input[type="text"] {
-	text-align: right;
-	width: 100%;
-	height: 100%;
-	border: none; /* Removes the border */
-	padding: 0; /* Optional: Adjusts padding */
-	margin: 0; /* Removes default margin */
-	box-sizing: border-box; /* Include padding and border in the element's width and height */
+.rosterInput  {
+  text-align: right;
+  width: 100%;
+  height: 100%;
+  border: none; /* Removes the border */
+  padding: 0; /* Optional: Adjusts padding */
+  margin: 0; /* Removes default margin */
+  box-sizing: border-box; /* Include padding and border in the element's width and height */
 }
 
 .roster-container {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .dayCell, .timeCell, .staffCell, .flagCell {
-	min-width: 0; /* This helps in preventing overflow and ensuring flex-shrink works */
-	max-width: 100%; /* Ensures columns don't grow beyond their parent's size */
+  min-width: 0; /* This helps in preventing overflow and ensuring flex-shrink works */
+  max-width: 100%; /* Ensures columns don't grow beyond their parent's size */
 }
 
 .day {
-	width: 50%;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .row {
-	width: 100%;
-	display: flex;
-	justify-content: center;
-	border-right: 1px solid black;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  border-right: 1px solid black;
 }
 
 .dayCell {
-	flex: 3;
+  flex: 3;
 }
 
 .timeCell {
-	flex: 1;
+  flex: 1;
 }
 
 .staffCell {
-	flex: 2;
+  flex: 2;
 }
 
 .flagCell {
-	flex: 0.5;
+  flex: 0.5;
 }
 
 .rosterCell {
-	display: flex;
-	justify-content: center;
+  display: flex;
+  justify-content: center;
 }
 
 .row > div {
-	border-left: 1px solid black;
-	border-top: 1px solid black;
+  border-left: 1px solid black;
+  border-top: 1px solid black;
 }
 
 .day:last-child {
-	border-bottom: 1px solid black;
+  border-bottom: 1px solid black;
 }
 
+.leave-request-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  border-bottom: 1px solid #ccc; /* A subtle bottom border for each row */
+}
+
+.leave-reason,
+.leave-start-date,
+.leave-end-date {
+  flex-grow: 1;
+  margin-right: 10px; /* Spacing between columns */
+}
+
+.delete-icon {
+  cursor: pointer;
+  font-size: 20px; /* Adjust size of the trash can emoji as needed */
+}
+
+/* Optional: reduce the size of the emoji and add padding on smaller screens */
+@media (max-width: 600px) {
+  .delete-icon {
+    font-size: 16px; /* Smaller emoji on small screens */
+    padding: 5px; /* Easier to tap on touch devices */
+  }
+}

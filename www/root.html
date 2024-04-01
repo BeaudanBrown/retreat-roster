@@ -1,16 +1,16 @@
 {{ define "root" }}
 <div id="roster" class="roster-container">
-	{{ $staff := .Staff }}
-	{{ $startDate := .StartDate }}
-	<div>
-			<button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"-"}' hx-swap='outerHTML' hx-target='#roster'>-</button>
-			<button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"0"}' hx-swap='outerHTML' hx-target='#roster'>This week</button>
-			<button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"+"}' hx-swap='outerHTML' hx-target='#roster'>+</button>
-	</div>
-	{{ range .Days }}
-		{{ $dayStruct := MakeDayStruct . $staff $startDate }}
-		{{ template "rosterDay" $dayStruct }}
-	{{ end }}
-	<a href="/auth/logout">Logout</a>
+  {{ $staff := .Staff }}
+  {{ $startDate := .StartDate }}
+  <div>
+    <button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"-"}' hx-swap='outerHTML' hx-target='#roster'>-</button>
+    <button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"0"}' hx-swap='outerHTML' hx-target='#roster'>This week</button>
+    <button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"+"}' hx-swap='outerHTML' hx-target='#roster'>+</button>
+  </div>
+  {{ range .Days }}
+  {{ $dayStruct := MakeDayStruct . $staff $startDate }}
+  {{ template "rosterDay" $dayStruct }}
+  {{ end }}
+  <a href="/auth/logout">Logout</a>
 </div>
 {{ end }}
