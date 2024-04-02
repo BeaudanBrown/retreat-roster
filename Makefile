@@ -11,6 +11,11 @@ docker:
 	@echo "Building dockerfile..."
 	docker build -t retreat-roster .
 
+docker-push:
+	@echo "Pushing docker image..."
+	docker tag retreat-roster docker.beaudan.me/retreat-roster
+	docker push docker.beaudan.me/retreat-roster:latest
+
 .PHONY: clean
 
 clean:
