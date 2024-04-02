@@ -20,6 +20,8 @@ import (
 
 const STATE_FILE = "./data/state.json"
 const SESSION_KEY = "sessionToken"
+var DEV_MODE = true
+const DEV_UUID = "00000000-0000-0000-0000-000000000000"
 
 func googleOauthConfig() *oauth2.Config {
   return &oauth2.Config{
@@ -101,29 +103,52 @@ type ProfileData struct {
 var emptyAvailability = []DayAvailability{
   {
     Name: "Tuesday",
+    Early: true,
+    Mid:   true,
+    Late:  true,
   },
   {
     Name: "Wednesday",
+    Early: true,
+    Mid:   true,
+    Late:  true,
   },
   {
     Name: "Thursday",
+    Early: true,
+    Mid:   true,
+    Late:  true,
   },
   {
     Name: "Friday",
+    Early: true,
+    Mid:   true,
+    Late:  true,
   },
   {
     Name: "Saturday",
+    Early: true,
+    Mid:   true,
+    Late:  true,
   },
   {
     Name: "Sunday",
+    Early: true,
+    Mid:   true,
+    Late:  true,
   },
   {
     Name: "Monday",
+    Early: true,
+    Mid:   true,
+    Late:  true,
   },
 }
 
 type StaffMember struct {
   ID   uuid.UUID
+  IsAdmin   bool
+  IsTrial   bool
   GoogleID   string
   FirstName string
   LastName string
@@ -229,29 +254,35 @@ func newState() *Server {
   nextTuesday := today.AddDate(0, 0, daysUntilTuesday)
 
   var Days []*RosterDay
-
-  staff := []*StaffMember{
-    {
-      FirstName: "Beaudan",
-      ID:   uuid.New(),
-      Availability: emptyAvailability,
-    },
-    {
-      FirstName: "Jamie",
-      ID:   uuid.New(),
-      Availability: emptyAvailability,
-    },
-    {
-      FirstName: "Kerryn",
-      ID:   uuid.New(),
-      Availability: emptyAvailability,
-    },
-    {
-      FirstName: "James",
-      ID:   uuid.New(),
-      Availability: emptyAvailability,
-    },
-  }
+  staff := []*StaffMember{}
+  // if (DEV_MODE) {
+  //   staff := []*StaffMember{}
+  // } else {
+  //   staff := []*StaffMember{
+  //     {
+  //       FirstName: "Beaudan",
+  //       ID:   uuid.Parse(DEV_UUID),
+  //       Availability: emptyAvailability,
+  //       IsAdmin: true,
+  //       GoogleID: "DEV",
+  //     },
+  //     {
+  //       FirstName: "Jamie",
+  //       ID:   uuid.New(),
+  //       Availability: emptyAvailability,
+  //     },
+  //     {
+  //       FirstName: "Kerryn",
+  //       ID:   uuid.New(),
+  //       Availability: emptyAvailability,
+  //     },
+  //     {
+  //       FirstName: "James",
+  //       ID:   uuid.New(),
+  //       Availability: emptyAvailability,
+  //     },
+  //   }
+  // }
 
   // Loop over dayNames to fill Days slice
   for i, dayName := range dayNames {
@@ -265,6 +296,8 @@ func newState() *Server {
       ID:      uuid.New(), // Generates a new UUID
       DayName: dayName,
       Rows: []*Row{
+        newRow(),
+        newRow(),
         newRow(),
         newRow(),
       },
@@ -297,7 +330,7 @@ func main() {
   http.HandleFunc("/app.css", func(w http.ResponseWriter, r *http.Request) {
     http.ServeFile(w, r, "./www/app.css")
   })
-  http.HandleFunc("/root", s.VerifySession(s.HandleRoot))
+  http.HandleFunc("/root", s.VerifyAdmin(s.HandleRoot))
   http.HandleFunc("/submitLeave", s.VerifySession(s.HandleSubmitLeave))
   http.HandleFunc("/profile", s.VerifySession(s.HandleProfileIndex))
   http.HandleFunc("/profileBody", s.VerifySession(s.HandleProfile))
@@ -305,6 +338,8 @@ func main() {
   http.HandleFunc("/auth/logout", s.handleGoogleLogout)
   http.HandleFunc("/auth/callback", s.handleGoogleCallback)
 
+  http.HandleFunc("/deleteTrial", s.VerifySession(s.handleDeleteTrial))
+  http.HandleFunc("/addTrial", s.VerifySession(s.handleAddTrial))
   http.HandleFunc("/shiftWindow", s.VerifySession(s.HandleShiftWindow))
   http.HandleFunc("/modifyProfile", s.VerifySession(s.HandleModifyProfile))
   http.HandleFunc("/modifyRows", s.VerifySession(s.HandleModifyRows))
@@ -356,37 +391,17 @@ type DeleteLeaveBody struct {
 
 func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
   log.Println("Delete leave request")
-  sessionToken, ok := r.Context().Value(SESSION_KEY).(uuid.UUID)
-  if !ok {
-    log.Println("Invalid or missing session token")
-    http.Redirect(w, r, "/login", http.StatusSeeOther)
-    return
-  }
-  bytes, err := io.ReadAll(r.Body)
-  if err != nil {
-    log.Printf("Error reading body: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
   var reqBody DeleteLeaveBody
-  err = json.Unmarshal(bytes, &reqBody)
-  if err != nil {
-    log.Printf("json: %v", bytes)
-    log.Printf("Error parsing json: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
-
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
   leaveID, err := uuid.Parse(reqBody.ID)
   if err != nil {
     log.Printf("Invalid dayID: %v", err)
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  staff := s.GetStaffByToken(sessionToken)
-  if staff == nil {
-    log.Println("Couldn't find staff with given token")
-    http.Redirect(w, r, "/login", http.StatusSeeOther)
+
+  staff := s.GetSessionUser(w, r)
+  if (staff == nil) {
     return
   }
   for i, leaveReq := range staff.LeaveRequests {
@@ -408,45 +423,24 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
   log.Println("Submit leave request")
-  sessionToken, ok := r.Context().Value(SESSION_KEY).(uuid.UUID)
-  if !ok {
-    log.Println("Invalid or missing session token")
-    http.Redirect(w, r, "/login", http.StatusSeeOther)
+  var reqBody LeaveRequest
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
+  reqBody.ID = uuid.New()
+  staff := s.GetSessionUser(w, r)
+  if (staff == nil) {
     return
   }
-  bytes, err := io.ReadAll(r.Body)
-  if err != nil {
-    log.Printf("Error reading body: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
-
-  var leaveReq LeaveRequest
-  leaveReq.ID = uuid.New()
-  err = json.Unmarshal(bytes, &leaveReq)
-  if err != nil {
-    log.Printf("json: %v", bytes)
-    log.Printf("Error parsing json: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
-  staff := s.GetStaffByToken(sessionToken)
-  if staff == nil {
-    log.Println("Couldn't find staff with given token")
-    http.Redirect(w, r, "/login", http.StatusSeeOther)
-    return
-  }
-  staff.LeaveRequests = append(staff.LeaveRequests, leaveReq)
+  staff.LeaveRequests = append(staff.LeaveRequests, reqBody)
   SaveState(s)
   data := ProfileData{
     StaffMember: *staff,
     ShowLeaveSuccess: true,
   }
-  if leaveReq.StartDate.After(leaveReq.EndDate.Time) {
+  if reqBody.StartDate.After(reqBody.EndDate.Time) {
     data.ShowLeaveError = true
     data.ShowLeaveSuccess = false
   }
-  err = s.Templates.ExecuteTemplate(w, "profile", data)
+  err := s.Templates.ExecuteTemplate(w, "profile", data)
   if err != nil {
     log.Printf("Error executing template: %v\n", err)
     http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -468,17 +462,8 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
-  sessionToken, ok := r.Context().Value(SESSION_KEY).(uuid.UUID)
-  if !ok {
-    log.Println("Invalid or missing session token")
-    http.Redirect(w, r, "/login", http.StatusSeeOther)
-    return
-  }
-
-  staff := s.GetStaffByToken(sessionToken)
-  if staff == nil {
-    log.Println("Couldn't find staff with given token")
-    http.Redirect(w, r, "/login", http.StatusSeeOther)
+  staff := s.GetSessionUser(w, r)
+  if (staff == nil) {
     return
   }
 
@@ -496,19 +481,6 @@ func (s *Server) HandleRoot(w http.ResponseWriter, r *http.Request) {
   err := s.Templates.ExecuteTemplate(w, "root", s)
   if err != nil {
     log.Fatalf("Error executing template: %v", err)
-  }
-}
-
-func (s *Server) HandlePostRequest(w http.ResponseWriter, r *http.Request) {
-  switch r.URL.Path {
-  case "/modifyRows":
-    s.HandleModifyRows(w, r)
-  case "/modifySlot":
-    s.HandleModifySlot(w, r)
-  case "/modifyTimeSlot":
-    s.HandleModifyTimeSlot(w, r)
-  default:
-    http.NotFound(w, r)
   }
 }
 
@@ -672,92 +644,89 @@ type ModifyProfile struct {
   MonLate  string `json:"Monday-late-avail"`
 }
 
+func (s *Server) GetSessionUser(w http.ResponseWriter, r *http.Request) *StaffMember {
+  sessionToken, ok := r.Context().Value(SESSION_KEY).(uuid.UUID)
+  if !ok {
+    log.Printf("Error retrieving token")
+    http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+    return nil
+  }
+  staff := s.GetStaffByToken(sessionToken)
+  if staff == nil {
+    log.Printf("Error modifying profile")
+    http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+    return nil
+  }
+  return staff
+}
+
 func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
   log.Println("Modify profile")
-  bytes, err := io.ReadAll(r.Body)
-  if err != nil {
-    log.Printf("Error reading body: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
-
   var reqBody ModifyProfile
-  err = json.Unmarshal(bytes, &reqBody)
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
+  staff := s.GetSessionUser(w, r)
+  if (staff == nil) {
+    return
+  }
+  staff.FirstName = reqBody.FirstName
+  staff.LastName = reqBody.LastName
+  staff.Email = reqBody.Email
+  staff.Phone = reqBody.Phone
+
+  staff.Availability = []DayAvailability{
+    {
+      Name: "Tuesday",
+      Early: reqBody.TuesEarly == "on",
+      Mid: reqBody.TuesMid == "on",
+      Late: reqBody.TuesLate == "on",
+    },
+    {
+      Name: "Wednesday",
+      Early: reqBody.WedEarly == "on",
+      Mid: reqBody.WedMid == "on",
+      Late: reqBody.WedLate == "on",
+    },
+    {
+      Name: "Thursday",
+      Early: reqBody.ThursEarly == "on",
+      Mid: reqBody.ThursMid == "on",
+      Late: reqBody.ThursLate == "on",
+    },
+    {
+      Name: "Friday",
+      Early: reqBody.FriEarly == "on",
+      Mid: reqBody.FriMid == "on",
+      Late: reqBody.FriLate == "on",
+    },
+    {
+      Name: "Saturday",
+      Early: reqBody.SatEarly == "on",
+      Mid: reqBody.SatMid == "on",
+      Late: reqBody.SatLate == "on",
+    },
+    {
+      Name: "Sunday",
+      Early: reqBody.SunEarly == "on",
+      Mid: reqBody.SunMid == "on",
+      Late: reqBody.SunLate == "on",
+    },
+    {
+      Name: "Monday",
+      Early: reqBody.MonEarly == "on",
+      Mid: reqBody.MonMid == "on",
+      Late: reqBody.MonLate == "on",
+    },
+  }
+  data := ProfileData{
+    StaffMember: *staff,
+    ShowUpdateSuccess: true,
+  }
+  SaveState(s)
+  err := s.Templates.ExecuteTemplate(w, "profile", data)
   if err != nil {
-    log.Printf("json: %v", bytes)
-    log.Printf("Error parsing json: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
+    log.Printf("Error executing template: %v\n", err)
+    http.Error(w, "Internal Server Error", http.StatusInternalServerError)
   }
-  sessionToken, ok := r.Context().Value(SESSION_KEY).(uuid.UUID)
-  if ok {
-    staff := s.GetStaffByToken(sessionToken)
-    if staff != nil {
-      staff.FirstName = reqBody.FirstName
-      staff.LastName = reqBody.LastName
-      staff.Email = reqBody.Email
-      staff.Phone = reqBody.Phone
-
-      staff.Availability = []DayAvailability{
-        {
-          Name: "Tuesday",
-          Early: reqBody.TuesEarly == "on",
-          Mid: reqBody.TuesMid == "on",
-          Late: reqBody.TuesLate == "on",
-        },
-        {
-          Name: "Wednesday",
-          Early: reqBody.WedEarly == "on",
-          Mid: reqBody.WedMid == "on",
-          Late: reqBody.WedLate == "on",
-        },
-        {
-          Name: "Thursday",
-          Early: reqBody.ThursEarly == "on",
-          Mid: reqBody.ThursMid == "on",
-          Late: reqBody.ThursLate == "on",
-        },
-        {
-          Name: "Friday",
-          Early: reqBody.FriEarly == "on",
-          Mid: reqBody.FriMid == "on",
-          Late: reqBody.FriLate == "on",
-        },
-        {
-          Name: "Saturday",
-          Early: reqBody.SatEarly == "on",
-          Mid: reqBody.SatMid == "on",
-          Late: reqBody.SatLate == "on",
-        },
-        {
-          Name: "Sunday",
-          Early: reqBody.SunEarly == "on",
-          Mid: reqBody.SunMid == "on",
-          Late: reqBody.SunLate == "on",
-        },
-        {
-          Name: "Monday",
-          Early: reqBody.MonEarly == "on",
-          Mid: reqBody.MonMid == "on",
-          Late: reqBody.MonLate == "on",
-        },
-      }
-    }
-    data := ProfileData{
-      StaffMember: *staff,
-      ShowUpdateSuccess: true,
-    }
-    SaveState(s)
-    err = s.Templates.ExecuteTemplate(w, "profile", data)
-    if err != nil {
-      log.Printf("Error executing template: %v\n", err)
-      http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-    }
-    return
-  }
-
-  log.Printf("Error executing template: %v\n", err)
-  http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 }
 
 func (s *Server) CheckFlags() {
@@ -849,21 +818,8 @@ type ShiftWindow struct {
 
 
 func (s *Server) HandleShiftWindow(w http.ResponseWriter, r *http.Request) {
-  bytes, err := io.ReadAll(r.Body)
-  if err != nil {
-    log.Printf("Error reading body: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
-
   var reqBody ShiftWindow
-  err = json.Unmarshal(bytes, &reqBody)
-  if err != nil {
-    log.Printf("Error parsing json: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
-
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
   switch reqBody.Action {
   case "+":
     s.StartDate = s.StartDate.AddDate(0, 0, 7)
@@ -878,7 +834,7 @@ func (s *Server) HandleShiftWindow(w http.ResponseWriter, r *http.Request) {
     s.StartDate = today.AddDate(0, 0, daysUntilTuesday)
   }
   SaveState(s)
-  err = s.Templates.ExecuteTemplate(w, "root", s)
+  err := s.Templates.ExecuteTemplate(w, "root", s)
   if err != nil {
     log.Fatalf("Error executing template: %v", err)
   }
@@ -886,20 +842,8 @@ func (s *Server) HandleShiftWindow(w http.ResponseWriter, r *http.Request) {
 
 
 func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
-  bytes, err := io.ReadAll(r.Body)
-  if err != nil {
-    log.Printf("Error reading body: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
-
   var reqBody ModifyRows
-  err = json.Unmarshal(bytes, &reqBody)
-  if err != nil {
-    log.Printf("Error parsing json: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
 
   dayID, err := uuid.Parse(reqBody.DayID)
   if err != nil {
@@ -913,7 +857,7 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
       if reqBody.Action == "+" {
         s.Days[i].Rows = append(s.Days[i].Rows, newRow())
       } else {
-        if len(s.Days[i].Rows) > 2 {
+        if len(s.Days[i].Rows) > 4 {
           s.Days[i].Rows = s.Days[i].Rows[:len(s.Days[i].Rows)-1]
         }
       }
@@ -941,49 +885,126 @@ func (s *Server) handleGoogleLogout(w http.ResponseWriter, r *http.Request) {
     SameSite:  http.SameSiteLaxMode,
   })
 
-  sessionToken, ok := r.Context().Value(SESSION_KEY).(uuid.UUID)
-  if ok {
-    staff := s.GetStaffByToken(sessionToken)
-    if staff != nil {
-      staff.Token = nil
-    }
+  staff := s.GetSessionUser(w, r)
+  if (staff == nil) {
     return
   }
+  staff.Token = nil
   http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
 func (s *Server) handleGoogleLogin(w http.ResponseWriter, r *http.Request) {
-  url := googleOauthConfig().AuthCodeURL("state", oauth2.AccessTypeOffline, oauth2.ApprovalForce, oauth2.SetAuthURLParam("prompt", "select_account"))
-  http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+  if (DEV_MODE) {
+    s.handleGoogleCallback(w, r)
+  } else {
+    url := googleOauthConfig().AuthCodeURL("state", oauth2.AccessTypeOffline, oauth2.ApprovalForce, oauth2.SetAuthURLParam("prompt", "select_account"))
+    http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+  }
+}
+
+type DeleteTrialBody struct {
+  ID            string `json:"id"`
+}
+
+func (s *Server) handleDeleteTrial(w http.ResponseWriter, r *http.Request) {
+  var reqBody DeleteTrialBody
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
+  trialID, err := uuid.Parse(reqBody.ID)
+  log.Println(trialID)
+  if err != nil {
+    log.Printf("Invalid dayID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  for i, staff := range *s.Staff {
+    if staff.ID == trialID {
+      newStaff := append((*s.Staff)[:i], (*s.Staff)[i+1:]...)
+      s.Staff = &newStaff
+      break
+    }
+  }
+
+  SaveState(s)
+  err = s.Templates.ExecuteTemplate(w, "root", s)
+  if err != nil {
+    log.Fatalf("Error executing template: %v", err)
+  }
+}
+
+func ReadAndUnmarshal(w http.ResponseWriter, r *http.Request, reqBody interface{}) error {
+  bytes, err := io.ReadAll(r.Body)
+  if err != nil {
+    log.Printf("Error reading body: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return err
+  }
+  defer r.Body.Close()
+
+  err = json.Unmarshal(bytes, reqBody)
+  if err != nil {
+    log.Printf("json: %v", string(bytes))
+    log.Printf("Error parsing json: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return err
+  }
+
+  return nil
+}
+
+type AddTrialBody struct {
+  Name            string `json:"name"`
+}
+
+func (s *Server) handleAddTrial(w http.ResponseWriter, r *http.Request) {
+  var reqBody AddTrialBody
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
+  newStaff := (append(*s.Staff, &StaffMember{
+    ID:    uuid.New(),
+    GoogleID:    "Trial",
+    IsTrial:    true,
+    FirstName:  reqBody.Name,
+    Availability: emptyAvailability,
+  }))
+  s.Staff = &newStaff
+
+  SaveState(s)
+  err := s.Templates.ExecuteTemplate(w, "root", s)
+  if err != nil {
+    log.Fatalf("Error executing template: %v", err)
+  }
 }
 
 func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
-  ctx := r.Context()
-  code := r.URL.Query().Get("code")
-  token, err := googleOauthConfig().Exchange(ctx, code)
-  if err != nil {
-    http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
-    return
-  }
-
-  response, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token="+token.AccessToken)
-  if err != nil {
-    http.Error(w, "Failed to login: "+err.Error(), http.StatusInternalServerError)
-    return
-  }
-
   var userInfo GoogleUserInfo
-  if err = json.NewDecoder(response.Body).Decode(&userInfo); err != nil {
-    http.Error(w, "Error decoding user information: "+err.Error(), http.StatusInternalServerError)
-    return
+  if (!DEV_MODE) {
+    ctx := r.Context()
+    code := r.URL.Query().Get("code")
+    token, err := googleOauthConfig().Exchange(ctx, code)
+    if err != nil {
+      http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
+      return
+    }
+
+    response, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token="+token.AccessToken)
+    if err != nil {
+      http.Error(w, "Failed to login: "+err.Error(), http.StatusInternalServerError)
+      return
+    }
+
+    if err = json.NewDecoder(response.Body).Decode(&userInfo); err != nil {
+      http.Error(w, "Error decoding user information: "+err.Error(), http.StatusInternalServerError)
+      return
+    }
+  } else {
+    userInfo = GoogleUserInfo{
+      ID: "DEV",
+    }
   }
 
   sessionIdentifier := uuid.New()
-  expirationTime := token.Expiry
   http.SetCookie(w, &http.Cookie{
     Name:     "session_token",
     Value:    sessionIdentifier.String(),
-    Expires:  expirationTime,
     HttpOnly: true,
     Secure:   true,
     SameSite:  http.SameSiteLaxMode,
@@ -999,10 +1020,12 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
   }
 
   if !found {
+    isAdmin := len(*s.Staff) == 0
     new := (append(*s.Staff, &StaffMember{
       ID:    uuid.New(),
       GoogleID:    userInfo.ID,
       FirstName:  "",
+      IsAdmin: isAdmin,
       Token: &sessionIdentifier,
       Availability: emptyAvailability,
     }))
@@ -1011,6 +1034,17 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 
   SaveState(s)
   http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (s *Server) VerifyAdmin(handler http.HandlerFunc) http.HandlerFunc {
+  return s.VerifySession(func(w http.ResponseWriter, r *http.Request) {
+    staff := s.GetSessionUser(w, r)
+    if (staff == nil || !staff.IsAdmin) {
+      http.Redirect(w, r, "/profile", http.StatusSeeOther)
+      return
+    }
+    handler(w, r)
+  })
 }
 
 func (s *Server) VerifySession(handler http.HandlerFunc) http.HandlerFunc {

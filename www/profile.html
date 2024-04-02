@@ -1,8 +1,10 @@
 {{ define "profile" }}
 <div id="profile">
   <div id="buttons">
+  {{if .IsAdmin }}
+    <a href="/">Edit Roster</a>
+  {{end}}
     <a href="/auth/logout">Logout</a>
-    <a href="/timeoff">Request Leave</a>
   </div>
   <section class="user-profile">
     <h1>Update Your Profile</h1>
