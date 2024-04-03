@@ -5,6 +5,7 @@
   {{ $date := .Date }}
   {{ $staff := .Staff }}
   {{ $isClosed := .IsClosed }}
+  {{ $ameliaOpen := .AmeliaOpen }}
   {{ $colour := .Colour }}
   {{range $index, $row := .Rows}}
   {{ if and $isClosed (gt $index 1) }}
@@ -25,8 +26,34 @@
               hx-vals='js:{"dayID":"{{$dayID}}"}'>
           Closed
       </label>
+      <label>
+          <input type="checkbox" {{ if $ameliaOpen }}checked{{ end }}
+              hx-post="/toggleAmelia"
+              hx-target="#d-{{$dayID}}"
+              hx-trigger="change"
+              hx-ext='json-enc'
+              hx-swap='outerHTML'
+              hx-vals='js:{"dayID":"{{$dayID}}"}'>
+          A/S Open
+      </label>
       {{else if eq $index 1}}
       {{$date.Format "02/01"}}
+      {{ else if $ameliaOpen }}
+      {{if $row.Amelia.AssignedStaff}}
+        <p>A/S </p>
+      {{end}}
+      <div class="rosterCell ameliaCell">
+        <form hx-post="/modifySlot" hx-trigger="change from:#as-{{ $row.Amelia.ID }}" hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>
+          <input type="hidden" name="dayID" value="{{ $dayID }}" />
+          <input type="hidden" name="slotID" value="{{ $row.Amelia.ID }}" />
+          <select style='background-color: {{ GetHighlightCol $colour $row.Amelia.Flag }};' id="as-{{ $row.Amelia.ID }}" name="staffID">
+            <option value=""></option>
+            {{ range $staff }}
+            <option value="{{.ID}}" {{if $row.Amelia.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
+            {{ end }}
+          </select>
+        </form>
+      </div>
       {{end}}
     </div>
 

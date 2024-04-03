@@ -3,6 +3,10 @@ DIST_FOLDER=./dist
 
 .PHONY: build
 
+run-clean:
+	rm data/state.json
+	go run cmd/main.go
+
 build:
 	@echo "Building static binary..."
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o $(DIST_FOLDER)/$(BINARY_NAME) ./cmd/main.go

@@ -166,10 +166,12 @@ type RosterDay struct {
   Colour         string
   Offset         int
   IsClosed         bool
+  AmeliaOpen         bool
 }
 
 type Row struct {
   ID     uuid.UUID
+  Amelia  Slot
   Early  Slot
   Mid Slot
   Late   Slot
@@ -232,6 +234,7 @@ func LoadState(filename string) (*Server, error) {
 func newRow() *Row {
   return &Row{
     ID:     uuid.New(),
+    Amelia:  newSlot(),
     Early:  newSlot(),
     Mid: newSlot(),
     Late:   newSlot(),
@@ -340,6 +343,7 @@ func main() {
   http.HandleFunc("/auth/logout", s.handleGoogleLogout)
   http.HandleFunc("/auth/callback", s.handleGoogleCallback)
 
+  http.HandleFunc("/toggleAmelia", s.VerifySession(s.handleToggleAmelia))
   http.HandleFunc("/toggleClosed", s.VerifySession(s.handleToggleClosed))
   http.HandleFunc("/deleteAcc", s.VerifySession(s.handleDeleteAccount))
   http.HandleFunc("/addTrial", s.VerifySession(s.handleAddTrial))
@@ -434,16 +438,15 @@ func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
   if (staff == nil) {
     return
   }
-  staff.LeaveRequests = append(staff.LeaveRequests, reqBody)
-  SaveState(s)
-  data := ProfileData{
-    StaffMember: *staff,
-    ShowLeaveSuccess: true,
-  }
+  data := ProfileData{}
   if reqBody.StartDate.After(reqBody.EndDate.Time) {
     data.ShowLeaveError = true
-    data.ShowLeaveSuccess = false
+  } else {
+    data.ShowLeaveSuccess = true
+    staff.LeaveRequests = append(staff.LeaveRequests, reqBody)
+    SaveState(s)
   }
+  data.StaffMember = *staff
   err := s.Templates.ExecuteTemplate(w, "profile", data)
   if err != nil {
     log.Printf("Error executing template: %v\n", err)
@@ -511,6 +514,9 @@ func (s *Server) GetSlotByID(slotID uuid.UUID) *Slot {
     day := s.Days[i]
     for j := range day.Rows {
       row := day.Rows[j]
+      if row.Amelia.ID == slotID {
+        return &row.Amelia
+      }
       if row.Early.ID == slotID {
         return &row.Early
       }
@@ -757,11 +763,14 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) CheckFlags() {
-  for _, day := range s.Days {
+  for i, day := range s.Days {
     // Create a new map for each day to track occurrences of staff IDs within that day
     staffIDOccurrences := make(map[uuid.UUID]int)
 
     for _, row := range day.Rows {
+      if day.AmeliaOpen && row.Amelia.AssignedStaff != nil {
+        staffIDOccurrences[*row.Amelia.AssignedStaff]++
+      }
       if row.Early.AssignedStaff != nil {
         staffIDOccurrences[*row.Early.AssignedStaff]++
       }
@@ -773,11 +782,31 @@ func (s *Server) CheckFlags() {
       }
     }
 
-    for i, row := range day.Rows {
+    for _, row := range day.Rows {
+      row.Amelia.Flag = None
       row.Early.Flag = None
       row.Mid.Flag = None
       row.Late.Flag = None
       date := s.StartDate.AddDate(0, 0, day.Offset)
+
+      if day.AmeliaOpen && row.Amelia.AssignedStaff != nil {
+        if staffIDOccurrences[*row.Amelia.AssignedStaff] > 1 {
+          row.Amelia.Flag = Duplicate
+        } else {
+          staff := s.GetStaffByID(*row.Amelia.AssignedStaff)
+          for _, req := range staff.LeaveRequests {
+            if !req.StartDate.After(date) && req.EndDate.After(date) {
+              row.Amelia.Flag = LeaveConflict
+              break
+            }
+          }
+          if staff != nil {
+            if !staff.Availability[i].Late {
+              row.Amelia.Flag = PrefConflict
+            }
+          }
+        }
+      }
 
       if row.Early.AssignedStaff != nil {
         if staffIDOccurrences[*row.Early.AssignedStaff] > 1 {
@@ -929,6 +958,35 @@ func (s *Server) handleGoogleLogin(w http.ResponseWriter, r *http.Request) {
   }
 }
 
+type ToggleAmeliaBody struct {
+  DayID            string `json:"dayID"`
+}
+
+func (s *Server) handleToggleAmelia(w http.ResponseWriter, r *http.Request) {
+  var reqBody ToggleAmeliaBody
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
+  dayID, err := uuid.Parse(reqBody.DayID)
+  if err != nil {
+    log.Printf("Invalid dayID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  day := s.GetDayByID(dayID)
+  if day == nil {
+    log.Printf("Invalid dayID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  day.AmeliaOpen = !day.AmeliaOpen
+  SaveState(s)
+  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate))
+  if err != nil {
+    log.Printf("Error executing template: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+}
+
 type ToggleClosedBody struct {
   DayID            string `json:"dayID"`
 }
@@ -981,9 +1039,25 @@ func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
     }
   }
 
+  for _, day := range s.Days {
+    for _, row := range day.Rows {
+      if row.Amelia.AssignedStaff != nil && *row.Amelia.AssignedStaff == accID {
+        row.Amelia.AssignedStaff = nil
+      }
+      if row.Early.AssignedStaff != nil && *row.Early.AssignedStaff == accID {
+        row.Early.AssignedStaff = nil
+      }
+      if row.Mid.AssignedStaff != nil && *row.Mid.AssignedStaff == accID {
+        row.Mid.AssignedStaff = nil
+      }
+      if row.Late.AssignedStaff != nil && *row.Late.AssignedStaff == accID {
+        row.Late.AssignedStaff = nil
+      }
+    }
+  }
+
   SaveState(s)
   if selfDelete {
-    log.Println("Delete")
     s.handleGoogleLogout(w, r)
   } else {
     err = s.Templates.ExecuteTemplate(w, "root", s)
