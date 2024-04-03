@@ -14,14 +14,14 @@
   {{ range .Staff }}
   {{if .IsTrial }}
     <div>{{ .FirstName }}</div>
-    <a href="#" hx-ext="json-enc" hx-post="/deleteTrial" hx-vals='js:{"id":"{{ .ID }}"}' hx-swap="outerHTML" hx-target="#roster">🗑</a>
+    <a href="#" hx-ext="json-enc" hx-post="/deleteAcc" hx-vals='js:{"id":"{{ .ID }}"}' hx-swap="outerHTML" hx-target="#roster">🗑</a>
   {{end}}
   {{ end }}
   <form id="addTrialForm" hx-post="/addTrial" hx-ext="json-enc" hx-swap="outerHTML" hx-target="#roster">
     <input type="text" name="name" id="customStaff" value="Trial" onfocus="this.select();" onclick="this.select();" />
     <button type="submit">+</button>
   </form>
-  <a href="/auth/logout">Logout</a>
+  <a href="#" hx-post="/auth/logout">Logout</a>
   <a href="/profile">Edit Profile</a>
 </div>
 {{ end }}

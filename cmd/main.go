@@ -20,7 +20,7 @@ import (
 
 const STATE_FILE = "./data/state.json"
 const SESSION_KEY = "sessionToken"
-var DEV_MODE = true
+var DEV_MODE = false
 const DEV_UUID = "00000000-0000-0000-0000-000000000000"
 
 func googleOauthConfig() *oauth2.Config {
@@ -338,7 +338,7 @@ func main() {
   http.HandleFunc("/auth/logout", s.handleGoogleLogout)
   http.HandleFunc("/auth/callback", s.handleGoogleCallback)
 
-  http.HandleFunc("/deleteTrial", s.VerifySession(s.handleDeleteTrial))
+  http.HandleFunc("/deleteAcc", s.VerifySession(s.handleDeleteAccount))
   http.HandleFunc("/addTrial", s.VerifySession(s.handleAddTrial))
   http.HandleFunc("/shiftWindow", s.VerifySession(s.HandleShiftWindow))
   http.HandleFunc("/modifyProfile", s.VerifySession(s.HandleModifyProfile))
@@ -648,13 +648,11 @@ func (s *Server) GetSessionUser(w http.ResponseWriter, r *http.Request) *StaffMe
   sessionToken, ok := r.Context().Value(SESSION_KEY).(uuid.UUID)
   if !ok {
     log.Printf("Error retrieving token")
-    http.Error(w, "Internal Server Error", http.StatusInternalServerError)
     return nil
   }
   staff := s.GetStaffByToken(sessionToken)
   if staff == nil {
     log.Printf("Error modifying profile")
-    http.Error(w, "Internal Server Error", http.StatusInternalServerError)
     return nil
   }
   return staff
@@ -886,11 +884,11 @@ func (s *Server) handleGoogleLogout(w http.ResponseWriter, r *http.Request) {
   })
 
   staff := s.GetSessionUser(w, r)
-  if (staff == nil) {
-    return
+  if (staff != nil) {
+    staff.Token = nil
   }
-  staff.Token = nil
-  http.Redirect(w, r, "/login", http.StatusSeeOther)
+  w.Header().Set("HX-Redirect", "/auth/login")
+  w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) handleGoogleLogin(w http.ResponseWriter, r *http.Request) {
@@ -902,22 +900,24 @@ func (s *Server) handleGoogleLogin(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-type DeleteTrialBody struct {
+type DeleteAccountBody struct {
   ID            string `json:"id"`
 }
 
-func (s *Server) handleDeleteTrial(w http.ResponseWriter, r *http.Request) {
-  var reqBody DeleteTrialBody
+func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
+  var reqBody DeleteAccountBody
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
-  trialID, err := uuid.Parse(reqBody.ID)
-  log.Println(trialID)
+  accID, err := uuid.Parse(reqBody.ID)
+
   if err != nil {
     log.Printf("Invalid dayID: %v", err)
     w.WriteHeader(http.StatusBadRequest)
     return
   }
+  thisStaff := s.GetSessionUser(w, r)
+  selfDelete := thisStaff.ID == accID
   for i, staff := range *s.Staff {
-    if staff.ID == trialID {
+    if staff.ID == accID {
       newStaff := append((*s.Staff)[:i], (*s.Staff)[i+1:]...)
       s.Staff = &newStaff
       break
@@ -925,9 +925,14 @@ func (s *Server) handleDeleteTrial(w http.ResponseWriter, r *http.Request) {
   }
 
   SaveState(s)
-  err = s.Templates.ExecuteTemplate(w, "root", s)
-  if err != nil {
-    log.Fatalf("Error executing template: %v", err)
+  if selfDelete {
+    log.Println("Delete")
+    s.handleGoogleLogout(w, r)
+  } else {
+    err = s.Templates.ExecuteTemplate(w, "root", s)
+    if err != nil {
+      log.Fatalf("Error executing template: %v", err)
+    }
   }
 }
 
@@ -1062,7 +1067,6 @@ func (s *Server) VerifySession(handler http.HandlerFunc) http.HandlerFunc {
 
     sessionTokenStr := cookie.Value
 
-    // Convert sessionTokenStr (type string) to type uuid.UUID
     sessionToken, err := uuid.Parse(sessionTokenStr)
     if err != nil {
       http.Redirect(w, r, "/auth/login", http.StatusSeeOther)

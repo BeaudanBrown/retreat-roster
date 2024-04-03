@@ -1,10 +1,14 @@
 {{ define "profile" }}
 <div id="profile">
   <div id="buttons">
-  {{if .IsAdmin }}
+  {{ if .IsAdmin }}
     <a href="/">Edit Roster</a>
+  {{ else }}
+    <a href="/" hx-ext='json-enc' hx-post="/deleteAcc" hx-vals='js:{"ID":"{{ .ID }}"}' hx-confirm="Are you sure you want to delete your account?">
+        Delete Account
+    </a>
   {{end}}
-    <a href="/auth/logout">Logout</a>
+    <a href="#" hx-post="/auth/logout">Logout</a>
   </div>
   <section class="user-profile">
     <h1>Update Your Profile</h1>
