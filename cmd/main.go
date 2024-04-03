@@ -165,6 +165,7 @@ type RosterDay struct {
   Rows           []*Row
   Colour         string
   Offset         int
+  IsClosed         bool
 }
 
 type Row struct {
@@ -179,6 +180,7 @@ type Slot struct {
   StartTime     string
   AssignedStaff *uuid.UUID
   Flag	Highlight
+  Description	string
 }
 
 type GoogleUserInfo struct {
@@ -338,6 +340,7 @@ func main() {
   http.HandleFunc("/auth/logout", s.handleGoogleLogout)
   http.HandleFunc("/auth/callback", s.handleGoogleCallback)
 
+  http.HandleFunc("/toggleClosed", s.VerifySession(s.handleToggleClosed))
   http.HandleFunc("/deleteAcc", s.VerifySession(s.handleDeleteAccount))
   http.HandleFunc("/addTrial", s.VerifySession(s.handleAddTrial))
   http.HandleFunc("/shiftWindow", s.VerifySession(s.HandleShiftWindow))
@@ -345,6 +348,7 @@ func main() {
   http.HandleFunc("/modifyRows", s.VerifySession(s.HandleModifyRows))
   http.HandleFunc("/modifySlot", s.VerifySession(s.HandleModifySlot))
   http.HandleFunc("/modifyTimeSlot", s.VerifySession(s.HandleModifyTimeSlot))
+  http.HandleFunc("/modifyDescriptionSlot", s.VerifySession(s.HandleModifyDescriptionSlot))
   http.HandleFunc("/deleteLeaveReq", s.VerifySession(s.HandleDeleteLeaveReq))
 
   log.Println(http.ListenAndServe(":6969", nil))
@@ -395,7 +399,7 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
   leaveID, err := uuid.Parse(reqBody.ID)
   if err != nil {
-    log.Printf("Invalid dayID: %v", err)
+    log.Printf("Invalid leaveID: %v", err)
     w.WriteHeader(http.StatusBadRequest)
     return
   }
@@ -528,6 +532,31 @@ func (s *Server) GetDayByID(dayID uuid.UUID) *RosterDay {
     }
   }
   return nil
+}
+
+func (s *Server) HandleModifyDescriptionSlot(w http.ResponseWriter, r *http.Request) {
+  if err := r.ParseForm(); err != nil {
+    log.Printf("Error parsing form: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  slotIDStr := r.FormValue("slotID")
+  descVal := r.FormValue("descVal")
+  slotID, err := uuid.Parse(slotIDStr)
+  if err != nil {
+    log.Printf("Invalid SlotID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  slot := s.GetSlotByID(slotID)
+  if slot == nil {
+    log.Printf("Invalid slotID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+
+  slot.Description = descVal
+  SaveState(s)
 }
 
 func (s *Server) HandleModifyTimeSlot(w http.ResponseWriter, r *http.Request) {
@@ -900,6 +929,35 @@ func (s *Server) handleGoogleLogin(w http.ResponseWriter, r *http.Request) {
   }
 }
 
+type ToggleClosedBody struct {
+  DayID            string `json:"dayID"`
+}
+
+func (s *Server) handleToggleClosed(w http.ResponseWriter, r *http.Request) {
+  var reqBody ToggleClosedBody
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
+  dayID, err := uuid.Parse(reqBody.DayID)
+  if err != nil {
+    log.Printf("Invalid dayID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  day := s.GetDayByID(dayID)
+  if day == nil {
+    log.Printf("Invalid dayID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  day.IsClosed = !day.IsClosed
+  SaveState(s)
+  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate))
+  if err != nil {
+    log.Printf("Error executing template: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+}
+
 type DeleteAccountBody struct {
   ID            string `json:"id"`
 }
@@ -908,9 +966,8 @@ func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
   var reqBody DeleteAccountBody
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
   accID, err := uuid.Parse(reqBody.ID)
-
   if err != nil {
-    log.Printf("Invalid dayID: %v", err)
+    log.Printf("Invalid accID: %v", err)
     w.WriteHeader(http.StatusBadRequest)
     return
   }

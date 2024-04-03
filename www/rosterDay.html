@@ -4,21 +4,45 @@
   {{ $dayID := .ID }}
   {{ $date := .Date }}
   {{ $staff := .Staff }}
+  {{ $isClosed := .IsClosed }}
   {{ $colour := .Colour }}
   {{range $index, $row := .Rows}}
+  {{ if and $isClosed (gt $index 1) }}
+  {{ else }}
   <div class="row">
     <div class="rosterCell dayCell">
       {{if eq $index 0}}
       {{$dayName}}
       <button hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"dayID":"{{$dayID}}", "action":"-"}' hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>-</button>
       <button hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"dayID":"{{$dayID}}", "action":"+"}' hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>+</button>
+      <label>
+          <input type="checkbox" {{ if $isClosed }}checked{{ end }}
+              hx-post="/toggleClosed"
+              hx-target="#d-{{$dayID}}"
+              hx-trigger="change"
+              hx-ext='json-enc'
+              hx-swap='outerHTML'
+              hx-vals='js:{"dayID":"{{$dayID}}"}'>
+          Closed
+      </label>
       {{else if eq $index 1}}
       {{$date.Format "02/01"}}
       {{end}}
     </div>
 
+    {{ if $isClosed }}
+    <div class="rosterCell timeCell">&nbsp;</div>
+    <div class="rosterCell staffCell"></div>
+    <div class="rosterCell flagCell"></div>
+    <div class="rosterCell timeCell"></div>
+    <div class="rosterCell staffCell"></div>
+    <div class="rosterCell flagCell"></div>
+    <div class="rosterCell timeCell"></div>
+    <div class="rosterCell staffCell"></div>
+    <div class="rosterCell flagCell"></div>
+    {{ else }}
     <div class="rosterCell timeCell">
-      <form hx-post="/modifyTimeSlot" hx-trigger="keyup delay:1500ms" hx-swap="none">
+      <form onkeydown="return event.key !== 'Enter';" hx-post="/modifyTimeSlot" hx-trigger="keyup delay:1500ms" hx-swap="none">
         <input class="rosterInput" style='background-color: {{$colour}};' name="timeVal" type="text" id="t-{{$row.Early.ID}}" value="{{$row.Early.StartTime}}" onfocus="this.select();" onclick="this.select();" />
         <input type="hidden" name="slotID" value="{{ $row.Early.ID }}" />
       </form>
@@ -38,10 +62,14 @@
     </div>
 
     <div class="rosterCell flagCell">
+      <form onkeydown="return event.key !== 'Enter';" hx-post="/modifyDescriptionSlot" hx-trigger="keyup delay:1500ms" hx-swap="none">
+        <input class="rosterInput" style='background-color: {{$colour}};' name="descVal" type="text" id="d-{{$row.Early.ID}}" value="{{$row.Early.Description}}" onfocus="this.select();" onclick="this.select();" />
+        <input type="hidden" name="slotID" value="{{ $row.Early.ID }}" />
+      </form>
     </div>
 
     <div class="rosterCell timeCell">
-      <form hx-post="/modifyTimeSlot" hx-trigger="keyup delay:1500ms" hx-swap="none">
+      <form onkeydown="return event.key !== 'Enter';" hx-post="/modifyTimeSlot" hx-trigger="keyup delay:1500ms" hx-swap="none">
         <input class="rosterInput" style='background-color: {{$colour}};' name="timeVal" type="text" id="t-{{$row.Mid.ID}}" value="{{$row.Mid.StartTime}}" onfocus="this.select();" onclick="this.select();" />
         <input type="hidden" name="slotID" value="{{ $row.Mid.ID }}" />
       </form>
@@ -61,10 +89,14 @@
     </div>
 
     <div class="rosterCell flagCell">
+      <form onkeydown="return event.key !== 'Enter';" hx-post="/modifyDescriptionSlot" hx-trigger="keyup delay:1500ms" hx-swap="none">
+        <input class="rosterInput" style='background-color: {{$colour}};' name="descVal" type="text" id="d-{{$row.Mid.ID}}" value="{{$row.Mid.Description}}" onfocus="this.select();" onclick="this.select();" />
+        <input type="hidden" name="slotID" value="{{ $row.Mid.ID }}" />
+      </form>
     </div>
 
     <div class="rosterCell timeCell">
-      <form hx-post="/modifyTimeSlot" hx-trigger="keyup delay:1500ms" hx-swap="none">
+      <form onkeydown="return event.key !== 'Enter';" hx-post="/modifyTimeSlot" hx-trigger="keyup delay:1500ms" hx-swap="none">
         <input class="rosterInput" style='background-color: {{$colour}};' name="timeVal" type="text" id="t-{{$row.Late.ID}}" value="{{$row.Late.StartTime}}" onfocus="this.select();" onclick="this.select();" />
         <input type="hidden" name="slotID" value="{{ $row.Late.ID }}" />
       </form>
@@ -84,9 +116,15 @@
     </div>
 
     <div class="rosterCell flagCell">
+      <form onkeydown="return event.key !== 'Enter';" hx-post="/modifyDescriptionSlot" hx-trigger="keyup delay:1500ms" hx-swap="none">
+        <input class="rosterInput" style='background-color: {{$colour}};' name="descVal" type="text" id="d-{{$row.Late.ID}}" value="{{$row.Late.Description}}" onfocus="this.select();" onclick="this.select();" />
+        <input type="hidden" name="slotID" value="{{ $row.Late.ID }}" />
+      </form>
     </div>
+    {{ end }}
 
   </div>
-  {{end}}
+  {{ end }}
+  {{ end }}
 </div>
 {{end}}

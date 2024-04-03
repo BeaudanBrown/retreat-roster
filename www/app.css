@@ -63,7 +63,7 @@ select {
 }
 
 .timeCell {
-  flex: 1;
+  flex: 0.5;
 }
 
 .staffCell {
@@ -71,7 +71,7 @@ select {
 }
 
 .flagCell {
-  flex: 0.5;
+  flex: 0.3;
 }
 
 .rosterCell {
