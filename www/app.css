@@ -5,6 +5,10 @@ select {
 }
 
 form {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
   width: 100%;
   height: 100%;
   border: none; /* Removes the border */
@@ -171,17 +175,38 @@ th, td {
   text-align: center;
 }
 
-/* .staff-row { */
-/*   display: flex; */
-/*   align-items: center; */
-/*   justify-content: space-between; */
-/* } */
+h1 {
+  text-align: center;
+}
 
-/* .staff-container { */
-/*   width: 100%; */
-/*   display: flex; */
-/*   flex-direction: column; */
-/*   align-items: center; */
-/*   justify-content: space-between; */
-/* } */
+.blank-table th, .blank-table td {
+  border: 0px;
+}
 
+.timeoff {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.profile {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.info-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 10px; /* Spacing between each label-input pair */
+}

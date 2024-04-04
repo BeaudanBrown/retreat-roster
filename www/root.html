@@ -95,6 +95,21 @@
         </tbody>
       </table>
     </div>
+
+  <h2>Leave Requests</h2>
+  {{ range $staff }}
+    {{ $name := .FirstName }}
+    {{ range .LeaveRequests }}
+      <div class="leave-request-row">
+        <div class="leave-reason">Staff: {{ $name }}</div>
+        <div class="leave-reason">Reason: {{ .Reason }}</div>
+        <div class="leave-start-date">Unavailable: {{ .StartDate.Format "Jan 2, 2006" }}</div>
+        <div class="leave-end-date">Available: {{ .EndDate.Format "Jan 2, 2006" }}</div>
+        <a href="#" hx-ext="json-enc" class="delete-icon" hx-post="/deleteAdminLeaveReq" hx-vals='js:{"id":"{{ .ID }}"}' hx-swap="outerHTML" hx-target="#roster">🗑</a>
+      </div>
+    {{ end }}
+  {{ end }}
+
   {{ else }}
     <button id="capture">Save image</button>
   {{ end }}

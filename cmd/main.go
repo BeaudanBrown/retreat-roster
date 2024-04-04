@@ -360,6 +360,7 @@ func main() {
   http.HandleFunc("/modifyTimeSlot", s.VerifySession(s.HandleModifyTimeSlot))
   http.HandleFunc("/modifyDescriptionSlot", s.VerifySession(s.HandleModifyDescriptionSlot))
   http.HandleFunc("/deleteLeaveReq", s.VerifySession(s.HandleDeleteLeaveReq))
+  http.HandleFunc("/deleteAdminLeaveReq", s.VerifyAdmin(s.HandleAdminDeleteLeaveReq))
 
   log.Println(http.ListenAndServe(":6969", nil))
 }
@@ -403,6 +404,38 @@ func MakeDayStruct(day RosterDay, staff *[]*StaffMember, startDate time.Time, is
 
 type DeleteLeaveBody struct {
   ID string `json:"id"`
+}
+
+func (s *Server) HandleAdminDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
+  log.Println("Delete leave request")
+  var reqBody DeleteLeaveBody
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
+  leaveID, err := uuid.Parse(reqBody.ID)
+  if err != nil {
+    log.Printf("Invalid leaveID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+
+  found := false
+  for _, staff := range *s.Staff {
+    for i, leaveReq := range staff.LeaveRequests {
+      if leaveReq.ID == leaveID {
+        staff.LeaveRequests = append(staff.LeaveRequests[:i], staff.LeaveRequests[i+1:]...)
+        SaveState(s)
+        found = true
+        break
+      }
+    }
+    if found {
+      break
+    }
+  }
+  err = s.Templates.ExecuteTemplate(w, "root", s)
+  if err != nil {
+    log.Printf("Error executing template: %v\n", err)
+    http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+  }
 }
 
 func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {

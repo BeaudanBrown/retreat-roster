@@ -1,5 +1,5 @@
 {{ define "profile" }}
-<div id="profile">
+<div id="profile" class="profile-container">
   <div id="buttons">
   {{ if .IsAdmin }}
     <a href="/">Edit Roster</a>
@@ -15,14 +15,24 @@
     <form hx-ext='json-enc' hx-post="/modifyProfile" hx-swap="outerHTML" hx-target="#profile">
       <fieldset>
         <legend>Personal Information</legend>
-        <label for="firstName">First Name:</label>
-        <input type="text" id="firstName" name="firstName" value="{{.FirstName}}" required>
-        <label for="lastName">Last Name:</label>
-        <input type="text" id="lastName" name="lastName" value="{{.LastName}}" required>
-        <label for="email">Email:</label>
-        <input type="email" id="email" name="email" value="{{.Email}}" required>
-        <label for="phone">Phone:</label>
-        <input type="tel" id="phone" name="phone" value="{{.Phone}}" required>
+        <table class="blank-table">
+          <tr>
+            <td><label for="firstName">First Name:</label></td>
+            <td><input type="text" id="firstName" name="firstName" value="{{.FirstName}}" required></td>
+          </tr>
+          <tr>
+            <td><label for="lastName">Last Name:</label></td>
+            <td><input type="text" id="lastName" name="lastName" value="{{.LastName}}" required></td>
+          </tr>
+          <tr>
+            <td><label for="email">Email:</label></td>
+            <td><input type="email" id="email" name="email" value="{{.Email}}" required></td>
+          </tr>
+          <tr>
+            <td><label for="phone">Phone:</label></td>
+            <td><input type="tel" id="phone" name="phone" value="{{.Phone}}" required></td>
+          </tr>
+        </table>
       </fieldset>
       <fieldset>
         <legend>Availability</legend>
@@ -36,14 +46,32 @@
             <option value=6 {{ if eq .IdealShifts 6 }}selected{{ end }}>6</option>
             <option value=7 {{ if eq .IdealShifts 7 }}selected{{ end }}>7</option>
         </select>
-        {{ range .Availability }}
-        <div class="availability">
-          <span>{{ .Name }}</span>
-          <label><input type="checkbox" name="{{.Name}}-early-avail" id="{{.Name}}-early-avail" {{ if .Early }}checked{{ end }}> Early</label>
-          <label><input type="checkbox" name="{{.Name}}-mid-avail" id="{{.Name}}-mid-avail" {{ if .Mid }}checked{{ end }}> Mid</label>
-          <label><input type="checkbox" name="{{.Name}}-late-avail" id="{{.Name}}-late-avail" {{ if .Late }}checked{{ end }}> Late</label>
-        </div>
-        {{ end }}
+        <table class="blank-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Early</th>
+              <th>Mid</th>
+              <th>Late</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{ range .Availability }}
+            <tr class="availability">
+              <td>{{ .Name }}</td>
+              <td>
+                <label><input type="checkbox" name="{{.Name}}-early-avail" id="{{.Name}}-early-avail" {{ if .Early }}checked{{ end }}> Early</label>
+              </td>
+              <td>
+                <label><input type="checkbox" name="{{.Name}}-mid-avail" id="{{.Name}}-mid-avail" {{ if .Mid }}checked{{ end }}> Mid</label>
+              </td>
+              <td>
+                <label><input type="checkbox" name="{{.Name}}-late-avail" id="{{.Name}}-late-avail" {{ if .Late }}checked{{ end }}> Late</label>
+              </td>
+            </tr>
+            {{ end }}
+          </tbody>
+        </table>
       </fieldset>
       <button type="submit">Save Changes</button>
       {{if .ShowUpdateSuccess }}
@@ -54,19 +82,26 @@
       {{end}}
     </form>
   </section>
-  <section class="timeoff">
-    <h1>Request Time off</h1>
+  <section>
     <form hx-ext='json-enc' hx-post="/submitLeave" hx-swap="outerHTML" hx-target="#profile">
-      <fieldset>
-        <legend>Submit Leave Request</legend>
-        <label for="reason">Reason for leave:</label>
-        <input type="text" id="reason" name="reason" required>
-        <label for="start-date">First date you will be unavailable:</label>
-        <input type="date" id="start-date" name="start-date" required>
-        <label for="end-date">First date you will available to work:</label>
-        <input type="date" id="end-date" name="end-date" required>
-      </fieldset>
+    <fieldset class="timeoff">
+      <legend>Request Leave</legend>
+      <table class="blank-table">
+        <tr>
+          <td><label for="reason">Reason for leave:</label></td>
+          <td><input type="text" id="reason" name="reason" required></td>
+        </tr>
+        <tr>
+          <td><label for="start-date">Unavailable:</label></td>
+          <td><input type="date" id="start-date" name="start-date" required></td>
+        </tr>
+        <tr>
+          <td><label for="end-date">Available again:</label></td>
+          <td><input type="date" id="end-date" name="end-date" required></td>
+        </tr>
+      </table>
       <button type="submit">Submit leave request</button>
+    </fieldset>
       {{if .ShowLeaveSuccess }}
       <div id="leave-success-message">Success!</div>
       {{end}}
@@ -78,16 +113,9 @@
 
   {{ range .LeaveRequests }}
   <div class="leave-request-row">
-    <!-- Displaying Reason -->
     <div class="leave-reason">Reason: {{ .Reason }}</div>
-
-    <!-- Displaying StartDate -->
-    <div class="leave-start-date">First date unavailable: {{ .StartDate.Format "Jan 2, 2006" }}</div>
-
-    <!-- Displaying EndDate -->
-    <div class="leave-end-date">First date back: {{ .EndDate.Format "Jan 2, 2006" }}</div>
-
-    <!-- Delete icon with hx-post -->
+    <div class="leave-start-date">Unavailable: {{ .StartDate.Format "01/02/06" }}</div>
+    <div class="leave-end-date">Available: {{ .EndDate.Format "02/01/06" }}</div>
     <a href="#" hx-ext="json-enc" class="delete-icon" hx-post="/deleteLeaveReq" hx-vals='js:{"id":"{{ .ID }}"}' hx-swap="outerHTML" hx-target="#profile">🗑</a>
   </div>
   {{ end }}
