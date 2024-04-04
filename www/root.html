@@ -31,12 +31,6 @@
   {{ end }}
   </div>
   {{if not $isLive }}
-    {{ range .Staff }}
-      {{if .IsTrial }}
-        <div>{{ .FirstName }}</div>
-        <a href="#" hx-ext="json-enc" hx-post="/deleteAcc" hx-vals='js:{"id":"{{ .ID }}"}' hx-swap="outerHTML" hx-target="#roster">🗑</a>
-      {{end}}
-    {{ end }}
     <div class="form-container">
       <form id="addTrialForm" hx-post="/addTrial" hx-ext="json-enc" hx-swap="outerHTML" hx-target="#roster">
         <label>Add New Trial</label>
@@ -44,19 +38,85 @@
         <button type="submit">+</button>
       </form>
     </div>
+    {{ range .Staff }}
+      {{if .IsTrial }}
+        <div>{{ .FirstName }} <a href="#" hx-ext="json-enc" hx-post="/deleteAcc" hx-vals='js:{"id":"{{ .ID }}"}' hx-swap="outerHTML" hx-target="#roster">🗑</a></div>
+      {{end}}
+    {{ end }}
     <button id="capture" style="display:none;">Capture as JPG</button>
+    <h2>All Staff</h2>
+    <div class="staff-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Phone #</th>
+            <th>Ideal # of Shifts</th>
+            <th>Hidden</th>
+            <th>Admin</th>
+            <th>Delete</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range .Staff }}
+            {{if not .IsTrial }}
+              <tr class="staff-row">
+                <td>{{ .FirstName }} {{ .LastName }}</td>
+                <td>{{ .Email }}</td>
+                <td>{{ .Phone }}</td>
+                <td>{{ .IdealShifts }}</td>
+                <td>
+                  <input type="checkbox" {{ if .IsHidden }}checked{{ end }}
+                    hx-ext="json-enc"
+                    hx-post="/toggleHidden"
+                    hx-target="#roster"
+                    hx-trigger="change"
+                    hx-vals='{"id": "{{ .ID }}"}'
+                    hx-swap='outerHTML'>
+                </td>
+                <td>
+                  <input type="checkbox" {{ if .IsAdmin }}checked{{ end }}
+                    hx-ext="json-enc"
+                    hx-post="/toggleAdmin"
+                    hx-target="#roster"
+                    hx-trigger="change"
+                    hx-vals='{"id": "{{ .ID }}"}'
+                    hx-swap='outerHTML'>
+                </td>
+                <td>
+                  {{if not .IsAdmin }}
+                  <a href="#" hx-ext="json-enc" hx-confirm="Are you sure you want to delete this staff member?" hx-post="/deleteAcc" hx-vals='js:{"id":"{{ .ID }}"}' hx-swap="outerHTML" hx-target="#roster">🗑</a>
+                  {{end}}
+                </td>
+              </tr>
+            {{end}}
+          {{ end }}
+        </tbody>
+      </table>
+    </div>
   {{ else }}
     <button id="capture">Save image</button>
   {{ end }}
   <a href="#" hx-post="/auth/logout">Logout</a>
   <a href="/profile">Edit Profile</a>
 </div>
+
 <script>
+function formatDate(dateStr) {
+    const date = new Date(dateStr);
+    let day = date.getDate().toString().padStart(2, '0');
+    let month = (date.getMonth() + 1).toString().padStart(2, '0'); // January is 0!
+    let year = date.getFullYear().toString().slice(-2); // Get last two digits of the year
+    return `${day}_${month}_${year}`;
+  }
+
 document.getElementById("capture").addEventListener("click", function() {
+  let dateStr = formatDate({{ $startDate }});
   html2canvas(document.querySelector("#roster-jpg")).then(canvas => {
     let a = document.createElement('a');
     a.href = canvas.toDataURL("image/jpeg").replace("image/jpeg", "image/octet-stream");
-    a.download = 'roster.jpg';
+    a.download = `roster_${dateStr}.jpg`; // File name incorporates formatted start date
     a.click();
   });
 });

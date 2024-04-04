@@ -23,7 +23,16 @@ select {
   box-sizing: border-box; /* Include padding and border in the element's width and height */
 }
 
+.root {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
 .rootBody {
+  padding: 0; /* Optional: Adjusts padding */
+  margin: 0; /* Removes default margin */
   /* background-color: #000033; /1* Deep navy blue *1/ */
 }
 
@@ -41,23 +50,24 @@ select {
 .roster-container {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   align-items: center;
+  width: 800px;
+  margin-left: 3px auto;
+  margin-right: 3px auto;
+}
+@media (max-width: 806px) {
+    .roster-container {
+        width: calc(100% - 6px);
+    }
 }
 
 .day {
-  max-width: 100%;
-  width: 800px;
+  width: 100%;
   display: flex;
-  margin-left: 10px auto;
-  margin-right: 10px auto;
   box-sizing: border-box;
   flex-direction: column;
   align-items: center;
-}
-@media (max-width: 620px) {
-    .day {
-        width: calc(100% - 20px); /* Adjust width, leaving a 10px gap on each side */
-    }
 }
 
 .row {
@@ -115,7 +125,12 @@ select {
 
 #roster-jpg {
   /* border-bottom: 1px solid black; */
+  width: 100%;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
 }
 
 .leave-request-row {
@@ -145,3 +160,28 @@ select {
     padding: 5px; /* Easier to tap on touch devices */
   }
 }
+
+table {
+  border-collapse: collapse;
+}
+
+th, td {
+  border: 1px solid black;
+  padding: 2px;
+  text-align: center;
+}
+
+/* .staff-row { */
+/*   display: flex; */
+/*   align-items: center; */
+/*   justify-content: space-between; */
+/* } */
+
+/* .staff-container { */
+/*   width: 100%; */
+/*   display: flex; */
+/*   flex-direction: column; */
+/*   align-items: center; */
+/*   justify-content: space-between; */
+/* } */
+

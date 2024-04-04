@@ -2,6 +2,7 @@ package main
 
 import (
   "context"
+  "strconv"
   "encoding/json"
   "fmt"
   "html/template"
@@ -148,11 +149,13 @@ type StaffMember struct {
   ID   uuid.UUID
   IsAdmin   bool
   IsTrial   bool
+  IsHidden   bool
   GoogleID   string
   FirstName string
   LastName string
   Email string
   Phone string
+  IdealShifts int
   Availability []DayAvailability
   Token *uuid.UUID
   LeaveRequests	[]LeaveRequest
@@ -343,6 +346,8 @@ func main() {
   http.HandleFunc("/auth/logout", s.handleGoogleLogout)
   http.HandleFunc("/auth/callback", s.handleGoogleCallback)
 
+  http.HandleFunc("/toggleAdmin", s.VerifySession(s.handleToggleAdmin))
+  http.HandleFunc("/toggleHidden", s.VerifySession(s.handleToggleHidden))
   http.HandleFunc("/toggleLive", s.VerifySession(s.handleToggleLive))
   http.HandleFunc("/toggleAmelia", s.VerifySession(s.handleToggleAmelia))
   http.HandleFunc("/toggleClosed", s.VerifySession(s.handleToggleClosed))
@@ -659,6 +664,7 @@ type ModifyRows struct {
 type ModifyProfile struct {
   FirstName string `json:"firstName"`
   LastName  string `json:"lastName"`
+  IdealShifts  string `json:"ideal-shifts"`
   Email  string `json:"email"`
   Phone  string `json:"phone"`
   TuesEarly  string `json:"Tuesday-early-avail"`
@@ -710,6 +716,8 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
   staff.LastName = reqBody.LastName
   staff.Email = reqBody.Email
   staff.Phone = reqBody.Phone
+  // This can fail but not from me
+  staff.IdealShifts, _ = strconv.Atoi(reqBody.IdealShifts)
 
   staff.Availability = []DayAvailability{
     {
@@ -960,6 +968,79 @@ func (s *Server) handleGoogleLogin(w http.ResponseWriter, r *http.Request) {
   } else {
     url := googleOauthConfig().AuthCodeURL("state", oauth2.AccessTypeOffline, oauth2.ApprovalForce, oauth2.SetAuthURLParam("prompt", "select_account"))
     http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+  }
+}
+
+type ToggleAdminBody struct {
+  ID            string `json:"id"`
+}
+
+func (s *Server) handleToggleAdmin(w http.ResponseWriter, r *http.Request) {
+  var reqBody ToggleAdminBody
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
+  accID, err := uuid.Parse(reqBody.ID)
+  if err != nil {
+    log.Printf("Invalid accID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  for _, staff := range *s.Staff {
+    if staff.ID == accID {
+      staff.IsAdmin = !staff.IsAdmin
+      break
+    }
+  }
+  SaveState(s)
+  err = s.Templates.ExecuteTemplate(w, "root", s)
+  if err != nil {
+    log.Fatalf("Error executing template: %v", err)
+  }
+}
+
+type ToggleHiddenBody struct {
+  ID            string `json:"id"`
+}
+
+func (s *Server) handleToggleHidden(w http.ResponseWriter, r *http.Request) {
+  var reqBody ToggleHiddenBody
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
+  accID, err := uuid.Parse(reqBody.ID)
+  if err != nil {
+    log.Printf("Invalid accID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  for _, staff := range *s.Staff {
+    if staff.ID == accID {
+      staff.IsHidden = !staff.IsHidden
+      break
+    }
+  }
+  for _, day := range s.Days {
+    for _, row := range day.Rows {
+      if row.Amelia.AssignedStaff != nil && *row.Amelia.AssignedStaff == accID {
+        row.Amelia.AssignedStaff = nil
+        row.Amelia.StaffString = nil
+      }
+      if row.Early.AssignedStaff != nil && *row.Early.AssignedStaff == accID {
+        row.Early.AssignedStaff = nil
+        row.Early.StaffString = nil
+      }
+      if row.Mid.AssignedStaff != nil && *row.Mid.AssignedStaff == accID {
+        row.Mid.AssignedStaff = nil
+        row.Mid.StaffString = nil
+      }
+      if row.Late.AssignedStaff != nil && *row.Late.AssignedStaff == accID {
+        row.Late.AssignedStaff = nil
+        row.Late.StaffString = nil
+      }
+    }
+  }
+
+  SaveState(s)
+  err = s.Templates.ExecuteTemplate(w, "root", s)
+  if err != nil {
+    log.Fatalf("Error executing template: %v", err)
   }
 }
 

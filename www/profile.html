@@ -26,6 +26,16 @@
       </fieldset>
       <fieldset>
         <legend>Availability</legend>
+        <label for="ideal-shifts">Ideal # shifts:</label>
+        <select style="width:auto" name="ideal-shifts" id="ideal-shifts">
+            <option value=1 {{ if eq .IdealShifts 1 }}selected{{ end }}>1</option>
+            <option value=2 {{ if eq .IdealShifts 2 }}selected{{ end }}>2</option>
+            <option value=3 {{ if eq .IdealShifts 3 }}selected{{ end }}>3</option>
+            <option value=4 {{ if eq .IdealShifts 4 }}selected{{ end }}>4</option>
+            <option value=5 {{ if eq .IdealShifts 5 }}selected{{ end }}>5</option>
+            <option value=6 {{ if eq .IdealShifts 6 }}selected{{ end }}>6</option>
+            <option value=7 {{ if eq .IdealShifts 7 }}selected{{ end }}>7</option>
+        </select>
         {{ range .Availability }}
         <div class="availability">
           <span>{{ .Name }}</span>
