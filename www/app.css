@@ -23,12 +23,17 @@ select {
   box-sizing: border-box; /* Include padding and border in the element's width and height */
 }
 
+.rootBody {
+  /* background-color: #000033; /1* Deep navy blue *1/ */
+}
+
 .rosterInput  {
   text-align: right;
   width: 100%;
   height: 100%;
   border: none; /* Removes the border */
   padding: 0; /* Optional: Adjusts padding */
+  background-color: transparent;
   margin: 0; /* Removes default margin */
   box-sizing: border-box; /* Include padding and border in the element's width and height */
 }
@@ -39,27 +44,39 @@ select {
   align-items: center;
 }
 
-.dayCell, .timeCell, .staffCell, .flagCell {
-  min-width: 0; /* This helps in preventing overflow and ensuring flex-shrink works */
-  max-width: 100%; /* Ensures columns don't grow beyond their parent's size */
-}
-
 .day {
-  width: 50%;
+  max-width: 100%;
+  width: 800px;
   display: flex;
+  margin-left: 10px auto;
+  margin-right: 10px auto;
+  box-sizing: border-box;
   flex-direction: column;
   align-items: center;
+}
+@media (max-width: 620px) {
+    .day {
+        width: calc(100% - 20px); /* Adjust width, leaving a 10px gap on each side */
+    }
 }
 
 .row {
   width: 100%;
   display: flex;
   justify-content: center;
-  border-right: 1px solid black;
+  border-left: 1px solid black;
+}
+
+.drop-opt {
+  text-align: center;
+}
+
+.text-p {
+  margin: 0;
 }
 
 .dayCell {
-  flex: 3;
+  flex: 2;
 }
 
 .timeCell {
@@ -67,25 +84,38 @@ select {
 }
 
 .staffCell {
-  flex: 2;
+  flex: 1.5;
 }
 
 .flagCell {
   flex: 0.3;
 }
 
-.rosterCell {
+.form-container {
   display: flex;
   justify-content: center;
+  align-items: center;
 }
 
-.row > div {
-  border-left: 1px solid black;
+.rosterCell {
+  padding: 1px; /* Optional: Adjusts padding */
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+  border-right: 1px solid black;
+  border-bottom: 1px solid black;
+}
+
+.day:first-child {
   border-top: 1px solid black;
 }
 
-.day:last-child {
-  border-bottom: 1px solid black;
+#roster-jpg {
+  /* border-bottom: 1px solid black; */
+  box-sizing: border-box;
 }
 
 .leave-request-row {

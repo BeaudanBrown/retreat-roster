@@ -5,55 +5,63 @@
   {{ $date := .Date }}
   {{ $staff := .Staff }}
   {{ $isClosed := .IsClosed }}
+  {{ $isLive := .IsLive }}
   {{ $ameliaOpen := .AmeliaOpen }}
   {{ $colour := .Colour }}
   {{range $index, $row := .Rows}}
-  {{ if and $isClosed (gt $index 1) }}
+  {{ if and $isClosed (gt $index 3) }}
   {{ else }}
   <div class="row">
-    <div class="rosterCell dayCell">
+    {{if not $isLive}}
+      <div class="rosterCell dayCell">
+      {{if eq $index 0}}
+        <label>
+            <input type="checkbox" {{ if $isClosed }}checked{{ end }}
+                hx-post="/toggleClosed"
+                hx-target="#d-{{$dayID}}"
+                hx-trigger="change"
+                hx-ext='json-enc'
+                hx-swap='outerHTML'
+                hx-vals='js:{"dayID":"{{$dayID}}"}'>
+            Closed
+        </label>
+      {{else if eq $index 1}}
+        <label>
+            <input type="checkbox" {{ if $ameliaOpen }}checked{{ end }}
+                hx-post="/toggleAmelia"
+                hx-target="#d-{{$dayID}}"
+                hx-trigger="change"
+                hx-ext='json-enc'
+                hx-swap='outerHTML'
+                hx-vals='js:{"dayID":"{{$dayID}}"}'>
+            A/S Open
+        </label>
+      {{end}}
+      </div>
+    {{end}}
+    <div style='background-color: {{ GetHighlightCol $colour $row.Amelia.Flag }};' class="rosterCell dayCell">
       {{if eq $index 0}}
       {{$dayName}}
       <button hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"dayID":"{{$dayID}}", "action":"-"}' hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>-</button>
       <button hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"dayID":"{{$dayID}}", "action":"+"}' hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>+</button>
-      <label>
-          <input type="checkbox" {{ if $isClosed }}checked{{ end }}
-              hx-post="/toggleClosed"
-              hx-target="#d-{{$dayID}}"
-              hx-trigger="change"
-              hx-ext='json-enc'
-              hx-swap='outerHTML'
-              hx-vals='js:{"dayID":"{{$dayID}}"}'>
-          Closed
-      </label>
-      <label>
-          <input type="checkbox" {{ if $ameliaOpen }}checked{{ end }}
-              hx-post="/toggleAmelia"
-              hx-target="#d-{{$dayID}}"
-              hx-trigger="change"
-              hx-ext='json-enc'
-              hx-swap='outerHTML'
-              hx-vals='js:{"dayID":"{{$dayID}}"}'>
-          A/S Open
-      </label>
       {{else if eq $index 1}}
       {{$date.Format "02/01"}}
-      {{ else if $ameliaOpen }}
-      {{if $row.Amelia.AssignedStaff}}
-        <p>A/S </p>
-      {{end}}
-      <div class="rosterCell ameliaCell">
+      {{else if and (eq $index 2) $isClosed}}
+        CLOSED
+      {{ else if and (not $isClosed) $ameliaOpen }}
+        {{if $row.Amelia.AssignedStaff}}
+          <p style="padding-left: 10px; padding-right: 10px;" class="text-p">A/S </p>
+        {{end}}
         <form hx-post="/modifySlot" hx-trigger="change from:#as-{{ $row.Amelia.ID }}" hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>
           <input type="hidden" name="dayID" value="{{ $dayID }}" />
           <input type="hidden" name="slotID" value="{{ $row.Amelia.ID }}" />
-          <select style='background-color: {{ GetHighlightCol $colour $row.Amelia.Flag }};' id="as-{{ $row.Amelia.ID }}" name="staffID">
+          <select class="rosterInput" id="as-{{ $row.Amelia.ID }}" name="staffID">
             <option value=""></option>
             {{ range $staff }}
-            <option value="{{.ID}}" {{if $row.Amelia.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
+            <option class="drop-opt" value="{{.ID}}" {{if $row.Amelia.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
             {{ end }}
           </select>
         </form>
-      </div>
       {{end}}
     </div>
 
@@ -68,83 +76,83 @@
     <div class="rosterCell staffCell"></div>
     <div class="rosterCell flagCell"></div>
     {{ else }}
-    <div class="rosterCell timeCell">
+    <div style='background-color: {{$colour}};' class="rosterCell timeCell">
       <form onkeydown="return event.key !== 'Enter';" hx-post="/modifyTimeSlot" hx-trigger="keyup delay:1500ms" hx-swap="none">
-        <input class="rosterInput" style='background-color: {{$colour}};' name="timeVal" type="text" id="t-{{$row.Early.ID}}" value="{{$row.Early.StartTime}}" onfocus="this.select();" onclick="this.select();" />
+        <input class="rosterInput" name="timeVal" type="text" id="t-{{$row.Early.ID}}" value="{{$row.Early.StartTime}}" onfocus="this.select();" onclick="this.select();" />
         <input type="hidden" name="slotID" value="{{ $row.Early.ID }}" />
       </form>
     </div>
 
-    <div class="rosterCell staffCell">
+    <div style='background-color: {{ GetHighlightCol $colour $row.Early.Flag }};' class="rosterCell staffCell">
       <form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Early.ID }}" hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>
         <input type="hidden" name="dayID" value="{{ $dayID }}" />
         <input type="hidden" name="slotID" value="{{ $row.Early.ID }}" />
-        <select style='background-color: {{ GetHighlightCol $colour $row.Early.Flag }};' id="s-{{ $row.Early.ID }}" name="staffID">
+        <select class="rosterInput" id="s-{{ $row.Early.ID }}" name="staffID">
           <option value=""></option>
           {{ range $staff }}
-          <option value="{{.ID}}" {{if $row.Early.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
+          <option class="drop-opt" value="{{.ID}}" {{if $row.Early.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
           {{ end }}
         </select>
       </form>
     </div>
 
-    <div class="rosterCell flagCell">
+    <div style='background-color: {{$colour}};' class="rosterCell flagCell">
       <form onkeydown="return event.key !== 'Enter';" hx-post="/modifyDescriptionSlot" hx-trigger="keyup delay:1500ms" hx-swap="none">
-        <input class="rosterInput" style='background-color: {{$colour}};' name="descVal" type="text" id="d-{{$row.Early.ID}}" value="{{$row.Early.Description}}" onfocus="this.select();" onclick="this.select();" />
+        <input class="rosterInput" name="descVal" type="text" id="d-{{$row.Early.ID}}" value="{{$row.Early.Description}}" onfocus="this.select();" onclick="this.select();" />
         <input type="hidden" name="slotID" value="{{ $row.Early.ID }}" />
       </form>
     </div>
 
-    <div class="rosterCell timeCell">
+    <div style='background-color: {{$colour}};' class="rosterCell timeCell">
       <form onkeydown="return event.key !== 'Enter';" hx-post="/modifyTimeSlot" hx-trigger="keyup delay:1500ms" hx-swap="none">
-        <input class="rosterInput" style='background-color: {{$colour}};' name="timeVal" type="text" id="t-{{$row.Mid.ID}}" value="{{$row.Mid.StartTime}}" onfocus="this.select();" onclick="this.select();" />
+        <input class="rosterInput" name="timeVal" type="text" id="t-{{$row.Mid.ID}}" value="{{$row.Mid.StartTime}}" onfocus="this.select();" onclick="this.select();" />
         <input type="hidden" name="slotID" value="{{ $row.Mid.ID }}" />
       </form>
     </div>
 
-    <div class="rosterCell staffCell">
+    <div style='background-color: {{ GetHighlightCol $colour $row.Mid.Flag }};' class="rosterCell staffCell">
       <form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Mid.ID }}" hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>
         <input type="hidden" name="dayID" value="{{ $dayID }}" />
         <input type="hidden" name="slotID" value="{{ $row.Mid.ID }}" />
-        <select style='background-color: {{ GetHighlightCol $colour $row.Mid.Flag }};' id="s-{{ $row.Mid.ID }}" name="staffID">
+        <select class="rosterInput" id="s-{{ $row.Mid.ID }}" name="staffID">
           <option value=""></option>
           {{ range $staff }}
-          <option value="{{.ID}}" {{if $row.Mid.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
+          <option class="drop-opt" value="{{.ID}}" {{if $row.Mid.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
           {{ end }}
         </select>
       </form>
     </div>
 
-    <div class="rosterCell flagCell">
+    <div style='background-color: {{$colour}};' class="rosterCell flagCell">
       <form onkeydown="return event.key !== 'Enter';" hx-post="/modifyDescriptionSlot" hx-trigger="keyup delay:1500ms" hx-swap="none">
-        <input class="rosterInput" style='background-color: {{$colour}};' name="descVal" type="text" id="d-{{$row.Mid.ID}}" value="{{$row.Mid.Description}}" onfocus="this.select();" onclick="this.select();" />
+        <input class="rosterInput" name="descVal" type="text" id="d-{{$row.Mid.ID}}" value="{{$row.Mid.Description}}" onfocus="this.select();" onclick="this.select();" />
         <input type="hidden" name="slotID" value="{{ $row.Mid.ID }}" />
       </form>
     </div>
 
-    <div class="rosterCell timeCell">
+    <div style='background-color: {{$colour}};' class="rosterCell timeCell">
       <form onkeydown="return event.key !== 'Enter';" hx-post="/modifyTimeSlot" hx-trigger="keyup delay:1500ms" hx-swap="none">
-        <input class="rosterInput" style='background-color: {{$colour}};' name="timeVal" type="text" id="t-{{$row.Late.ID}}" value="{{$row.Late.StartTime}}" onfocus="this.select();" onclick="this.select();" />
+        <input class="rosterInput" name="timeVal" type="text" id="t-{{$row.Late.ID}}" value="{{$row.Late.StartTime}}" onfocus="this.select();" onclick="this.select();" />
         <input type="hidden" name="slotID" value="{{ $row.Late.ID }}" />
       </form>
     </div>
 
-    <div class="rosterCell staffCell">
+    <div style='background-color: {{ GetHighlightCol $colour $row.Late.Flag }};' class="rosterCell staffCell">
       <form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Late.ID }}" hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>
         <input type="hidden" name="dayID" value="{{ $dayID }}" />
         <input type="hidden" name="slotID" value="{{ $row.Late.ID }}" />
-        <select style='background-color: {{ GetHighlightCol $colour $row.Late.Flag }};' id="s-{{ $row.Late.ID }}" name="staffID">
+        <select class="rosterInput" id="s-{{ $row.Late.ID }}" name="staffID">
           <option value=""></option>
           {{ range $staff }}
-          <option value="{{.ID}}" {{if $row.Late.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
+          <option class="drop-opt" value="{{.ID}}" {{if $row.Late.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
           {{ end }}
         </select>
       </form>
     </div>
 
-    <div class="rosterCell flagCell">
+    <div style='background-color: {{$colour}};' class="rosterCell flagCell">
       <form onkeydown="return event.key !== 'Enter';" hx-post="/modifyDescriptionSlot" hx-trigger="keyup delay:1500ms" hx-swap="none">
-        <input class="rosterInput" style='background-color: {{$colour}};' name="descVal" type="text" id="d-{{$row.Late.ID}}" value="{{$row.Late.Description}}" onfocus="this.select();" onclick="this.select();" />
+        <input class="rosterInput" name="descVal" type="text" id="d-{{$row.Late.ID}}" value="{{$row.Late.Description}}" onfocus="this.select();" onclick="this.select();" />
         <input type="hidden" name="slotID" value="{{ $row.Late.ID }}" />
       </form>
     </div>

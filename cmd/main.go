@@ -52,6 +52,7 @@ type ServerDisc struct {
   StartDate  time.Time   `json:"startDate"`
   Days  []*RosterDay   `json:"days"`
   Staff *[]*StaffMember `json:"staff"`
+  IsLive         bool `json:"isLive"`
 }
 
 type DayAvailability struct {
@@ -67,8 +68,6 @@ type CustomDate struct {
 
 func (cd *CustomDate) UnmarshalJSON(input []byte) error {
   strInput := strings.Trim(string(input), `"`)
-  log.Println(strInput)
-
   // Try parsing the date in the expected formats
   formats := []string{"2006-01-02", "2006-01-02T15:04:05Z"}
   var parseErr error
@@ -181,6 +180,7 @@ type Slot struct {
   ID            uuid.UUID
   StartTime     string
   AssignedStaff *uuid.UUID
+  StaffString *string
   Flag	Highlight
   Description	string
 }
@@ -343,6 +343,7 @@ func main() {
   http.HandleFunc("/auth/logout", s.handleGoogleLogout)
   http.HandleFunc("/auth/callback", s.handleGoogleCallback)
 
+  http.HandleFunc("/toggleLive", s.VerifySession(s.handleToggleLive))
   http.HandleFunc("/toggleAmelia", s.VerifySession(s.handleToggleAmelia))
   http.HandleFunc("/toggleClosed", s.VerifySession(s.handleToggleClosed))
   http.HandleFunc("/deleteAcc", s.VerifySession(s.handleDeleteAccount))
@@ -369,6 +370,7 @@ type DayStruct struct {
   RosterDay
   Staff *[]*StaffMember
   Date time.Time
+  IsLive bool
 }
 
 func GetHighlightCol(defaultCol string, flag Highlight) string {
@@ -384,12 +386,13 @@ func GetHighlightCol(defaultCol string, flag Highlight) string {
   return defaultCol
 }
 
-func MakeDayStruct(day RosterDay, staff *[]*StaffMember, startDate time.Time) DayStruct {
+func MakeDayStruct(day RosterDay, staff *[]*StaffMember, startDate time.Time, isLive bool) DayStruct {
   date := startDate.AddDate(0, 0, day.Offset)
   return DayStruct{
     day,
     staff,
     date,
+    isLive,
   }
 }
 
@@ -622,11 +625,13 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
   staffID, err := uuid.Parse(staffIDStr)
   if err != nil {
     slot.AssignedStaff = nil
+    slot.StaffString = nil
   } else {
     log.Printf("Modify %v slot id: %v, staffid: %v", slotID, slotID, staffID)
     member := s.GetStaffByID(staffID)
     if member != nil {
       slot.AssignedStaff = &member.ID
+      slot.StaffString = &member.FirstName
     }
   }
 
@@ -638,7 +643,7 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate))
+  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate, s.IsLive))
   if err != nil {
     log.Printf("Error executing template: %v", err)
     w.WriteHeader(http.StatusBadRequest)
@@ -918,7 +923,7 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
         }
       }
       SaveState(s)
-      err := s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*s.Days[i], s.Staff, s.StartDate))
+      err := s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*s.Days[i], s.Staff, s.StartDate, s.IsLive))
       if err != nil {
         log.Printf("Error executing template: %v", err)
         w.WriteHeader(http.StatusBadRequest)
@@ -958,6 +963,17 @@ func (s *Server) handleGoogleLogin(w http.ResponseWriter, r *http.Request) {
   }
 }
 
+func (s *Server) handleToggleLive(w http.ResponseWriter, r *http.Request) {
+  s.IsLive = !s.IsLive
+  SaveState(s)
+  err := s.Templates.ExecuteTemplate(w, "root", s)
+  if err != nil {
+    log.Printf("Error executing template: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+}
+
 type ToggleAmeliaBody struct {
   DayID            string `json:"dayID"`
 }
@@ -979,7 +995,7 @@ func (s *Server) handleToggleAmelia(w http.ResponseWriter, r *http.Request) {
   }
   day.AmeliaOpen = !day.AmeliaOpen
   SaveState(s)
-  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate))
+  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate, s.IsLive))
   if err != nil {
     log.Printf("Error executing template: %v", err)
     w.WriteHeader(http.StatusBadRequest)
@@ -1008,7 +1024,7 @@ func (s *Server) handleToggleClosed(w http.ResponseWriter, r *http.Request) {
   }
   day.IsClosed = !day.IsClosed
   SaveState(s)
-  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate))
+  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate, s.IsLive))
   if err != nil {
     log.Printf("Error executing template: %v", err)
     w.WriteHeader(http.StatusBadRequest)
@@ -1043,15 +1059,19 @@ func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
     for _, row := range day.Rows {
       if row.Amelia.AssignedStaff != nil && *row.Amelia.AssignedStaff == accID {
         row.Amelia.AssignedStaff = nil
+        row.Amelia.StaffString = nil
       }
       if row.Early.AssignedStaff != nil && *row.Early.AssignedStaff == accID {
         row.Early.AssignedStaff = nil
+        row.Early.StaffString = nil
       }
       if row.Mid.AssignedStaff != nil && *row.Mid.AssignedStaff == accID {
         row.Mid.AssignedStaff = nil
+        row.Mid.StaffString = nil
       }
       if row.Late.AssignedStaff != nil && *row.Late.AssignedStaff == accID {
         row.Late.AssignedStaff = nil
+        row.Late.StaffString = nil
       }
     }
   }

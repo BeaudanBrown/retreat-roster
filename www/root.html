@@ -2,26 +2,63 @@
 <div id="roster" class="roster-container">
   {{ $staff := .Staff }}
   {{ $startDate := .StartDate }}
+  {{ $isLive := .IsLive }}
   <div>
-    <button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"-"}' hx-swap='outerHTML' hx-target='#roster'>-</button>
-    <button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"0"}' hx-swap='outerHTML' hx-target='#roster'>This week</button>
-    <button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"+"}' hx-swap='outerHTML' hx-target='#roster'>+</button>
+    <label>
+      <input type="checkbox" {{ if .IsLive }}checked{{ end }}
+        hx-get="/toggleLive"
+        hx-target="#roster"
+        hx-trigger="change"
+        hx-swap='outerHTML'>
+        Make Public
+    </label>
   </div>
+  <div>
+    {{if not $isLive }}
+      <button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"-"}' hx-swap='outerHTML' hx-target='#roster'>-</button>
+      <button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"0"}' hx-swap='outerHTML' hx-target='#roster'>This week</button>
+      <button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"+"}' hx-swap='outerHTML' hx-target='#roster'>+</button>
+    {{ end }}
+  </div>
+  <div id="roster-jpg">
   {{ range .Days }}
-  {{ $dayStruct := MakeDayStruct . $staff $startDate }}
-  {{ template "rosterDay" $dayStruct }}
+    {{ $dayStruct := MakeDayStruct . $staff $startDate $isLive }}
+    {{if $isLive }}
+      {{ template "rosterDayLocked" $dayStruct }}
+    {{ else }}
+      {{ template "rosterDay" $dayStruct }}
+    {{ end }}
   {{ end }}
-  {{ range .Staff }}
-  {{if .IsTrial }}
-    <div>{{ .FirstName }}</div>
-    <a href="#" hx-ext="json-enc" hx-post="/deleteAcc" hx-vals='js:{"id":"{{ .ID }}"}' hx-swap="outerHTML" hx-target="#roster">🗑</a>
-  {{end}}
+  </div>
+  {{if not $isLive }}
+    {{ range .Staff }}
+      {{if .IsTrial }}
+        <div>{{ .FirstName }}</div>
+        <a href="#" hx-ext="json-enc" hx-post="/deleteAcc" hx-vals='js:{"id":"{{ .ID }}"}' hx-swap="outerHTML" hx-target="#roster">🗑</a>
+      {{end}}
+    {{ end }}
+    <div class="form-container">
+      <form id="addTrialForm" hx-post="/addTrial" hx-ext="json-enc" hx-swap="outerHTML" hx-target="#roster">
+        <label>Add New Trial</label>
+        <input type="text" name="name" id="customStaff" value="Trial" onfocus="this.select();" onclick="this.select();" />
+        <button type="submit">+</button>
+      </form>
+    </div>
+    <button id="capture" style="display:none;">Capture as JPG</button>
+  {{ else }}
+    <button id="capture">Save image</button>
   {{ end }}
-  <form id="addTrialForm" hx-post="/addTrial" hx-ext="json-enc" hx-swap="outerHTML" hx-target="#roster">
-    <input type="text" name="name" id="customStaff" value="Trial" onfocus="this.select();" onclick="this.select();" />
-    <button type="submit">+</button>
-  </form>
   <a href="#" hx-post="/auth/logout">Logout</a>
   <a href="/profile">Edit Profile</a>
 </div>
+<script>
+document.getElementById("capture").addEventListener("click", function() {
+  html2canvas(document.querySelector("#roster-jpg")).then(canvas => {
+    let a = document.createElement('a');
+    a.href = canvas.toDataURL("image/jpeg").replace("image/jpeg", "image/octet-stream");
+    a.download = 'roster.jpg';
+    a.click();
+  });
+});
+</script>
 {{ end }}
