@@ -334,6 +334,7 @@ func main() {
     log.Fatalf("Error loading state: %v", err)
   }
   http.HandleFunc("/", s.VerifySession(s.HandleIndex))
+  http.HandleFunc("/landing", s.HandleLanding)
 
   http.HandleFunc("/app.css", func(w http.ResponseWriter, r *http.Request) {
     http.ServeFile(w, r, "./www/app.css")
@@ -497,6 +498,13 @@ func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
   err := s.Templates.ExecuteTemplate(w, "profileIndex", s.CacheBust)
+  if err != nil {
+    log.Fatalf("Error executing template: %v", err)
+  }
+}
+
+func (s *Server) HandleLanding(w http.ResponseWriter, r *http.Request) {
+  err := s.Templates.ExecuteTemplate(w, "landing", s.CacheBust)
   if err != nil {
     log.Fatalf("Error executing template: %v", err)
   }
@@ -991,7 +999,7 @@ func (s *Server) handleGoogleLogout(w http.ResponseWriter, r *http.Request) {
   if (staff != nil) {
     staff.Token = nil
   }
-  w.Header().Set("HX-Redirect", "/auth/login")
+  w.Header().Set("HX-Redirect", "/landing")
   w.WriteHeader(http.StatusOK)
 }
 
@@ -1323,7 +1331,7 @@ func (s *Server) VerifySession(handler http.HandlerFunc) http.HandlerFunc {
     cookie, err := r.Cookie("session_token")
     if err != nil {
       if err == http.ErrNoCookie {
-        http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+        http.Redirect(w, r, "/landing", http.StatusSeeOther)
       } else {
         http.Error(w, "Bad Request", http.StatusBadRequest)
       }
@@ -1334,12 +1342,12 @@ func (s *Server) VerifySession(handler http.HandlerFunc) http.HandlerFunc {
 
     sessionToken, err := uuid.Parse(sessionTokenStr)
     if err != nil {
-      http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+      http.Redirect(w, r, "/landing", http.StatusSeeOther)
       return
     }
 
     if !s.isValidSession(sessionToken) {
-      http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+      http.Redirect(w, r, "/landing", http.StatusSeeOther)
       return
     }
 

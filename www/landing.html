@@ -1,0 +1,38 @@
+{{ define "landing" }}
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<html>
+  <head>
+    <base href="/">
+    <title>Retreat Roster</title>
+    <link rel="stylesheet" href="app.css?v={{ . }}">
+    <meta content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=0" name="viewport">
+  </head>
+  <body class="profile">
+    <a class="hidden" id="enter" href="/landing">Enter</a>
+  </body>
+</html>
+<script>
+function isEmbeddedBrowser() {
+    var ua = navigator.userAgent || navigator.vendor || window.opera;
+
+    // Checks specifically for Facebook and Instagram in-app browsers
+    if (ua.indexOf('FBAN') > -1 || ua.indexOf('FBAV') > -1) {
+        return true; // Indicates Facebook's in-app browser
+    }
+    if (ua.indexOf('Instagram') > -1) {
+        return true; // Indicates Instagram's in-app browser
+    }
+
+    // No indicators for Facebook or Instagram in-app browsers found
+    return false;
+}
+
+if (isEmbeddedBrowser()) {
+    alert('It looks like you are using an in-app browser from Facebook or Instagram. Please open in default browser to login.');
+    document.getElementById('enter').classList.remove('hidden');
+} else {
+    window.location.href = '/auth/login';
+}
+</script>
+{{ end }}
+

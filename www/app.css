@@ -210,3 +210,7 @@ h1 {
   align-items: center;
   margin-bottom: 10px; /* Spacing between each label-input pair */
 }
+
+.hidden {
+  display: none;
+}
