@@ -18,7 +18,7 @@
             CLOSED
           {{ else if and (not $isClosed) $ameliaOpen }}
             {{if $row.Amelia.AssignedStaff}}
-              <div class="rosterCell ameliaCell"><p>A/S {{$row.Amelia.AssignedStaff}}</p> </div>
+              <div class="ameliaCell"><p>A/S {{$row.Amelia.StaffString}}</p> </div>
             {{end}}
           {{end}}
         </div>

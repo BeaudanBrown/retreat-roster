@@ -111,8 +111,18 @@ select {
   align-items: center;
 }
 
+.ameliaCell {
+  padding: 1px;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+}
+
 .rosterCell {
-  padding: 1px; /* Optional: Adjusts padding */
+  padding: 1px;
   display: flex;
   min-width: 0;
   max-width: 100%;

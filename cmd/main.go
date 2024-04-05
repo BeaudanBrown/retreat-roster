@@ -151,6 +151,7 @@ type StaffMember struct {
   IsTrial   bool
   IsHidden   bool
   GoogleID   string
+  NickName string
   FirstName string
   LastName string
   Email string
@@ -677,7 +678,11 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
     member := s.GetStaffByID(staffID)
     if member != nil {
       slot.AssignedStaff = &member.ID
-      slot.StaffString = &member.FirstName
+      if member.NickName != "" {
+        slot.StaffString = &member.NickName
+      } else {
+        slot.StaffString = &member.FirstName
+      }
     }
   }
 
@@ -702,9 +707,10 @@ type ModifyRows struct {
   DayID  string `json:"dayID"`
 }
 
-type ModifyProfile struct {
+type ModifyProfileBody struct {
   FirstName string `json:"firstName"`
   LastName  string `json:"lastName"`
+  NickName string `json:"nickName"`
   IdealShifts  string `json:"ideal-shifts"`
   Email  string `json:"email"`
   Phone  string `json:"phone"`
@@ -747,12 +753,13 @@ func (s *Server) GetSessionUser(w http.ResponseWriter, r *http.Request) *StaffMe
 
 func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
   log.Println("Modify profile")
-  var reqBody ModifyProfile
+  var reqBody ModifyProfileBody
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
   staff := s.GetSessionUser(w, r)
   if (staff == nil) {
     return
   }
+  staff.NickName = reqBody.NickName
   staff.FirstName = reqBody.FirstName
   staff.LastName = reqBody.LastName
   staff.Email = reqBody.Email

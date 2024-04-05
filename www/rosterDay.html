@@ -60,7 +60,13 @@
             <option value=""></option>
             {{ range $staff }}
               {{ if not .IsHidden }}
-                <option class="drop-opt" value="{{.ID}}" {{if $row.Amelia.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
+                <option class="drop-opt" value="{{.ID}}" {{if $row.Amelia.HasThisStaff .ID}}selected{{end}}>
+                {{if .NickName }}
+                  {{.NickName}}
+                {{ else }}
+                  {{.FirstName}}
+                {{ end }}
+                </option>
               {{ end }}
             {{ end }}
           </select>
@@ -94,7 +100,13 @@
           <option value=""></option>
           {{ range $staff }}
             {{ if not .IsHidden }}
-              <option class="drop-opt" value="{{.ID}}" {{if $row.Early.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
+              <option class="drop-opt" value="{{.ID}}" {{if $row.Early.HasThisStaff .ID}}selected{{end}}>
+                {{if .NickName }}
+                  {{.NickName}}
+                {{ else }}
+                  {{.FirstName}}
+                {{ end }}
+              </option>
             {{ end }}
           {{ end }}
         </select>
@@ -123,7 +135,13 @@
           <option value=""></option>
           {{ range $staff }}
             {{ if not .IsHidden }}
-              <option class="drop-opt" value="{{.ID}}" {{if $row.Mid.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
+              <option class="drop-opt" value="{{.ID}}" {{if $row.Mid.HasThisStaff .ID}}selected{{end}}>
+                {{if .NickName }}
+                  {{.NickName}}
+                {{ else }}
+                  {{.FirstName}}
+                {{ end }}
+              </option>
             {{ end }}
           {{ end }}
         </select>
@@ -152,7 +170,13 @@
           <option value=""></option>
           {{ range $staff }}
             {{ if not .IsHidden }}
-              <option class="drop-opt" value="{{.ID}}" {{if $row.Late.HasThisStaff .ID}}selected{{end}}>{{.FirstName}}</option>
+              <option class="drop-opt" value="{{.ID}}" {{if $row.Late.HasThisStaff .ID}}selected{{end}}>
+                {{if .NickName }}
+                  {{.NickName}}
+                {{ else }}
+                  {{.FirstName}}
+                {{ end }}
+              </option>
             {{ end }}
           {{ end }}
         </select>
