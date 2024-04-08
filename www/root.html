@@ -57,6 +57,10 @@
       {{end}}
     {{ end }}
     <button id="capture" style="display:none;">Capture as JPG</button>
+
+  {{ else }}
+    <button id="capture">Save image</button>
+  {{ end }}
     <h2>All Staff</h2>
     <div class="staff-container">
       <table>
@@ -65,7 +69,9 @@
             <th>Name</th>
             <th>Email</th>
             <th>Phone #</th>
-            <th>Ideal # of Shifts</th>
+            <th>Contact Name</th>
+            <th>Contact Phone #</th>
+            <th>Ideal Shifts</th>
             <th>Hidden</th>
             <th>Admin</th>
             <th>Delete</th>
@@ -78,6 +84,8 @@
                 <td>{{ .FirstName }} {{ .LastName }}</td>
                 <td>{{ .Email }}</td>
                 <td>{{ .Phone }}</td>
+                <td>{{ .ContactName }}</td>
+                <td>{{ .ContactPhone }}</td>
                 <td>{{ .IdealShifts }}</td>
                 <td>
                   <input type="checkbox" {{ if .IsHidden }}checked{{ end }}
@@ -122,10 +130,6 @@
         </div>
       {{ end }}
     {{ end }}
-
-  {{ else }}
-    <button id="capture">Save image</button>
-  {{ end }}
   {{ end }}
   <a href="#" hx-post="/auth/logout">Logout</a>
   <a href="/profile">Edit Profile</a>

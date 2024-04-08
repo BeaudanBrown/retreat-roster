@@ -157,6 +157,8 @@ type StaffMember struct {
   LastName string
   Email string
   Phone string
+  ContactName string
+  ContactPhone string
   IdealShifts int
   Availability []DayAvailability
   Token *uuid.UUID
@@ -758,6 +760,8 @@ type ModifyProfileBody struct {
   IdealShifts  string `json:"ideal-shifts"`
   Email  string `json:"email"`
   Phone  string `json:"phone"`
+  ContactName  string `json:"contactName"`
+  ContactPhone  string `json:"contactPhone"`
   TuesEarly  string `json:"Tues-early-avail"`
   TuesMid  string `json:"Tues-mid-avail"`
   TuesLate  string `json:"Tues-late-avail"`
@@ -808,6 +812,8 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
   staff.LastName = reqBody.LastName
   staff.Email = reqBody.Email
   staff.Phone = reqBody.Phone
+  staff.ContactName = reqBody.ContactName
+  staff.ContactPhone = reqBody.ContactPhone
   // This can fail but not from me
   staff.IdealShifts, _ = strconv.Atoi(reqBody.IdealShifts)
 
