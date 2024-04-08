@@ -17,6 +17,7 @@ docker:
 
 docker-push:
 	@echo "Pushing docker image..."
+	docker build -t retreat-roster .
 	docker tag retreat-roster docker.beaudan.me/retreat-roster
 	docker push docker.beaudan.me/retreat-roster:latest
 

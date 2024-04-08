@@ -3,6 +3,17 @@
   {{ $staff := .Staff }}
   {{ $startDate := .StartDate }}
   {{ $isLive := .IsLive }}
+  {{ $activeStaff := .ActiveStaff }}
+  {{ if not .ActiveStaff.IsAdmin }}
+    <div id="roster-jpg">
+    {{ range .Days }}
+      {{ $dayStruct := MakeDayStruct . $staff $startDate $isLive $activeStaff }}
+      {{if $isLive }}
+        {{ template "rosterDayLocked" $dayStruct }}
+      {{ end }}
+    {{ end }}
+    </div>
+  {{ else }}
   <div>
     <label>
       <input type="checkbox" {{ if .IsLive }}checked{{ end }}
@@ -22,7 +33,7 @@
   </div>
   <div id="roster-jpg">
   {{ range .Days }}
-    {{ $dayStruct := MakeDayStruct . $staff $startDate $isLive }}
+    {{ $dayStruct := MakeDayStruct . $staff $startDate $isLive $activeStaff }}
     {{if $isLive }}
       {{ template "rosterDayLocked" $dayStruct }}
     {{ else }}
@@ -34,8 +45,10 @@
     <div class="form-container">
       <form id="addTrialForm" hx-post="/addTrial" hx-ext="json-enc" hx-swap="outerHTML" hx-target="#roster">
         <label>Add New Trial</label>
-        <input type="text" name="name" id="customStaff" value="Trial" onfocus="this.select();" onclick="this.select();" />
-        <button type="submit">+</button>
+        <div class="form-container">
+          <input type="text" name="name" id="customStaff" value="Trial" onfocus="this.select();" onclick="this.select();" />
+          <button type="submit">+</button>
+        </div>
       </form>
     </div>
     {{ range .Staff }}
@@ -96,22 +109,23 @@
       </table>
     </div>
 
-  <h2>Leave Requests</h2>
-  {{ range $staff }}
-    {{ $name := .FirstName }}
-    {{ range .LeaveRequests }}
-      <div class="leave-request-row">
-        <div class="leave-reason">Staff: {{ $name }}</div>
-        <div class="leave-reason">Reason: {{ .Reason }}</div>
-        <div class="leave-start-date">Unavailable: {{ .StartDate.Format "Jan 2, 2006" }}</div>
-        <div class="leave-end-date">Available: {{ .EndDate.Format "Jan 2, 2006" }}</div>
-        <a href="#" hx-ext="json-enc" class="delete-icon" hx-post="/deleteAdminLeaveReq" hx-vals='js:{"id":"{{ .ID }}"}' hx-swap="outerHTML" hx-target="#roster">🗑</a>
-      </div>
+    <h2>Leave Requests</h2>
+    {{ range $staff }}
+      {{ $name := .FirstName }}
+      {{ range .LeaveRequests }}
+        <div class="leave-request-row">
+          <div class="leave-reason">Staff: {{ $name }}</div>
+          <div class="leave-reason">Reason: {{ .Reason }}</div>
+          <div class="leave-start-date">Unavailable from: {{ .StartDate.Format "Jan 2, 2006" }}</div>
+          <div class="leave-end-date">Available again: {{ .EndDate.Format "Jan 2, 2006" }}</div>
+          <a href="#" hx-ext="json-enc" class="delete-icon" hx-post="/deleteAdminLeaveReq" hx-vals='js:{"id":"{{ .ID }}"}' hx-swap="outerHTML" hx-target="#roster">🗑</a>
+        </div>
+      {{ end }}
     {{ end }}
-  {{ end }}
 
   {{ else }}
     <button id="capture">Save image</button>
+  {{ end }}
   {{ end }}
   <a href="#" hx-post="/auth/logout">Logout</a>
   <a href="/profile">Edit Profile</a>
@@ -119,21 +133,24 @@
 
 <script>
 function formatDate(dateStr) {
-    const date = new Date(dateStr);
-    let day = date.getDate().toString().padStart(2, '0');
-    let month = (date.getMonth() + 1).toString().padStart(2, '0'); // January is 0!
-    let year = date.getFullYear().toString().slice(-2); // Get last two digits of the year
-    return `${day}_${month}_${year}`;
-  }
+  const date = new Date(dateStr);
+  let day = date.getDate().toString().padStart(2, '0');
+  let month = (date.getMonth() + 1).toString().padStart(2, '0'); // January is 0!
+  let year = date.getFullYear().toString().slice(-2); // Get last two digits of the year
+  return `${day}_${month}_${year}`;
+}
 
-document.getElementById("capture").addEventListener("click", function() {
-  let dateStr = formatDate({{ $startDate }});
-  html2canvas(document.querySelector("#roster-jpg")).then(canvas => {
-    let a = document.createElement('a');
-    a.href = canvas.toDataURL("image/jpeg").replace("image/jpeg", "image/octet-stream");
-    a.download = `roster_${dateStr}.jpg`; // File name incorporates formatted start date
-    a.click();
+if (!!document.getElementById("capture")) {
+  document.getElementById("capture").addEventListener("click", function() {
+    let dateStr = formatDate({{ $startDate }});
+    html2canvas(document.querySelector("#roster-jpg")).then(canvas => {
+      let a = document.createElement('a');
+      a.href = canvas.toDataURL("image/jpeg").replace("image/jpeg", "image/octet-stream");
+      a.download = `roster_${dateStr}.jpg`; // File name incorporates formatted start date
+      a.click();
+    });
   });
-});
+}
+
 </script>
 {{ end }}

@@ -5,23 +5,42 @@
   {{ $date := .Date }}
   {{ $isClosed := .IsClosed }}
   {{ $ameliaOpen := .AmeliaOpen }}
+  {{ $activeStaff := .ActiveStaff }}
   {{range $index, $row := .Rows}}
     {{ if and $isClosed (gt $index 3) }}
     {{ else }}
       <div class="row">
-        <div class="rosterCell dayCell">
           {{if eq $index 0}}
-          {{$dayName}}
+          <div class="rosterCell dayCell">
+            {{$dayName}}
+          </div>
           {{else if eq $index 1}}
-          {{$date.Format "02/01"}}
-          {{else if and (eq $index 2) $isClosed}}
-            CLOSED
-          {{ else if and (not $isClosed) $ameliaOpen }}
-            {{if $row.Amelia.AssignedStaff}}
-              <div class="ameliaCell"><p>A/S {{$row.Amelia.StaffString}}</p> </div>
+          <div class="rosterCell dayCell">
+            {{$date.Format "02/01"}}
+          </div>
+          {{else if (eq $index 2)}}
+            {{if $isClosed}}
+              <div class="rosterCell dayCell">
+                CLOSED
+              </div>
+            {{else if $ameliaOpen}}
+              <div class="rosterCell dayCell">
+                A/S
+              </div>
+            {{else}}
+              <div class="rosterCell dayCell">&nbsp;</div>
             {{end}}
+          {{ else if and (not $isClosed) $ameliaOpen }}
+            {{ if $row.Amelia.AssignedStaff}}
+              <div class="rosterCell ameliaCell {{if (MemberIsAssigned $activeStaff.ID $row.Amelia.AssignedStaff)}}shiftHighlight{{end}}">
+                {{$row.Amelia.StaffString}}
+              </div>
+            {{ else }}
+              <div class="rosterCell ameliaCell">&nbsp;</div>
+            {{ end }}
+          {{else}}
+            <div class="rosterCell dayCell">&nbsp;</div>
           {{end}}
-        </div>
         {{ if $isClosed }}
           <div class="rosterCell timeCell">&nbsp;</div>
           <div class="rosterCell staffCell"></div>
@@ -34,15 +53,33 @@
           <div class="rosterCell flagCell"></div>
         {{ else }}
           <div class="rosterCell timeCell">{{$row.Early.StartTime}}</div>
-          <div class="rosterCell staffCell">{{ if $row.Early.AssignedStaff}} {{$row.Early.StaffString}} {{else}}&nbsp;{{end}}</div>
+          {{ if $row.Early.AssignedStaff}}
+            <div class="rosterCell staffCell {{if (MemberIsAssigned $activeStaff.ID $row.Early.AssignedStaff)}}shiftHighlight{{end}}">
+              {{$row.Early.StaffString}}
+            </div>
+          {{ else }}
+            <div class="rosterCell staffCell">&nbsp;</div>
+          {{ end }}
           <div class="rosterCell flagCell">{{$row.Early.Description}}</div>
 
           <div class="rosterCell timeCell">{{$row.Mid.StartTime}}</div>
-          <div class="rosterCell staffCell">{{ if $row.Mid.AssignedStaff}} {{$row.Mid.StaffString}} {{else}}&nbsp;{{end}}</div>
+          {{ if $row.Mid.AssignedStaff}}
+            <div class="rosterCell staffCell {{if (MemberIsAssigned $activeStaff.ID $row.Mid.AssignedStaff)}}shiftHighlight{{end}}">
+              {{$row.Mid.StaffString}}
+            </div>
+          {{ else }}
+            <div class="rosterCell staffCell">&nbsp;</div>
+          {{ end }}
           <div class="rosterCell flagCell">{{$row.Mid.Description}}</div>
 
           <div class="rosterCell timeCell">{{$row.Late.StartTime}}</div>
-          <div class="rosterCell staffCell">{{ if $row.Late.AssignedStaff}} {{$row.Late.StaffString}} {{else}}&nbsp;{{end}}</div>
+          {{ if $row.Late.AssignedStaff}}
+            <div class="rosterCell staffCell {{if (MemberIsAssigned $activeStaff.ID $row.Late.AssignedStaff)}}shiftHighlight{{end}}">
+              {{$row.Late.StaffString}}
+            </div>
+          {{ else }}
+            <div class="rosterCell staffCell">&nbsp;</div>
+          {{ end }}
           <div class="rosterCell flagCell">{{$row.Late.Description}}</div>
         {{ end }}
       </div>

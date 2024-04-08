@@ -94,6 +94,7 @@ type LeaveRequest struct {
 
 type ProfileData struct {
   StaffMember
+  RosterLive bool
   ShowUpdateSuccess bool
   ShowUpdateError bool
   ShowLeaveSuccess bool
@@ -102,43 +103,43 @@ type ProfileData struct {
 
 var emptyAvailability = []DayAvailability{
   {
-    Name: "Tuesday",
+    Name: "Tues",
     Early: true,
     Mid:   true,
     Late:  true,
   },
   {
-    Name: "Wednesday",
+    Name: "Wed",
     Early: true,
     Mid:   true,
     Late:  true,
   },
   {
-    Name: "Thursday",
+    Name: "Thurs",
     Early: true,
     Mid:   true,
     Late:  true,
   },
   {
-    Name: "Friday",
+    Name: "Fri",
     Early: true,
     Mid:   true,
     Late:  true,
   },
   {
-    Name: "Saturday",
+    Name: "Sat",
     Early: true,
     Mid:   true,
     Late:  true,
   },
   {
-    Name: "Sunday",
+    Name: "Sun",
     Early: true,
     Mid:   true,
     Late:  true,
   },
   {
-    Name: "Monday",
+    Name: "Mon",
     Early: true,
     Mid:   true,
     Late:  true,
@@ -227,6 +228,8 @@ func LoadState(filename string) (*Server, error) {
   state.Templates = template.New("").Funcs(template.FuncMap{
     "MakeDayStruct": MakeDayStruct,
     "GetHighlightCol": GetHighlightCol,
+    "MakeRootStruct": MakeRootStruct,
+    "MemberIsAssigned": MemberIsAssigned,
   })
   state.Templates, err = state.Templates.ParseGlob("./www/*.html")
   if err != nil {
@@ -254,7 +257,7 @@ func newSlot() Slot {
 }
 
 func newState() *Server {
-  dayNames := []string{"Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Monday"}
+  dayNames := []string{"Tues", "Wed", "Thurs", "Fri", "Sat", "Sun", "Mon"}
   today := time.Now()
   daysUntilTuesday := int(time.Tuesday - today.Weekday())
   if daysUntilTuesday <= 0 {
@@ -340,7 +343,7 @@ func main() {
   http.HandleFunc("/app.css", func(w http.ResponseWriter, r *http.Request) {
     http.ServeFile(w, r, "./www/app.css")
   })
-  http.HandleFunc("/root", s.VerifyAdmin(s.HandleRoot))
+  http.HandleFunc("/root", s.VerifySession(s.HandleRoot))
   http.HandleFunc("/submitLeave", s.VerifySession(s.HandleSubmitLeave))
   http.HandleFunc("/profile", s.VerifySession(s.HandleProfileIndex))
   http.HandleFunc("/profileBody", s.VerifySession(s.HandleProfile))
@@ -374,13 +377,6 @@ func (s *Slot) HasThisStaff(staffId uuid.UUID) bool {
   return false
 }
 
-type DayStruct struct {
-  RosterDay
-  Staff *[]*StaffMember
-  Date time.Time
-  IsLive bool
-}
-
 func GetHighlightCol(defaultCol string, flag Highlight) string {
   if flag == Duplicate {
     return "#FFA07A"
@@ -394,13 +390,41 @@ func GetHighlightCol(defaultCol string, flag Highlight) string {
   return defaultCol
 }
 
-func MakeDayStruct(day RosterDay, staff *[]*StaffMember, startDate time.Time, isLive bool) DayStruct {
+type RootStruct struct {
+  Server
+  ActiveStaff StaffMember
+}
+
+func MemberIsAssigned(activeID uuid.UUID, assignedID *uuid.UUID) bool {
+  if assignedID == nil {
+    return false
+  }
+  return *assignedID == activeID
+}
+
+func MakeRootStruct(server Server, activeStaff StaffMember) RootStruct {
+  return RootStruct{
+    server,
+    activeStaff,
+  }
+}
+
+type DayStruct struct {
+  RosterDay
+  Staff *[]*StaffMember
+  Date time.Time
+  IsLive bool
+  ActiveStaff StaffMember
+}
+
+func MakeDayStruct(day RosterDay, staff *[]*StaffMember, startDate time.Time, isLive bool, activeStaff StaffMember) DayStruct {
   date := startDate.AddDate(0, 0, day.Offset)
   return DayStruct{
     day,
     staff,
     date,
     isLive,
+    activeStaff,
   }
 }
 
@@ -433,7 +457,11 @@ func (s *Server) HandleAdminDeleteLeaveReq(w http.ResponseWriter, r *http.Reques
       break
     }
   }
-  err = s.Templates.ExecuteTemplate(w, "root", s)
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  err = s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
   if err != nil {
     log.Printf("Error executing template: %v\n", err)
     http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -463,6 +491,7 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
   }
   data := ProfileData{
     StaffMember: *staff,
+    RosterLive: s.IsLive,
   }
   SaveState(s)
   err = s.Templates.ExecuteTemplate(w, "profile", data)
@@ -490,6 +519,7 @@ func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
     SaveState(s)
   }
   data.StaffMember = *staff
+  data.RosterLive = s.IsLive
   err := s.Templates.ExecuteTemplate(w, "profile", data)
   if err != nil {
     log.Printf("Error executing template: %v\n", err)
@@ -526,6 +556,7 @@ func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
 
   data := ProfileData{
     StaffMember: *staff,
+    RosterLive: s.IsLive,
   }
   err := s.Templates.ExecuteTemplate(w, "profile", data)
   if err != nil {
@@ -535,7 +566,16 @@ func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleRoot(w http.ResponseWriter, r *http.Request) {
-  err := s.Templates.ExecuteTemplate(w, "root", s)
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  if !thisStaff.IsAdmin && !s.IsLive {
+    w.Header().Set("HX-Redirect", "/profile")
+    w.WriteHeader(http.StatusOK)
+    return
+  }
+  err := s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
   if err != nil {
     log.Fatalf("Error executing template: %v", err)
   }
@@ -653,6 +693,10 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusBadRequest)
     return
   }
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
 
   slotIDStr := r.FormValue("slotID")
   staffIDStr := r.FormValue("staffID")
@@ -694,7 +738,7 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate, s.IsLive))
+  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate, s.IsLive, *thisStaff))
   if err != nil {
     log.Printf("Error executing template: %v", err)
     w.WriteHeader(http.StatusBadRequest)
@@ -714,27 +758,27 @@ type ModifyProfileBody struct {
   IdealShifts  string `json:"ideal-shifts"`
   Email  string `json:"email"`
   Phone  string `json:"phone"`
-  TuesEarly  string `json:"Tuesday-early-avail"`
-  TuesMid  string `json:"Tuesday-mid-avail"`
-  TuesLate  string `json:"Tuesday-late-avail"`
-  WedEarly  string `json:"Wednesday-early-avail"`
-  WedMid  string `json:"Wednesday-mid-avail"`
-  WedLate  string `json:"Wednesday-late-avail"`
-  ThursEarly  string `json:"Thursday-early-avail"`
-  ThursMid  string `json:"Thursday-mid-avail"`
-  ThursLate  string `json:"Thursday-late-avail"`
-  FriEarly  string `json:"Friday-early-avail"`
-  FriMid  string `json:"Friday-mid-avail"`
-  FriLate  string `json:"Friday-late-avail"`
-  SatEarly  string `json:"Saturday-early-avail"`
-  SatMid  string `json:"Saturday-mid-avail"`
-  SatLate  string `json:"Saturday-late-avail"`
-  SunEarly  string `json:"Sunday-early-avail"`
-  SunMid  string `json:"Sunday-mid-avail"`
-  SunLate  string `json:"Sunday-late-avail"`
-  MonEarly  string `json:"Monday-early-avail"`
-  MonMid  string `json:"Monday-mid-avail"`
-  MonLate  string `json:"Monday-late-avail"`
+  TuesEarly  string `json:"Tues-early-avail"`
+  TuesMid  string `json:"Tues-mid-avail"`
+  TuesLate  string `json:"Tues-late-avail"`
+  WedEarly  string `json:"Wed-early-avail"`
+  WedMid  string `json:"Wed-mid-avail"`
+  WedLate  string `json:"Wed-late-avail"`
+  ThursEarly  string `json:"Thurs-early-avail"`
+  ThursMid  string `json:"Thurs-mid-avail"`
+  ThursLate  string `json:"Thurs-late-avail"`
+  FriEarly  string `json:"Fri-early-avail"`
+  FriMid  string `json:"Fri-mid-avail"`
+  FriLate  string `json:"Fri-late-avail"`
+  SatEarly  string `json:"Sat-early-avail"`
+  SatMid  string `json:"Sat-mid-avail"`
+  SatLate  string `json:"Sat-late-avail"`
+  SunEarly  string `json:"Sun-early-avail"`
+  SunMid  string `json:"Sun-mid-avail"`
+  SunLate  string `json:"Sun-late-avail"`
+  MonEarly  string `json:"Mon-early-avail"`
+  MonMid  string `json:"Mon-mid-avail"`
+  MonLate  string `json:"Mon-late-avail"`
 }
 
 func (s *Server) GetSessionUser(w http.ResponseWriter, r *http.Request) *StaffMember {
@@ -769,43 +813,43 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 
   staff.Availability = []DayAvailability{
     {
-      Name: "Tuesday",
+      Name: "Tues",
       Early: reqBody.TuesEarly == "on",
       Mid: reqBody.TuesMid == "on",
       Late: reqBody.TuesLate == "on",
     },
     {
-      Name: "Wednesday",
+      Name: "Wed",
       Early: reqBody.WedEarly == "on",
       Mid: reqBody.WedMid == "on",
       Late: reqBody.WedLate == "on",
     },
     {
-      Name: "Thursday",
+      Name: "Thurs",
       Early: reqBody.ThursEarly == "on",
       Mid: reqBody.ThursMid == "on",
       Late: reqBody.ThursLate == "on",
     },
     {
-      Name: "Friday",
+      Name: "Fri",
       Early: reqBody.FriEarly == "on",
       Mid: reqBody.FriMid == "on",
       Late: reqBody.FriLate == "on",
     },
     {
-      Name: "Saturday",
+      Name: "Sat",
       Early: reqBody.SatEarly == "on",
       Mid: reqBody.SatMid == "on",
       Late: reqBody.SatLate == "on",
     },
     {
-      Name: "Sunday",
+      Name: "Sun",
       Early: reqBody.SunEarly == "on",
       Mid: reqBody.SunMid == "on",
       Late: reqBody.SunLate == "on",
     },
     {
-      Name: "Monday",
+      Name: "Mon",
       Early: reqBody.MonEarly == "on",
       Mid: reqBody.MonMid == "on",
       Late: reqBody.MonLate == "on",
@@ -813,6 +857,7 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
   }
   data := ProfileData{
     StaffMember: *staff,
+    RosterLive: s.IsLive,
     ShowUpdateSuccess: true,
   }
   SaveState(s)
@@ -951,7 +996,11 @@ func (s *Server) HandleShiftWindow(w http.ResponseWriter, r *http.Request) {
     s.StartDate = today.AddDate(0, 0, daysUntilTuesday)
   }
   SaveState(s)
-  err := s.Templates.ExecuteTemplate(w, "root", s)
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  err := s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
   if err != nil {
     log.Fatalf("Error executing template: %v", err)
   }
@@ -968,6 +1017,10 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusBadRequest)
     return
   }
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
 
   for i := range s.Days {
     if s.Days[i].ID == dayID {
@@ -979,7 +1032,7 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
         }
       }
       SaveState(s)
-      err := s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*s.Days[i], s.Staff, s.StartDate, s.IsLive))
+      err := s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*s.Days[i], s.Staff, s.StartDate, s.IsLive, *thisStaff))
       if err != nil {
         log.Printf("Error executing template: %v", err)
         w.WriteHeader(http.StatusBadRequest)
@@ -1039,7 +1092,11 @@ func (s *Server) handleToggleAdmin(w http.ResponseWriter, r *http.Request) {
     }
   }
   SaveState(s)
-  err = s.Templates.ExecuteTemplate(w, "root", s)
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  err = s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
   if err != nil {
     log.Fatalf("Error executing template: %v", err)
   }
@@ -1086,7 +1143,11 @@ func (s *Server) handleToggleHidden(w http.ResponseWriter, r *http.Request) {
   }
 
   SaveState(s)
-  err = s.Templates.ExecuteTemplate(w, "root", s)
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  err = s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
   if err != nil {
     log.Fatalf("Error executing template: %v", err)
   }
@@ -1095,7 +1156,11 @@ func (s *Server) handleToggleHidden(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleToggleLive(w http.ResponseWriter, r *http.Request) {
   s.IsLive = !s.IsLive
   SaveState(s)
-  err := s.Templates.ExecuteTemplate(w, "root", s)
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  err := s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
   if err != nil {
     log.Printf("Error executing template: %v", err)
     w.WriteHeader(http.StatusBadRequest)
@@ -1124,7 +1189,11 @@ func (s *Server) handleToggleAmelia(w http.ResponseWriter, r *http.Request) {
   }
   day.AmeliaOpen = !day.AmeliaOpen
   SaveState(s)
-  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate, s.IsLive))
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate, s.IsLive, *thisStaff))
   if err != nil {
     log.Printf("Error executing template: %v", err)
     w.WriteHeader(http.StatusBadRequest)
@@ -1153,7 +1222,11 @@ func (s *Server) handleToggleClosed(w http.ResponseWriter, r *http.Request) {
   }
   day.IsClosed = !day.IsClosed
   SaveState(s)
-  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate, s.IsLive))
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate, s.IsLive, *thisStaff))
   if err != nil {
     log.Printf("Error executing template: %v", err)
     w.WriteHeader(http.StatusBadRequest)
@@ -1209,7 +1282,11 @@ func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
   if selfDelete {
     s.handleGoogleLogout(w, r)
   } else {
-    err = s.Templates.ExecuteTemplate(w, "root", s)
+    thisStaff := s.GetSessionUser(w, r)
+    if (thisStaff == nil) {
+      return
+    }
+    err = s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
     if err != nil {
       log.Fatalf("Error executing template: %v", err)
     }
@@ -1253,7 +1330,11 @@ func (s *Server) handleAddTrial(w http.ResponseWriter, r *http.Request) {
   s.Staff = &newStaff
 
   SaveState(s)
-  err := s.Templates.ExecuteTemplate(w, "root", s)
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  err := s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
   if err != nil {
     log.Fatalf("Error executing template: %v", err)
   }

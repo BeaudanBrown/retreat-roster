@@ -13,10 +13,10 @@
   {{ else }}
   <div class="row">
     {{if not $isLive}}
-      <div class="rosterCell dayCell">
+      <div class="rosterCell ctrlCell">
       {{if eq $index 0}}
-      <button hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"dayID":"{{$dayID}}", "action":"-"}' hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>-</button>
-      <button hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"dayID":"{{$dayID}}", "action":"+"}' hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>+</button>
+      <button class="rowButton" hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"dayID":"{{$dayID}}", "action":"-"}' hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>-</button>
+      <button class="rowButton" hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"dayID":"{{$dayID}}", "action":"+"}' hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>+</button>
       {{else if eq $index 1}}
         <label>
             <input type="checkbox" {{ if $isClosed }}checked{{ end }}
@@ -26,7 +26,7 @@
                 hx-ext='json-enc'
                 hx-swap='outerHTML'
                 hx-vals='js:{"dayID":"{{$dayID}}"}'>
-            Close
+            Closed
         </label>
       {{else if eq $index 2}}
         <label>
@@ -47,12 +47,13 @@
       {{$dayName}}
       {{else if eq $index 1}}
       {{$date.Format "02/01"}}
-      {{else if and (eq $index 2) $isClosed}}
+      {{else if (eq $index 2)}}
+        {{if $isClosed}}
         CLOSED
-      {{ else if and (not $isClosed) $ameliaOpen }}
-        {{if $row.Amelia.AssignedStaff}}
-          <p style="padding-left: 10px; padding-right: 10px;" class="text-p">A/S </p>
+        {{else if $ameliaOpen}}
+        A/S
         {{end}}
+      {{ else if and (not $isClosed) $ameliaOpen }}
         <form hx-post="/modifySlot" hx-trigger="change from:#as-{{ $row.Amelia.ID }}" hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>
           <input type="hidden" name="dayID" value="{{ $dayID }}" />
           <input type="hidden" name="slotID" value="{{ $row.Amelia.ID }}" />

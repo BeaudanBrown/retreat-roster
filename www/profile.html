@@ -1,9 +1,13 @@
 {{ define "profile" }}
+<div id="profileBody" class="profileBody">
 <div id="profile" class="profile-container">
-  <div id="buttons">
+  <div class="buttons" id="buttons">
   {{ if .IsAdmin }}
     <a href="/">Edit Roster</a>
   {{ else }}
+    {{ if .RosterLive }}
+    <a href="/">View Roster</a>
+    {{end}}
     <a href="/" hx-ext='json-enc' hx-post="/deleteAcc" hx-vals='js:{"ID":"{{ .ID }}"}' hx-confirm="Are you sure you want to delete your account?">
         Delete Account
     </a>
@@ -12,7 +16,7 @@
   </div>
   <section class="user-profile">
     <h1>Update Your Profile</h1>
-    <form hx-ext='json-enc' hx-post="/modifyProfile" hx-swap="outerHTML" hx-target="#profile">
+    <form hx-ext='json-enc' hx-post="/modifyProfile" hx-swap="outerHTML" hx-target="#profileBody">
       <fieldset>
         <legend>Personal Information</legend>
         <table class="blank-table">
@@ -40,16 +44,18 @@
       </fieldset>
       <fieldset>
         <legend>Availability</legend>
-        <label for="ideal-shifts">Ideal # shifts:</label>
-        <select style="width:auto" name="ideal-shifts" id="ideal-shifts">
-            <option value=1 {{ if eq .IdealShifts 1 }}selected{{ end }}>1</option>
-            <option value=2 {{ if eq .IdealShifts 2 }}selected{{ end }}>2</option>
-            <option value=3 {{ if eq .IdealShifts 3 }}selected{{ end }}>3</option>
-            <option value=4 {{ if eq .IdealShifts 4 }}selected{{ end }}>4</option>
-            <option value=5 {{ if eq .IdealShifts 5 }}selected{{ end }}>5</option>
-            <option value=6 {{ if eq .IdealShifts 6 }}selected{{ end }}>6</option>
-            <option value=7 {{ if eq .IdealShifts 7 }}selected{{ end }}>7</option>
-        </select>
+        <div class="labelBody">
+          <label for="ideal-shifts">Ideal # shifts:</label>
+          <select style="width:auto" name="ideal-shifts" id="ideal-shifts">
+              <option value=1 {{ if eq .IdealShifts 1 }}selected{{ end }}>1</option>
+              <option value=2 {{ if eq .IdealShifts 2 }}selected{{ end }}>2</option>
+              <option value=3 {{ if eq .IdealShifts 3 }}selected{{ end }}>3</option>
+              <option value=4 {{ if eq .IdealShifts 4 }}selected{{ end }}>4</option>
+              <option value=5 {{ if eq .IdealShifts 5 }}selected{{ end }}>5</option>
+              <option value=6 {{ if eq .IdealShifts 6 }}selected{{ end }}>6</option>
+              <option value=7 {{ if eq .IdealShifts 7 }}selected{{ end }}>7</option>
+          </select>
+        </div>
         <table class="blank-table">
           <thead>
             <tr>
@@ -96,7 +102,7 @@
           <td><input type="text" id="reason" name="reason" required></td>
         </tr>
         <tr>
-          <td><label for="start-date">Unavailable:</label></td>
+          <td><label for="start-date">Unavailable from:</label></td>
           <td><input type="date" id="start-date" name="start-date" required></td>
         </tr>
         <tr>
@@ -118,10 +124,11 @@
   {{ range .LeaveRequests }}
   <div class="leave-request-row">
     <div class="leave-reason">Reason: {{ .Reason }}</div>
-    <div class="leave-start-date">Unavailable: {{ .StartDate.Format "01/02/06" }}</div>
-    <div class="leave-end-date">Available: {{ .EndDate.Format "02/01/06" }}</div>
+    <div class="leave-start-date">Unavailable from: {{ .StartDate.Format "01/02/06" }}</div>
+    <div class="leave-end-date">Available again: {{ .EndDate.Format "02/01/06" }}</div>
     <a href="#" hx-ext="json-enc" class="delete-icon" hx-post="/deleteLeaveReq" hx-vals='js:{"id":"{{ .ID }}"}' hx-swap="outerHTML" hx-target="#profile">🗑</a>
   </div>
   {{ end }}
+</div>
 </div>
 {{ end }}
