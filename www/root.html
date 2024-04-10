@@ -4,6 +4,10 @@
   {{ $startDate := .StartDate }}
   {{ $isLive := .IsLive }}
   {{ $activeStaff := .ActiveStaff }}
+  <div class="buttons" id="buttons">
+    <a href="/profile">Edit Profile</a>
+    <a href="#" hx-post="/auth/logout">Logout</a>
+  </div>
   {{ if not .ActiveStaff.IsAdmin }}
     <div id="roster-jpg">
     {{ range .Days }}
@@ -81,7 +85,11 @@
           {{ range .Staff }}
             {{if not .IsTrial }}
               <tr class="staff-row">
-                <td>{{ .FirstName }} {{ .LastName }}</td>
+                {{if not (eq .NickName "") }}
+                  <td>{{ .NickName }}</td>
+                {{else}}
+                  <td>{{ .FirstName }}</td>
+                {{end}}
                 <td>{{ .Email }}</td>
                 <td>{{ .Phone }}</td>
                 <td>{{ .ContactName }}</td>
@@ -120,9 +128,13 @@
     <h2>Leave Requests</h2>
     {{ range $staff }}
       {{ $name := .FirstName }}
+      {{if not (eq .NickName "")}}
+        {{ $name := .NickName }}
+      {{end}}
       {{ range .LeaveRequests }}
         <div class="leave-request-row">
           <div class="leave-reason">Staff: {{ $name }}</div>
+          <div class="leave-end-date">Created: {{ .CreationDate.Format "02/01/06" }}</div>
           <div class="leave-reason">Reason: {{ .Reason }}</div>
           <div class="leave-start-date">Unavailable from: {{ .StartDate.Format "Jan 2, 2006" }}</div>
           <div class="leave-end-date">Available again: {{ .EndDate.Format "Jan 2, 2006" }}</div>
@@ -131,8 +143,6 @@
       {{ end }}
     {{ end }}
   {{ end }}
-  <a href="#" hx-post="/auth/logout">Logout</a>
-  <a href="/profile">Edit Profile</a>
 </div>
 
 <script>

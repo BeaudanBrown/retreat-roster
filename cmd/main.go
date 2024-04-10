@@ -87,6 +87,7 @@ func (cd *CustomDate) UnmarshalJSON(input []byte) error {
 
 type LeaveRequest struct {
   ID uuid.UUID
+  CreationDate CustomDate
   Reason string	`json:"reason"`
   StartDate CustomDate	`json:"start-date"`
   EndDate CustomDate	`json:"end-date"`
@@ -480,6 +481,7 @@ func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
   var reqBody LeaveRequest
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
   reqBody.ID = uuid.New()
+  reqBody.CreationDate = CustomDate{time.Now()}
   staff := s.GetSessionUser(w, r)
   if (staff == nil) {
     return
