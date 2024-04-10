@@ -269,34 +269,6 @@ func newState() *Server {
 
   var Days []*RosterDay
   staff := []*StaffMember{}
-  // if (DEV_MODE) {
-  //   staff := []*StaffMember{}
-  // } else {
-  //   staff := []*StaffMember{
-  //     {
-  //       FirstName: "Beaudan",
-  //       ID:   uuid.Parse(DEV_UUID),
-  //       Availability: emptyAvailability,
-  //       IsAdmin: true,
-  //       GoogleID: "DEV",
-  //     },
-  //     {
-  //       FirstName: "Jamie",
-  //       ID:   uuid.New(),
-  //       Availability: emptyAvailability,
-  //     },
-  //     {
-  //       FirstName: "Kerryn",
-  //       ID:   uuid.New(),
-  //       Availability: emptyAvailability,
-  //     },
-  //     {
-  //       FirstName: "James",
-  //       ID:   uuid.New(),
-  //       Availability: emptyAvailability,
-  //     },
-  //   }
-  // }
 
   // Loop over dayNames to fill Days slice
   for i, dayName := range dayNames {

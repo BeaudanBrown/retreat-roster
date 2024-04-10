@@ -55,6 +55,7 @@
         <div class="labelBody">
           <label for="ideal-shifts">Ideal # shifts:</label>
           <select style="width:auto" name="ideal-shifts" id="ideal-shifts">
+              <option value=0 {{ if eq .IdealShifts 0 }}selected{{ end }}>0</option>
               <option value=1 {{ if eq .IdealShifts 1 }}selected{{ end }}>1</option>
               <option value=2 {{ if eq .IdealShifts 2 }}selected{{ end }}>2</option>
               <option value=3 {{ if eq .IdealShifts 3 }}selected{{ end }}>3</option>
@@ -132,7 +133,7 @@
   {{ range .LeaveRequests }}
   <div class="leave-request-row">
     <div class="leave-reason">Reason: {{ .Reason }}</div>
-    <div class="leave-start-date">Unavailable from: {{ .StartDate.Format "01/02/06" }}</div>
+    <div class="leave-start-date">Unavailable from: {{ .StartDate.Format "02/01/06" }}</div>
     <div class="leave-end-date">Available again: {{ .EndDate.Format "02/01/06" }}</div>
     <a href="#" hx-ext="json-enc" class="delete-icon" hx-post="/deleteLeaveReq" hx-vals='js:{"id":"{{ .ID }}"}' hx-swap="outerHTML" hx-target="#profile">🗑</a>
   </div>

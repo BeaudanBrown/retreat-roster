@@ -60,7 +60,7 @@
           <select class="rosterInput" id="as-{{ $row.Amelia.ID }}" name="staffID">
             <option value=""></option>
             {{ range $staff }}
-              {{ if not .IsHidden }}
+              {{ if and (gt .IdealShifts  0) (not .IsHidden) }}
                 <option class="drop-opt" value="{{.ID}}" {{if $row.Amelia.HasThisStaff .ID}}selected{{end}}>
                 {{if .NickName }}
                   {{.NickName}}
@@ -100,7 +100,7 @@
         <select class="rosterInput" id="s-{{ $row.Early.ID }}" name="staffID">
           <option value=""></option>
           {{ range $staff }}
-            {{ if not .IsHidden }}
+            {{ if and (gt .IdealShifts  0) (not .IsHidden) }}
               <option class="drop-opt" value="{{.ID}}" {{if $row.Early.HasThisStaff .ID}}selected{{end}}>
                 {{if .NickName }}
                   {{.NickName}}
@@ -135,7 +135,7 @@
         <select class="rosterInput" id="s-{{ $row.Mid.ID }}" name="staffID">
           <option value=""></option>
           {{ range $staff }}
-            {{ if not .IsHidden }}
+            {{ if and (gt .IdealShifts  0) (not .IsHidden) }}
               <option class="drop-opt" value="{{.ID}}" {{if $row.Mid.HasThisStaff .ID}}selected{{end}}>
                 {{if .NickName }}
                   {{.NickName}}
@@ -170,7 +170,7 @@
         <select class="rosterInput" id="s-{{ $row.Late.ID }}" name="staffID">
           <option value=""></option>
           {{ range $staff }}
-            {{ if not .IsHidden }}
+            {{ if and (gt .IdealShifts  0) (not .IsHidden) }}
               <option class="drop-opt" value="{{.ID}}" {{if $row.Late.HasThisStaff .ID}}selected{{end}}>
                 {{if .NickName }}
                   {{.NickName}}
