@@ -70,7 +70,7 @@ type CustomDate struct {
 func (cd *CustomDate) UnmarshalJSON(input []byte) error {
   strInput := strings.Trim(string(input), `"`)
   // Try parsing the date in the expected formats
-  formats := []string{"2006-01-02", "2006-01-02T15:04:05Z"}
+  formats := []string{"2006-01-02", "2006-01-02T15:04:05Z", "2006-01-02T15:04:05.999999999Z07:00"}
   var parseErr error
   for _, format := range formats {
     var newTime time.Time
