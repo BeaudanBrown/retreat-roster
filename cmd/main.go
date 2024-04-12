@@ -921,7 +921,7 @@ func (s *Server) CheckFlags() {
           if staff != nil {
             for _, req := range staff.LeaveRequests {
               if !req.StartDate.After(date) && req.EndDate.After(date) {
-                row.Early.Flag = LeaveConflict
+                row.Mid.Flag = LeaveConflict
                 break
               }
             }
@@ -939,7 +939,7 @@ func (s *Server) CheckFlags() {
           staff := s.GetStaffByID(*row.Late.AssignedStaff)
           for _, req := range staff.LeaveRequests {
             if !req.StartDate.After(date) && req.EndDate.After(date) {
-              row.Early.Flag = LeaveConflict
+              row.Late.Flag = LeaveConflict
               break
             }
           }
