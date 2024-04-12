@@ -141,7 +141,7 @@
         {{ range $staff }}
           {{ $name := .FirstName }}
           {{if not (eq .NickName "")}}
-            {{ $name := .NickName }}
+            {{ $name = .NickName }}
           {{end}}
           {{ range .LeaveRequests }}
             <tr>
