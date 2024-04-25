@@ -353,6 +353,14 @@ func main() {
   log.Println(http.ListenAndServe(":6969", nil))
 }
 
+func (s *Server) renderTemplate(w http.ResponseWriter, templateName string, data interface{}) {
+  err := s.Templates.ExecuteTemplate(w, templateName, data)
+  if err != nil {
+    log.Printf("Error executing template: %v\n", err)
+    http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+  }
+}
+
 func (s *Slot) HasThisStaff(staffId uuid.UUID) bool {
   if s.AssignedStaff != nil && *s.AssignedStaff == staffId {
     return true
@@ -477,11 +485,7 @@ func (s *Server) HandleAdminDeleteLeaveReq(w http.ResponseWriter, r *http.Reques
   if (thisStaff == nil) {
     return
   }
-  err = s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
-  if err != nil {
-    log.Printf("Error executing template: %v\n", err)
-    http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-  }
+  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
 }
 
 func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
@@ -510,11 +514,7 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
     RosterLive: s.IsLive,
   }
   SaveState(s)
-  err = s.Templates.ExecuteTemplate(w, "profile", data)
-  if err != nil {
-    log.Printf("Error executing template: %v\n", err)
-    http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-  }
+  s.renderTemplate(w, "profile", data)
 }
 
 func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
@@ -537,32 +537,19 @@ func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
   }
   data.StaffMember = *staff
   data.RosterLive = s.IsLive
-  err := s.Templates.ExecuteTemplate(w, "profile", data)
-  if err != nil {
-    log.Printf("Error executing template: %v\n", err)
-    http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-  }
+  s.renderTemplate(w, "profile", data)
 }
 
 func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
-  err := s.Templates.ExecuteTemplate(w, "profileIndex", s.CacheBust)
-  if err != nil {
-    log.Fatalf("Error executing template: %v", err)
-  }
+  s.renderTemplate(w, "profileIndex", s.CacheBust)
 }
 
 func (s *Server) HandleLanding(w http.ResponseWriter, r *http.Request) {
-  err := s.Templates.ExecuteTemplate(w, "landing", s.CacheBust)
-  if err != nil {
-    log.Fatalf("Error executing template: %v", err)
-  }
+  s.renderTemplate(w, "landing", s.CacheBust)
 }
 
 func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
-  err := s.Templates.ExecuteTemplate(w, "index", s.CacheBust)
-  if err != nil {
-    log.Fatalf("Error executing template: %v", err)
-  }
+  s.renderTemplate(w, "index", s.CacheBust)
 }
 
 func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
@@ -575,11 +562,7 @@ func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
     StaffMember: *staff,
     RosterLive: s.IsLive,
   }
-  err := s.Templates.ExecuteTemplate(w, "profile", data)
-  if err != nil {
-    log.Printf("Error executing template: %v\n", err)
-    http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-  }
+  s.renderTemplate(w, "profile", data)
 }
 
 func (s *Server) HandleRoot(w http.ResponseWriter, r *http.Request) {
@@ -592,10 +575,7 @@ func (s *Server) HandleRoot(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusOK)
     return
   }
-  err := s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
-  if err != nil {
-    log.Fatalf("Error executing template: %v", err)
-  }
+  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
 }
 
 func (s *Server) GetStaffByToken(token uuid.UUID) *StaffMember {
@@ -742,10 +722,7 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
   }
 
   SaveState(s)
-  err = s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
-  if err != nil {
-    log.Fatalf("Error executing template: %v", err)
-  }
+  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
 }
 
 type ModifyRows struct {
@@ -867,11 +844,7 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
     ShowUpdateSuccess: true,
   }
   SaveState(s)
-  err := s.Templates.ExecuteTemplate(w, "profile", data)
-  if err != nil {
-    log.Printf("Error executing template: %v\n", err)
-    http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-  }
+  s.renderTemplate(w, "profile", data)
 }
 
 func (s *Server) CheckFlags() {
@@ -1025,10 +998,7 @@ func (s *Server) HandleShiftWindow(w http.ResponseWriter, r *http.Request) {
   if (thisStaff == nil) {
     return
   }
-  err := s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
-  if err != nil {
-    log.Fatalf("Error executing template: %v", err)
-  }
+  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
 }
 
 
@@ -1057,12 +1027,7 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
         }
       }
       SaveState(s)
-      err := s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*s.Days[i], *s, *thisStaff))
-      if err != nil {
-        log.Printf("Error executing template: %v", err)
-        w.WriteHeader(http.StatusBadRequest)
-        return
-      }
+      s.renderTemplate(w, "rosterDay", MakeDayStruct(*s.Days[i], *s, *thisStaff))
       break
     }
   }
@@ -1121,10 +1086,7 @@ func (s *Server) handleToggleAdmin(w http.ResponseWriter, r *http.Request) {
   if (thisStaff == nil) {
     return
   }
-  err = s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
-  if err != nil {
-    log.Fatalf("Error executing template: %v", err)
-  }
+  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
 }
 
 type ToggleHiddenBody struct {
@@ -1172,10 +1134,7 @@ func (s *Server) handleToggleHidden(w http.ResponseWriter, r *http.Request) {
   if (thisStaff == nil) {
     return
   }
-  err = s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
-  if err != nil {
-    log.Fatalf("Error executing template: %v", err)
-  }
+  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
 }
 
 func (s *Server) handleToggleHideByIdeal(w http.ResponseWriter, r *http.Request) {
@@ -1185,12 +1144,7 @@ func (s *Server) handleToggleHideByIdeal(w http.ResponseWriter, r *http.Request)
   if (thisStaff == nil) {
     return
   }
-  err := s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
-  if err != nil {
-    log.Printf("Error executing template: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
+  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
 }
 
 func (s *Server) handleToggleHideByPreferences(w http.ResponseWriter, r *http.Request) {
@@ -1200,12 +1154,7 @@ func (s *Server) handleToggleHideByPreferences(w http.ResponseWriter, r *http.Re
   if (thisStaff == nil) {
     return
   }
-  err := s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
-  if err != nil {
-    log.Printf("Error executing template: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
+  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
 }
 
 func (s *Server) handleToggleHideByLeave(w http.ResponseWriter, r *http.Request) {
@@ -1215,12 +1164,7 @@ func (s *Server) handleToggleHideByLeave(w http.ResponseWriter, r *http.Request)
   if (thisStaff == nil) {
     return
   }
-  err := s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
-  if err != nil {
-    log.Printf("Error executing template: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
+  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
 }
 
 func (s *Server) handleToggleLive(w http.ResponseWriter, r *http.Request) {
@@ -1230,12 +1174,7 @@ func (s *Server) handleToggleLive(w http.ResponseWriter, r *http.Request) {
   if (thisStaff == nil) {
     return
   }
-  err := s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
-  if err != nil {
-    log.Printf("Error executing template: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
+  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
 }
 
 type ToggleAmeliaBody struct {
@@ -1263,10 +1202,7 @@ func (s *Server) handleToggleAmelia(w http.ResponseWriter, r *http.Request) {
   if (thisStaff == nil) {
     return
   }
-  err = s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
-  if err != nil {
-    log.Fatalf("Error executing template: %v", err)
-  }
+  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
 }
 
 type ToggleClosedBody struct {
@@ -1294,12 +1230,7 @@ func (s *Server) handleToggleClosed(w http.ResponseWriter, r *http.Request) {
   if (thisStaff == nil) {
     return
   }
-  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate, s.IsLive, *thisStaff))
-  if err != nil {
-    log.Printf("Error executing template: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
+  s.renderTemplate(w, "rosterDat", MakeDayStruct(*day, *s, *thisStaff))
 }
 
 type DeleteAccountBody struct {
@@ -1354,10 +1285,7 @@ func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
     if (thisStaff == nil) {
       return
     }
-    err = s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
-    if err != nil {
-      log.Fatalf("Error executing template: %v", err)
-    }
+    s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
   }
 }
 
@@ -1402,10 +1330,7 @@ func (s *Server) handleAddTrial(w http.ResponseWriter, r *http.Request) {
   if (thisStaff == nil) {
     return
   }
-  err := s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
-  if err != nil {
-    log.Fatalf("Error executing template: %v", err)
-  }
+  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
 }
 
 func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
