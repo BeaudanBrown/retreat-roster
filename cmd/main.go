@@ -54,6 +54,9 @@ type ServerDisc struct {
   Days  []*RosterDay   `json:"days"`
   Staff *[]*StaffMember `json:"staff"`
   IsLive         bool `json:"isLive"`
+  HideByIdeal         bool `json:"hideByIdeal"`
+  HideByPrefs         bool `json:"hideByPrefs"`
+  HideByLeave         bool `json:"hideByLeave"`
 }
 
 type DayAvailability struct {
@@ -161,6 +164,7 @@ type StaffMember struct {
   ContactName string
   ContactPhone string
   IdealShifts int
+  CurrentShifts int
   Availability []DayAvailability
   Token *uuid.UUID
   LeaveRequests	[]LeaveRequest
@@ -172,8 +176,8 @@ type RosterDay struct {
   Rows           []*Row
   Colour         string
   Offset         int
-  IsClosed         bool
-  AmeliaOpen         bool
+  IsClosed       bool
+  AmeliaOpen     bool
 }
 
 type Row struct {
@@ -326,6 +330,10 @@ func main() {
   http.HandleFunc("/auth/logout", s.handleGoogleLogout)
   http.HandleFunc("/auth/callback", s.handleGoogleCallback)
 
+  http.HandleFunc("/toggleHideByIdeal", s.VerifySession(s.handleToggleHideByIdeal))
+  http.HandleFunc("/toggleHideByPreferences", s.VerifySession(s.handleToggleHideByPreferences))
+  http.HandleFunc("/toggleHideByLeave", s.VerifySession(s.handleToggleHideByLeave))
+
   http.HandleFunc("/toggleAdmin", s.VerifySession(s.handleToggleAdmin))
   http.HandleFunc("/toggleHidden", s.VerifySession(s.handleToggleHidden))
   http.HandleFunc("/toggleLive", s.VerifySession(s.handleToggleLive))
@@ -390,21 +398,54 @@ type DayStruct struct {
   Date time.Time
   IsLive bool
   ActiveStaff StaffMember
+  HideByIdeal bool
+  HideByPrefs bool
+  HideByLeave bool
 }
 
-func MakeDayStruct(day RosterDay, staff *[]*StaffMember, startDate time.Time, isLive bool, activeStaff StaffMember) DayStruct {
-  date := startDate.AddDate(0, 0, day.Offset)
+func MakeDayStruct(day RosterDay, s Server, activeStaff StaffMember) DayStruct {
+  date :=  s.StartDate.AddDate(0, 0, day.Offset)
   return DayStruct{
     day,
-    staff,
+    s.Staff,
     date,
-    isLive,
+    s.IsLive,
     activeStaff,
+    s.HideByIdeal,
+    s.HideByPrefs,
+    s.HideByLeave,
   }
 }
 
 type DeleteLeaveBody struct {
   ID string `json:"id"`
+}
+
+func (staff *StaffMember) HasConflict(slot string, offset int) bool {
+  switch slot {
+  case "Early":
+    if !staff.Availability[offset].Early {
+      return true
+    }
+  case "Mid":
+    if !staff.Availability[offset].Mid {
+      return true
+    }
+  case "Late":
+    if !staff.Availability[offset].Late {
+      return true
+    }
+  }
+  return false
+}
+
+func (staff *StaffMember) IsAway(date time.Time) bool {
+  for _, req := range staff.LeaveRequests {
+    if !req.StartDate.After(date) && req.EndDate.After(date) {
+      return true
+    }
+  }
+  return false
 }
 
 func (s *Server) HandleAdminDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
@@ -663,12 +704,6 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  dayID, err := uuid.Parse(r.FormValue("dayID"))
-  if err != nil {
-    log.Printf("Invalid dayID: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
   thisStaff := s.GetSessionUser(w, r)
   if (thisStaff == nil) {
     return
@@ -707,18 +742,9 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
   }
 
   SaveState(s)
-
-  day := s.GetDayByID(dayID)
-  if day == nil {
-    log.Printf("Error executing template: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
-  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate, s.IsLive, *thisStaff))
+  err = s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
   if err != nil {
-    log.Printf("Error executing template: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
+    log.Fatalf("Error executing template: %v", err)
   }
 }
 
@@ -849,6 +875,9 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) CheckFlags() {
+  for _, staff := range *s.Staff {
+    staff.CurrentShifts = 0
+  }
   for i, day := range s.Days {
     // Create a new map for each day to track occurrences of staff IDs within that day
     staffIDOccurrences := make(map[uuid.UUID]int)
@@ -856,15 +885,31 @@ func (s *Server) CheckFlags() {
     for _, row := range day.Rows {
       if day.AmeliaOpen && row.Amelia.AssignedStaff != nil {
         staffIDOccurrences[*row.Amelia.AssignedStaff]++
+        staff := s.GetStaffByID(*row.Amelia.AssignedStaff)
+        if staff != nil {
+          staff.CurrentShifts += 1
+        }
       }
       if row.Early.AssignedStaff != nil {
         staffIDOccurrences[*row.Early.AssignedStaff]++
+        staff := s.GetStaffByID(*row.Early.AssignedStaff)
+        if staff != nil {
+          staff.CurrentShifts += 1
+        }
       }
       if row.Mid.AssignedStaff != nil {
         staffIDOccurrences[*row.Mid.AssignedStaff]++
+        staff := s.GetStaffByID(*row.Mid.AssignedStaff)
+        if staff != nil {
+          staff.CurrentShifts += 1
+        }
       }
       if row.Late.AssignedStaff != nil {
         staffIDOccurrences[*row.Late.AssignedStaff]++
+        staff := s.GetStaffByID(*row.Late.AssignedStaff)
+        if staff != nil {
+          staff.CurrentShifts += 1
+        }
       }
     }
 
@@ -1012,7 +1057,7 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
         }
       }
       SaveState(s)
-      err := s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*s.Days[i], s.Staff, s.StartDate, s.IsLive, *thisStaff))
+      err := s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*s.Days[i], *s, *thisStaff))
       if err != nil {
         log.Printf("Error executing template: %v", err)
         w.WriteHeader(http.StatusBadRequest)
@@ -1133,6 +1178,51 @@ func (s *Server) handleToggleHidden(w http.ResponseWriter, r *http.Request) {
   }
 }
 
+func (s *Server) handleToggleHideByIdeal(w http.ResponseWriter, r *http.Request) {
+  s.HideByIdeal = !s.HideByIdeal
+  SaveState(s)
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  err := s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+  if err != nil {
+    log.Printf("Error executing template: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+}
+
+func (s *Server) handleToggleHideByPreferences(w http.ResponseWriter, r *http.Request) {
+  s.HideByPrefs = !s.HideByPrefs
+  SaveState(s)
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  err := s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+  if err != nil {
+    log.Printf("Error executing template: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+}
+
+func (s *Server) handleToggleHideByLeave(w http.ResponseWriter, r *http.Request) {
+  s.HideByLeave = !s.HideByLeave
+  SaveState(s)
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  err := s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+  if err != nil {
+    log.Printf("Error executing template: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+}
+
 func (s *Server) handleToggleLive(w http.ResponseWriter, r *http.Request) {
   s.IsLive = !s.IsLive
   SaveState(s)
@@ -1173,11 +1263,9 @@ func (s *Server) handleToggleAmelia(w http.ResponseWriter, r *http.Request) {
   if (thisStaff == nil) {
     return
   }
-  err = s.Templates.ExecuteTemplate(w, "rosterDay", MakeDayStruct(*day, s.Staff, s.StartDate, s.IsLive, *thisStaff))
+  err = s.Templates.ExecuteTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
   if err != nil {
-    log.Printf("Error executing template: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
+    log.Fatalf("Error executing template: %v", err)
   }
 }
 

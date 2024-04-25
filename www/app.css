@@ -35,7 +35,7 @@ select {
   }
 }
 
-.buttons a {
+.buttons a, label {
   padding-left: 5px; /* Adds padding around each link */
   padding-right: 5px; /* Adds padding around each link */
 }

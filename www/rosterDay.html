@@ -7,6 +7,10 @@
   {{ $isClosed := .IsClosed }}
   {{ $isLive := .IsLive }}
   {{ $ameliaOpen := .AmeliaOpen }}
+  {{ $hideByIdeal := .HideByIdeal }}
+  {{ $hideByLeave := .HideByLeave }}
+  {{ $hideByPrefs := .HideByPrefs }}
+  {{ $offset := .Offset }}
   {{ $colour := .Colour }}
   {{range $index, $row := .Rows}}
   {{ if and $isClosed (gt $index 3) }}
@@ -21,7 +25,7 @@
         <label>
             <input type="checkbox" {{ if $isClosed }}checked{{ end }}
                 hx-post="/toggleClosed"
-                hx-target="#d-{{$dayID}}"
+                hx-target="#roster"
                 hx-trigger="change"
                 hx-ext='json-enc'
                 hx-swap='outerHTML'
@@ -32,7 +36,7 @@
         <label>
             <input type="checkbox" {{ if $ameliaOpen }}checked{{ end }}
                 hx-post="/toggleAmelia"
-                hx-target="#d-{{$dayID}}"
+                hx-target="#roster"
                 hx-trigger="change"
                 hx-ext='json-enc'
                 hx-swap='outerHTML'
@@ -54,20 +58,28 @@
         A/S
         {{end}}
       {{ else if and (not $isClosed) $ameliaOpen }}
-        <form hx-post="/modifySlot" hx-trigger="change from:#as-{{ $row.Amelia.ID }}" hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>
+        <form hx-post="/modifySlot" hx-trigger="change from:#as-{{ $row.Amelia.ID }}" hx-swap='outerHTML' hx-target='#roster'>
           <input type="hidden" name="dayID" value="{{ $dayID }}" />
           <input type="hidden" name="slotID" value="{{ $row.Amelia.ID }}" />
           <select class="rosterInput" id="as-{{ $row.Amelia.ID }}" name="staffID">
             <option value=""></option>
             {{ range $staff }}
-              {{ if or (.IsTrial) (and (gt .IdealShifts  0) (not .IsHidden)) }}
-                <option class="drop-opt" value="{{.ID}}" {{if $row.Amelia.HasThisStaff .ID}}selected{{end}}>
-                {{if .NickName }}
-                  {{.NickName}}
-                {{ else }}
-                  {{.FirstName}}
+              {{ if not .IsHidden }}
+                {{ if or
+                  (or (.IsTrial) ($row.Amelia.HasThisStaff .ID))
+                  (and
+                    (or (not $hideByIdeal) (lt .CurrentShifts .IdealShifts))
+                    (or (not $hideByLeave) (not (.IsAway $date)))
+                  )
+                }}
+                  <option class="drop-opt" value="{{.ID}}" {{if $row.Amelia.HasThisStaff .ID}}selected{{end}}>
+                    {{if .NickName}}
+                      {{.NickName}}
+                    {{else}}
+                      {{.FirstName}}
+                    {{end}}
+                  </option>
                 {{ end }}
-                </option>
               {{ end }}
             {{ end }}
           </select>
@@ -94,20 +106,31 @@
     </div>
 
     <div style='background-color: {{ GetHighlightCol $colour $row.Early.Flag }};' class="rosterCell staffCell">
-      <form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Early.ID }}" hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>
+      <form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Early.ID }}" hx-swap='outerHTML' hx-target='#roster'>
         <input type="hidden" name="dayID" value="{{ $dayID }}" />
         <input type="hidden" name="slotID" value="{{ $row.Early.ID }}" />
         <select class="rosterInput" id="s-{{ $row.Early.ID }}" name="staffID">
           <option value=""></option>
           {{ range $staff }}
-            {{ if or (.IsTrial) (and (gt .IdealShifts  0) (not .IsHidden)) }}
-              <option class="drop-opt" value="{{.ID}}" {{if $row.Early.HasThisStaff .ID}}selected{{end}}>
-                {{if .NickName }}
-                  {{.NickName}}
-                {{ else }}
-                  {{.FirstName}}
-                {{ end }}
-              </option>
+            {{ if not .IsHidden }}
+              {{ if or
+                (or (.IsTrial) ($row.Early.HasThisStaff .ID))
+                (and
+                  (and
+                    (or (not $hideByIdeal) (lt .CurrentShifts .IdealShifts))
+                    (or (not $hideByLeave) (not (.IsAway $date)))
+                  )
+                  (or (not $hideByPrefs) (not (.HasConflict "Early" $offset)))
+                )
+              }}
+                <option class="drop-opt" value="{{.ID}}" {{if $row.Early.HasThisStaff .ID}}selected{{end}}>
+                  {{if .NickName}}
+                    {{.NickName}}
+                  {{else}}
+                    {{.FirstName}}
+                  {{end}}
+                </option>
+              {{ end }}
             {{ end }}
           {{ end }}
         </select>
@@ -129,20 +152,31 @@
     </div>
 
     <div style='background-color: {{ GetHighlightCol $colour $row.Mid.Flag }};' class="rosterCell staffCell">
-      <form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Mid.ID }}" hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>
+      <form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Mid.ID }}" hx-swap='outerHTML' hx-target='#roster'>
         <input type="hidden" name="dayID" value="{{ $dayID }}" />
         <input type="hidden" name="slotID" value="{{ $row.Mid.ID }}" />
         <select class="rosterInput" id="s-{{ $row.Mid.ID }}" name="staffID">
           <option value=""></option>
           {{ range $staff }}
-            {{ if or (.IsTrial) (and (gt .IdealShifts  0) (not .IsHidden)) }}
-              <option class="drop-opt" value="{{.ID}}" {{if $row.Mid.HasThisStaff .ID}}selected{{end}}>
-                {{if .NickName }}
-                  {{.NickName}}
-                {{ else }}
-                  {{.FirstName}}
-                {{ end }}
-              </option>
+            {{ if not .IsHidden }}
+              {{ if or
+                (or (.IsTrial) ($row.Mid.HasThisStaff .ID))
+                (and
+                  (and
+                    (or (not $hideByIdeal) (lt .CurrentShifts .IdealShifts))
+                    (or (not $hideByLeave) (not (.IsAway $date)))
+                  )
+                  (or (not $hideByPrefs) (not (.HasConflict "Mid" $offset)))
+                )
+              }}
+                <option class="drop-opt" value="{{.ID}}" {{if $row.Mid.HasThisStaff .ID}}selected{{end}}>
+                  {{if .NickName}}
+                    {{.NickName}}
+                  {{else}}
+                    {{.FirstName}}
+                  {{end}}
+                </option>
+              {{ end }}
             {{ end }}
           {{ end }}
         </select>
@@ -164,20 +198,31 @@
     </div>
 
     <div style='background-color: {{ GetHighlightCol $colour $row.Late.Flag }};' class="rosterCell staffCell">
-      <form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Late.ID }}" hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>
+      <form hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Late.ID }}" hx-swap='outerHTML' hx-target='#roster'>
         <input type="hidden" name="dayID" value="{{ $dayID }}" />
         <input type="hidden" name="slotID" value="{{ $row.Late.ID }}" />
         <select class="rosterInput" id="s-{{ $row.Late.ID }}" name="staffID">
           <option value=""></option>
           {{ range $staff }}
-            {{ if or (.IsTrial) (and (gt .IdealShifts  0) (not .IsHidden)) }}
-              <option class="drop-opt" value="{{.ID}}" {{if $row.Late.HasThisStaff .ID}}selected{{end}}>
-                {{if .NickName }}
-                  {{.NickName}}
-                {{ else }}
-                  {{.FirstName}}
-                {{ end }}
-              </option>
+            {{ if not .IsHidden }}
+              {{ if or
+                (or (.IsTrial) ($row.Late.HasThisStaff .ID))
+                (and
+                  (and
+                    (or (not $hideByIdeal) (lt .CurrentShifts .IdealShifts))
+                    (or (not $hideByLeave) (not (.IsAway $date)))
+                  )
+                  (or (not $hideByPrefs) (not (.HasConflict "Late" $offset)))
+                )
+              }}
+                <option class="drop-opt" value="{{.ID}}" {{if $row.Late.HasThisStaff .ID}}selected{{end}}>
+                  {{if .NickName}}
+                    {{.NickName}}
+                  {{else}}
+                    {{.FirstName}}
+                  {{end}}
+                </option>
+              {{ end }}
             {{ end }}
           {{ end }}
         </select>

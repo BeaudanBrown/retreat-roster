@@ -4,6 +4,7 @@
   {{ $startDate := .StartDate }}
   {{ $isLive := .IsLive }}
   {{ $activeStaff := .ActiveStaff }}
+  {{ $server := .Server }}
   <div class="buttons" id="buttons">
     <a href="/profile">Edit Profile</a>
     <a href="#" hx-post="/auth/logout">Logout</a>
@@ -11,7 +12,7 @@
   {{ if not .ActiveStaff.IsAdmin }}
     <div id="roster-jpg">
     {{ range .Days }}
-      {{ $dayStruct := MakeDayStruct . $staff $startDate $isLive $activeStaff }}
+      {{ $dayStruct := MakeDayStruct . $server $activeStaff }}
       {{if $isLive }}
         {{ template "rosterDayLocked" $dayStruct }}
       {{ end }}
@@ -28,16 +29,45 @@
         Make Public
     </label>
   </div>
-  <div>
-    {{if not $isLive }}
+  {{if not $isLive }}
+    <div>
       <button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"-"}' hx-swap='outerHTML' hx-target='#roster'>-</button>
       <button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"0"}' hx-swap='outerHTML' hx-target='#roster'>This week</button>
       <button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"+"}' hx-swap='outerHTML' hx-target='#roster'>+</button>
-    {{ end }}
-  </div>
+    </div>
+    <div>
+      <label>Hide staff with:</label>
+    </div>
+    <div class="buttons" id="filters">
+      <label>
+        <input type="checkbox" {{ if .HideByIdeal }}checked{{ end }}
+          hx-get="/toggleHideByIdeal"
+          hx-target="#roster"
+          hx-trigger="change"
+          hx-swap='outerHTML'>
+          Ideal # shifts
+      </label>
+      <label>
+        <input type="checkbox" {{ if .HideByPrefs }}checked{{ end }}
+          hx-get="/toggleHideByPreferences"
+          hx-target="#roster"
+          hx-trigger="change"
+          hx-swap='outerHTML'>
+          Preference conflict
+      </label>
+      <label>
+        <input type="checkbox" {{ if .HideByLeave }}checked{{ end }}
+          hx-get="/toggleHideByLeave"
+          hx-target="#roster"
+          hx-trigger="change"
+          hx-swap='outerHTML'>
+          Leave requests
+      </label>
+    </div>
+  {{ end }}
   <div id="roster-jpg">
   {{ range .Days }}
-    {{ $dayStruct := MakeDayStruct . $staff $startDate $isLive $activeStaff }}
+    {{ $dayStruct := MakeDayStruct . $server $activeStaff }}
     {{if $isLive }}
       {{ template "rosterDayLocked" $dayStruct }}
     {{ else }}
@@ -75,6 +105,7 @@
             <th>Phone #</th>
             <th>Contact Name</th>
             <th>Contact Phone #</th>
+            <th>Current Shifts</th>
             <th>Ideal Shifts</th>
             <th>Hidden</th>
             <th>Admin</th>
@@ -94,6 +125,7 @@
                 <td>{{ .Phone }}</td>
                 <td>{{ .ContactName }}</td>
                 <td>{{ .ContactPhone }}</td>
+                <td>{{ .CurrentShifts }}</td>
                 <td>{{ .IdealShifts }}</td>
                 <td>
                   <input type="checkbox" {{ if .IsHidden }}checked{{ end }}
