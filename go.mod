@@ -1,6 +1,6 @@
 module roster
 
-go 1.22.0
+go 1.22
 
 require (
 	cloud.google.com/go/compute v1.23.4 // indirect
