@@ -79,13 +79,13 @@
             <tr class="availability">
               <td>{{ .Name }}</td>
               <td>
-                <label><input type="checkbox" name="{{.Name}}-early-avail" id="{{.Name}}-early-avail" {{ if .Early }}checked{{ end }}> Early</label>
+                <label><input class="availCheckbox" type="checkbox" name="{{.Name}}-early-avail" id="{{.Name}}-early-avail" {{ if .Early }}checked{{ end }}> Early</label>
               </td>
               <td>
-                <label><input type="checkbox" name="{{.Name}}-mid-avail" id="{{.Name}}-mid-avail" {{ if .Mid }}checked{{ end }}> Mid</label>
+                <label><input class="availCheckbox" type="checkbox" name="{{.Name}}-mid-avail" id="{{.Name}}-mid-avail" {{ if .Mid }}checked{{ end }}> Mid</label>
               </td>
               <td>
-                <label><input type="checkbox" name="{{.Name}}-late-avail" id="{{.Name}}-late-avail" {{ if .Late }}checked{{ end }}> Late</label>
+                <label><input class="availCheckbox" type="checkbox" name="{{.Name}}-late-avail" id="{{.Name}}-late-avail" {{ if .Late }}checked{{ end }}> Late</label>
               </td>
             </tr>
             {{ end }}

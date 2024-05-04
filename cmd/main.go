@@ -17,6 +17,7 @@ import (
   "github.com/joho/godotenv"
   "golang.org/x/oauth2"
   "golang.org/x/oauth2/google"
+  "roster/cmd/timesheet"
 )
 
 const STATE_FILE = "./data/state.json"
@@ -322,6 +323,7 @@ func main() {
   http.HandleFunc("/app.css", func(w http.ResponseWriter, r *http.Request) {
     http.ServeFile(w, r, "./www/app.css")
   })
+  http.HandleFunc("/timesheet", s.VerifySession(s.HandleTimesheet))
   http.HandleFunc("/root", s.VerifySession(s.HandleRoot))
   http.HandleFunc("/submitLeave", s.VerifySession(s.HandleSubmitLeave))
   http.HandleFunc("/profile", s.VerifySession(s.HandleProfileIndex))
@@ -563,6 +565,11 @@ func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
     RosterLive: s.IsLive,
   }
   s.renderTemplate(w, "profile", data)
+}
+
+
+func (s *Server) HandleTimesheet(w http.ResponseWriter, r *http.Request) {
+  s.renderTemplate(w, "timesheet", s)
 }
 
 func (s *Server) HandleRoot(w http.ResponseWriter, r *http.Request) {
