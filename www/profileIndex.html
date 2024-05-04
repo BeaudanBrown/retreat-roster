@@ -4,13 +4,14 @@
   <head>
     <base href="/profile">
     <title>Retreat Profile</title>
-    <link rel="stylesheet" href="app.css?v={{ . }}">
+    <link rel="stylesheet" href="app.css?v={{ .CacheBust }}">
     <meta content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=0" name="viewport">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
   </head>
   <body>
-    <div hx-get="/profileBody" hx-trigger="load"></div>
+    {{ $profileStruct := MakeProfileStruct .RosterLive .StaffMember .AdminRights }}
+    {{ template "profile" $profileStruct }}
   </body>
 </html>
 {{ end }}

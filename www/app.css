@@ -414,8 +414,7 @@ h1 {
 }
 
 .day-header > div, .day > div {
-  flex: 1; /* consistent flex basis for all equivalent columns */
-  padding: 0 4px;
+  flex: 1;
 }
 
 .timesheetDay > * {

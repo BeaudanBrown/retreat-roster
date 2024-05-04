@@ -97,8 +97,16 @@ type LeaveRequest struct {
   EndDate CustomDate	`json:"end-date"`
 }
 
+type ProfileIndexData struct {
+  CacheBust string
+  RosterLive bool
+  AdminRights bool
+  StaffMember
+}
+
 type ProfileData struct {
   StaffMember
+  AdminRights bool
   RosterLive bool
   ShowUpdateSuccess bool
   ShowUpdateError bool
@@ -237,6 +245,7 @@ func LoadState(filename string) (*Server, error) {
     "MakeDayStruct": MakeDayStruct,
     "GetHighlightCol": GetHighlightCol,
     "MakeRootStruct": MakeRootStruct,
+    "MakeProfileStruct": MakeProfileStruct,
     "MemberIsAssigned": MemberIsAssigned,
   })
   state.Templates, err = state.Templates.ParseGlob("./www/*.html")
@@ -395,6 +404,14 @@ func MemberIsAssigned(activeID uuid.UUID, assignedID *uuid.UUID) bool {
   return *assignedID == activeID
 }
 
+func MakeProfileStruct(rosterLive bool, staffMember StaffMember, adminRights bool) ProfileData {
+  return ProfileData{
+    StaffMember: staffMember,
+    AdminRights: adminRights,
+    RosterLive: rosterLive,
+  }
+}
+
 func MakeRootStruct(server Server, activeStaff StaffMember) RootStruct {
   return RootStruct{
     server,
@@ -513,6 +530,7 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
   }
   data := ProfileData{
     StaffMember: *staff,
+    AdminRights: staff.IsAdmin,
     RosterLive: s.IsLive,
   }
   SaveState(s)
@@ -529,7 +547,10 @@ func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
   if (staff == nil) {
     return
   }
-  data := ProfileData{}
+  data := ProfileData{
+    AdminRights: staff.IsAdmin,
+    RosterLive: s.IsLive,
+  }
   if reqBody.StartDate.After(reqBody.EndDate.Time) {
     data.ShowLeaveError = true
   } else {
@@ -538,12 +559,7 @@ func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
     SaveState(s)
   }
   data.StaffMember = *staff
-  data.RosterLive = s.IsLive
   s.renderTemplate(w, "profile", data)
-}
-
-func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
-  s.renderTemplate(w, "profileIndex", s.CacheBust)
 }
 
 func (s *Server) HandleLanding(w http.ResponseWriter, r *http.Request) {
@@ -554,6 +570,54 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
   s.renderTemplate(w, "index", s.CacheBust)
 }
 
+type ProfileIndexBody struct {
+  ID            string `json:"editStaffId"`
+}
+
+func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
+  editStaff := s.GetSessionUser(w, r)
+  if editStaff == nil {
+    w.WriteHeader(http.StatusUnauthorized)
+    return
+  }
+  adminRights := editStaff.IsAdmin
+
+  if r.Method == http.MethodGet {
+    editStaffIdParam := r.URL.Query().Get("editStaffId")
+    if editStaffIdParam != "" {
+      editStaffId, err := uuid.Parse(editStaffIdParam)
+      if err != nil {
+        log.Printf("Invalid UUID: %v", err)
+        w.WriteHeader(http.StatusBadRequest)
+        return
+      }
+      staff := s.GetStaffByID(editStaffId)
+      if staff != nil {
+        editStaff = staff
+      } else {
+        w.WriteHeader(http.StatusNotFound)
+        return
+      }
+    }
+  } else {
+    w.WriteHeader(http.StatusMethodNotAllowed)
+    return
+  }
+
+  data := ProfileIndexData{
+    CacheBust: s.CacheBust,
+    StaffMember: *editStaff,
+    AdminRights: adminRights,
+    RosterLive: s.IsLive,
+  }
+
+  err := s.Templates.ExecuteTemplate(w, "profileIndex", data)
+  if err != nil {
+    log.Fatalf("Error executing template: %v", err)
+    return
+  }
+}
+
 func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
   staff := s.GetSessionUser(w, r)
   if (staff == nil) {
@@ -561,6 +625,7 @@ func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
   }
 
   data := ProfileData{
+    AdminRights: staff.IsAdmin,
     StaffMember: *staff,
     RosterLive: s.IsLive,
   }
@@ -738,6 +803,7 @@ type ModifyRows struct {
 }
 
 type ModifyProfileBody struct {
+  ID string `json:"id"`
   FirstName string `json:"firstName"`
   LastName  string `json:"lastName"`
   NickName string `json:"nickName"`
@@ -787,8 +853,23 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
   log.Println("Modify profile")
   var reqBody ModifyProfileBody
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
-  staff := s.GetSessionUser(w, r)
+  staffID, err := uuid.Parse(reqBody.ID)
+  if err != nil {
+    log.Printf("Invalid staffID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  staff := s.GetStaffByID(staffID)
   if (staff == nil) {
+    return
+  }
+  activeStaff := s.GetSessionUser(w, r)
+  if (activeStaff == nil) {
+    return
+  }
+  if activeStaff.ID != staff.ID && !activeStaff.IsAdmin {
+    log.Printf("Insufficient privilledges: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
     return
   }
   staff.NickName = reqBody.NickName
@@ -846,6 +927,7 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
     },
   }
   data := ProfileData{
+    AdminRights: activeStaff.IsAdmin,
     StaffMember: *staff,
     RosterLive: s.IsLive,
     ShowUpdateSuccess: true,
@@ -1292,7 +1374,8 @@ func (s *Server) handleDeleteAccount(w http.ResponseWriter, r *http.Request) {
     if (thisStaff == nil) {
       return
     }
-    s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+    w.Header().Set("HX-Redirect", "/")
+    w.WriteHeader(http.StatusOK)
   }
 }
 
