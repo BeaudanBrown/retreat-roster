@@ -71,6 +71,7 @@ func (cd *CustomDate) UnmarshalJSON(input []byte) error {
     "2006-01-02T15:04:05Z",
     "2006-01-02T15:04:05.999999999Z07:00",
     "2006-01-02 15:04:05.999999999 -0700 MST",
+    "15:04",
   }
   var parseErr error
   for _, format := range formats {

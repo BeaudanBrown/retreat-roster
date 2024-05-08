@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"time"
@@ -37,8 +38,8 @@ type TimesheetEntry struct {
   ShiftEnd  time.Time   `json:"shiftEnd"`
   BreakStart  time.Time   `json:"breakStart"`
   BreakEnd  time.Time   `json:"breakEnd"`
-  BreakLength time.Duration `json:"breakLength"`
-  ShiftLength time.Duration `json:"shiftLength"`
+  BreakLength float64 `json:"breakLength"`
+  ShiftLength float64 `json:"shiftLength"`
   Managing         bool `json:"managing"`
   Admin         bool `json:"admin"`
 }
@@ -215,7 +216,7 @@ type DeleteTimesheetEntryBody struct {
   StartDate CustomDate	`json:"start-date"`
 }
 
-func (s *Server) DeleteTimesheetEntry(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleDeleteTimesheetEntry(w http.ResponseWriter, r *http.Request) {
   log.Println("Delete timesheet entry")
   var reqBody DeleteTimesheetEntryBody
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
@@ -254,9 +255,7 @@ func (s *Server) DeleteTimesheetEntry(w http.ResponseWriter, r *http.Request) {
         break
       }
     }
-    if found {
-      break
-    }
+    if found { break }
   }
   data := MakeTimesheetStruct(*thisStaff, *thisStaffWeek, s.TimesheetStartDate)
   s.renderTemplate(w, "timesheet", data)
@@ -268,7 +267,7 @@ type AddTimesheetEntryBody struct {
   StartDate CustomDate	`json:"start-date"`
 }
 
-func (s *Server) AddTimesheetEntry(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request) {
   var reqBody AddTimesheetEntryBody
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { log.Printf("Error parsing body: %v", err); return }
   staffID, err := uuid.Parse(reqBody.StaffID)
@@ -313,3 +312,72 @@ func (s *Server) AddTimesheetEntry(w http.ResponseWriter, r *http.Request) {
   s.renderTemplate(w, "timesheet", data)
 }
 
+type ModifyTimesheetEntryBody struct {
+    StaffID       string     `json:"staffID"`
+    EntryID         string     `json:"entryID"`
+    StartDate     CustomDate `json:"start-date"`
+    ShiftStart CustomDate     `json:"shiftStart"`
+    ShiftEnd  CustomDate     `json:"shiftEnd"`
+    BreakStart CustomDate     `json:"breakStart"`
+    BreakEnd  CustomDate     `json:"breakEnd"`
+    Managing      string       `json:"managing"`
+    Admin         string       `json:"admin"`
+}
+
+func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Request) {
+  var reqBody ModifyTimesheetEntryBody
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { log.Printf("Error parsing body: %v", err); return }
+  staffID, err := uuid.Parse(reqBody.StaffID)
+  if err != nil {
+    log.Printf("Invalid staffID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  entryID, err := uuid.Parse(reqBody.EntryID)
+  if err != nil {
+    log.Printf("Invalid entryID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+
+  t, err := LoadWeek(reqBody.StartDate.Time)
+  if err != nil {
+    log.Printf("Failed to load timesheet week: %v", err)
+    return
+  }
+  week := t.getTimesheetWeek(staffID)
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+
+  found := false
+  for _, day := range week.Days {
+    for _, entry := range day.Entries {
+      if entry.ID == entryID {
+        found = true
+        entry.Admin = reqBody.Admin == "on"
+        entry.Managing = reqBody.Managing == "on"
+        entry.ShiftStart = reqBody.ShiftStart.Time
+        entry.ShiftEnd = reqBody.ShiftEnd.Time
+        entry.BreakStart = reqBody.BreakStart.Time
+        entry.BreakEnd = reqBody.BreakEnd.Time
+        if entry.BreakEnd.After(entry.BreakStart) {
+            entry.BreakLength = math.Round(entry.BreakEnd.Sub(entry.BreakStart).Hours() * 100) / 100
+        } else {
+            entry.BreakLength = 0
+        }
+        if entry.ShiftEnd.After(entry.ShiftStart) {
+            entry.ShiftLength = math.Round((entry.ShiftEnd.Sub(entry.ShiftStart).Hours() - entry.BreakLength) * 100) / 100
+        } else {
+            entry.ShiftLength = 0
+        }
+        SaveTimesheetState(t)
+        break
+      }
+    }
+    if found { break }
+  }
+  data := MakeTimesheetStruct(*thisStaff, *week, s.TimesheetStartDate)
+  s.renderTemplate(w, "timesheet", data)
+}
