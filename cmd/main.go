@@ -52,6 +52,7 @@ func main() {
 
   http.HandleFunc("/shiftTimesheetWindow", s.VerifySession(s.HandleShiftTimesheetWindow))
   http.HandleFunc("/addTimesheetEntry", s.VerifySession(s.AddTimesheetEntry))
+  http.HandleFunc("/deleteTimesheetEntry", s.VerifySession(s.DeleteTimesheetEntry))
 
   log.Println(http.ListenAndServe(":6969", nil))
 }

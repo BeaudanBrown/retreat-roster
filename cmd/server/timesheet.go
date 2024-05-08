@@ -209,6 +209,59 @@ func (s *Server) HandleShiftTimesheetWindow(w http.ResponseWriter, r *http.Reque
   s.renderTemplate(w, "timesheet", data)
 }
 
+type DeleteTimesheetEntryBody struct {
+  StaffID string `json:"staffID"`
+  EntryID string `json:"entryID"`
+  StartDate CustomDate	`json:"start-date"`
+}
+
+func (s *Server) DeleteTimesheetEntry(w http.ResponseWriter, r *http.Request) {
+  log.Println("Delete timesheet entry")
+  var reqBody DeleteTimesheetEntryBody
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
+  entryID, err := uuid.Parse(reqBody.EntryID)
+  if err != nil {
+    log.Printf("Invalid entryID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  staffID, err := uuid.Parse(reqBody.StaffID)
+  if err != nil {
+    log.Printf("Invalid staffID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  t, err := LoadWeek(reqBody.StartDate.Time)
+  if err != nil {
+    log.Printf("Failed to load timesheet week: %v", err)
+    return
+  }
+  thisStaffWeek := t.getTimesheetWeek(staffID)
+
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  found := false
+  for _, day := range thisStaffWeek.Days {
+    for i, entry := range day.Entries {
+      if entry.ID == entryID {
+        if thisStaff.IsAdmin || staffID == thisStaff.ID {
+          day.Entries = append(day.Entries[:i], day.Entries[i+1:]...)
+          SaveTimesheetState(t)
+          found = true
+        }
+        break
+      }
+    }
+    if found {
+      break
+    }
+  }
+  data := MakeTimesheetStruct(*thisStaff, *thisStaffWeek, s.TimesheetStartDate)
+  s.renderTemplate(w, "timesheet", data)
+}
+
 type AddTimesheetEntryBody struct {
   StaffID string `json:"staffID"`
   DayID string `json:"dayID"`

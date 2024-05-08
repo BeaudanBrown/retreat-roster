@@ -27,6 +27,7 @@
           <div>Total</div>
           <div>Managing</div>
           <div>Admin</div>
+          <div>Delete</div>
         </div>
         {{ range .Days }}
           {{ $dayName := .DayName }}
@@ -44,6 +45,7 @@
               <div class="total">Total</div>
               <div><input type="checkbox" name="managing_tuesday" id="managing_tuesday"{{ if .Managing }}checked{{ end }}></div>
               <div><input type="checkbox" name="admin_tuesday" id="admin_tuesday"{{ if .Admin }}checked{{ end }}></div>
+              <div><a href="#" hx-ext="json-enc" hx-post="/deleteTimesheetEntry" hx-vals='js:{"entryID":"{{ .ID }}", "staffID":"{{$staffMember.ID}}", "start-date":"{{$startDate}}"}' hx-swap="outerHTML" hx-target="#timesheet">🗑</a></div>
             </div>
           {{ end }}
         {{ end }}
