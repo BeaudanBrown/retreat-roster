@@ -5,6 +5,7 @@ import (
   "log"
   "os"
   "time"
+  "net/http"
 
   "github.com/google/uuid"
 )
@@ -43,7 +44,11 @@ type TimesheetEntry struct {
   Admin         bool `json:"admin"`
 }
 
-func newState(startDate time.Time) *TimesheetWeekState {
+// func (s *Server) HandleTimesheet(w http.ResponseWriter, r *http.Request) {
+//   s.renderTemplate(w, "timesheet", s)
+// }
+
+func newTimesheetWeekState(startDate time.Time) *TimesheetWeekState {
   daysUntilTuesday := int(time.Tuesday - startDate.Weekday())
   if daysUntilTuesday <= 0 {
     daysUntilTuesday += 7
@@ -100,7 +105,7 @@ func LoadWeek(startDate time.Time) (*TimesheetWeekState, error) {
   var err error
   filename := GetWeekFilename(startDate)
   if _, err = os.Stat(filename); err != nil {
-    s = newState(startDate)
+    s = newTimesheetWeekState(startDate)
     SaveState(s)
   } else {
     var data []byte
