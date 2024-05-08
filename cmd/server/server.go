@@ -174,6 +174,7 @@ func LoadState(filename string) (*Server, error) {
 
 type ServerDisc struct {
   StartDate  time.Time   `json:"startDate"`
+  TimesheetStartDate  time.Time   `json:"timesheetStartDate"`
   Days  []*RosterDay   `json:"days"`
   Staff *[]*StaffMember `json:"staff"`
   IsLive         bool `json:"isLive"`

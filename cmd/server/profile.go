@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -60,6 +61,27 @@ type StaffMember struct {
 
 type CustomDate struct {
   time.Time
+}
+
+func (cd *CustomDate) UnmarshalJSON(input []byte) error {
+  strInput := strings.Trim(string(input), `"`)
+  // Try parsing the date in the expected formats
+  formats := []string{
+    "2006-01-02",
+    "2006-01-02T15:04:05Z",
+    "2006-01-02T15:04:05.999999999Z07:00",
+    "2006-01-02 15:04:05.999999999 -0700 MST",
+  }
+  var parseErr error
+  for _, format := range formats {
+    var newTime time.Time
+    newTime, parseErr = time.Parse(format, strInput)
+    if parseErr == nil {
+      cd.Time = newTime
+      return nil
+    }
+  }
+  return parseErr
 }
 
 type LeaveRequest struct {

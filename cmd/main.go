@@ -22,7 +22,7 @@ func main() {
   http.HandleFunc("/app.css", func(w http.ResponseWriter, r *http.Request) {
     http.ServeFile(w, r, "./www/app.css")
   })
-  // http.HandleFunc("/timesheet", s.VerifySession(timesheet.s.HandleTimesheet))
+  http.HandleFunc("/timesheet", s.VerifySession(s.HandleTimesheet))
   http.HandleFunc("/root", s.VerifySession(s.HandleRoot))
   http.HandleFunc("/submitLeave", s.VerifySession(s.HandleSubmitLeave))
   http.HandleFunc("/profile", s.VerifySession(s.HandleProfileIndex))
@@ -49,6 +49,9 @@ func main() {
   http.HandleFunc("/modifyTimeSlot", s.VerifySession(s.HandleModifyTimeSlot))
   http.HandleFunc("/modifyDescriptionSlot", s.VerifySession(s.HandleModifyDescriptionSlot))
   http.HandleFunc("/deleteLeaveReq", s.VerifySession(s.HandleDeleteLeaveReq))
+
+  http.HandleFunc("/shiftTimesheetWindow", s.VerifySession(s.HandleShiftTimesheetWindow))
+  http.HandleFunc("/addTimesheetEntry", s.VerifySession(s.AddTimesheetEntry))
 
   log.Println(http.ListenAndServe(":6969", nil))
 }

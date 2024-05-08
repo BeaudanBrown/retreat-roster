@@ -1,19 +1,24 @@
 {{ define "timesheet" }}
+{{ $staffMember := .StaffMember }}
+{{ $startDate := .StartDate }}
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html>
   <head>
     <base href="/">
     <title>Retreat Roster</title>
-    <link rel="stylesheet" href="app.css?v={{ . }}">
-    <!-- <meta content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=0" name="viewport"> -->
+    <link rel="stylesheet" href="app.css">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
   </head>
   <body class="timesheetBody">
-    <div class="timesheet">
+    <div id="timesheet" class="timesheet">
+      <div>
+        <button hx-post='/shiftTimesheetWindow' hx-ext='json-enc' hx-vals='js:{"action":"-"}' hx-swap='outerHTML' hx-target='#timesheet'>-</button>
+        <button hx-post='/shiftTimesheetWindow' hx-ext='json-enc' hx-vals='js:{"action":"0"}' hx-swap='outerHTML' hx-target='#timesheet'>This Week</button>
+        <button hx-post='/shiftTimesheetWindow' hx-ext='json-enc' hx-vals='js:{"action":"+"}' hx-swap='outerHTML' hx-target='#timesheet'>+</button>
+      </div>
       <div class="week-form">
         <div class="timesheetDay day-header">
-          <div>Day</div>
           <div>Shift Start</div>
           <div>Break Start</div>
           <div>Break Stop</div>
@@ -23,83 +28,25 @@
           <div>Managing</div>
           <div>Admin</div>
         </div>
-        <div class="timesheetDay" id="tuesday">
-          <div class="day-name">Tuesday</div>
-          <div><input type="time" name="start1_tuesday"></div>
-          <div><input type="time" name="stop1_tuesday"></div>
-          <div><input type="time" name="start2_tuesday"></div>
-          <div><input type="time" name="stop2_tuesday"></div>
-          <div class="break">Break</div>
-          <div class="total">Total</div>
-          <div><input type="checkbox" name="managing_tuesday" id="managing_tuesday"></div>
-          <div><input type="checkbox" name="admin_tuesday" id="admin_tuesday"></div>
-        </div>
-        <div class="timesheetDay" id="wednesday">
-          <div class="day-name">Wednesday</div>
-          <div><input type="time" name="start1_wednesday"></div>
-          <div><input type="time" name="stop1_wednesday"></div>
-          <div><input type="time" name="start2_wednesday"></div>
-          <div><input type="time" name="stop2_wednesday"></div>
-          <div class="break">Break</div>
-          <div class="total">Total</div>
-          <div><input type="checkbox" name="managing_wednesday" id="managing_wednesday"></div>
-          <div><input type="checkbox" name="admin_wednesday" id="admin_wednesday"></div>
-        </div>
-        <div class="timesheetDay" id="thursday">
-          <div class="day-name">Thursday</div>
-          <div><input type="time" name="start1_thursday"></div>
-          <div><input type="time" name="stop1_thursday"></div>
-          <div><input type="time" name="start2_thursday"></div>
-          <div><input type="time" name="stop2_thursday"></div>
-          <div class="break">Break</div>
-          <div class="total">Total</div>
-          <div><input type="checkbox" name="managing_thursday" id="managing_thursday"></div>
-          <div><input type="checkbox" name="admin_thursday" id="admin_thursday"></div>
-        </div>
-        <div class="timesheetDay" id="friday">
-          <div class="day-name">Friday</div>
-          <div><input type="time" name="start1_friday"></div>
-          <div><input type="time" name="stop1_friday"></div>
-          <div><input type="time" name="start2_friday"></div>
-          <div><input type="time" name="stop2_friday"></div>
-          <div class="break">Break</div>
-          <div class="total">Total</div>
-          <div><input type="checkbox" name="managing_friday" id="managing_friday"></div>
-          <div><input type="checkbox" name="admin_friday" id="admin_friday"></div>
-        </div>
-        <div class="timesheetDay" id="saturday">
-          <div class="day-name">Saturday</div>
-          <div><input type="time" name="start1_saturday"></div>
-          <div><input type="time" name="stop1_saturday"></div>
-          <div><input type="time" name="start2_saturday"></div>
-          <div><input type="time" name="stop2_saturday"></div>
-          <div class="break">Break</div>
-          <div class="total">Total</div>
-          <div><input type="checkbox" name="managing_saturday" id="managing_saturday"></div>
-          <div><input type="checkbox" name="admin_saturday" id="admin_saturday"></div>
-        </div>
-        <div class="timesheetDay" id="sunday">
-          <div class="day-name">Sunday</div>
-          <div><input type="time" name="start1_sunday"></div>
-          <div><input type="time" name="stop1_sunday"></div>
-          <div><input type="time" name="start2_sunday"></div>
-          <div><input type="time" name="stop2_sunday"></div>
-          <div class="break">Break</div>
-          <div class="total">Total</div>
-          <div><input type="checkbox" name="managing_sunday" id="managing_sunday"></div>
-          <div><input type="checkbox" name="admin_sunday" id="admin_sunday"></div>
-        </div>
-        <div class="timesheetDay" id="monday">
-          <div class="day-name">Monday</div>
-          <div><input type="time" name="start1_monday"></div>
-          <div><input type="time" name="stop1_monday"></div>
-          <div><input type="time" name="start2_monday"></div>
-          <div><input type="time" name="stop2_monday"></div>
-          <div class="break">Break</div>
-          <div class="total">Total</div>
-          <div><input type="checkbox" name="managing_monday" id="managing_monday"></div>
-          <div><input type="checkbox" name="admin_monday" id="admin_monday"></div>
-        </div>
+        {{ range .Days }}
+          {{ $dayName := .DayName }}
+          <div>
+            <h2>{{$dayName}}</h2>
+            <button hx-post='/addTimesheetEntry' hx-ext='json-enc' hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "dayID":"{{.ID}}", "start-date":"{{$startDate}}"}' hx-swap='outerHTML' hx-target='#timesheet'>+</button>
+          </div>
+          {{ range .Entries }}
+            <div class="timesheetDay" id="{{$dayName}}">
+              <div><input type="time" name="start1_tuesday" value="{{.ShiftStart}}"></div>
+              <div><input type="time" name="stop1_tuesday" value="{{.ShiftEnd}}"></div>
+              <div><input type="time" name="start2_tuesday" value="{{.BreakStart}}"></div>
+              <div><input type="time" name="stop2_tuesday" value="{{.BreakEnd}}"></div>
+              <div class="break">Break</div>
+              <div class="total">Total</div>
+              <div><input type="checkbox" name="managing_tuesday" id="managing_tuesday"{{ if .Managing }}checked{{ end }}></div>
+              <div><input type="checkbox" name="admin_tuesday" id="admin_tuesday"{{ if .Admin }}checked{{ end }}></div>
+            </div>
+          {{ end }}
+        {{ end }}
       </div>
     </div>
   </body>
