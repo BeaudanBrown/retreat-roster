@@ -7,6 +7,7 @@
   {{ $server := .Server }}
   <div class="buttons" id="buttons">
     <a href="/profile">Edit Profile</a>
+    <a href="/timesheet">View Timesheets</a>
     <a href="#" hx-post="/auth/logout">Logout</a>
   </div>
   {{ if not .ActiveStaff.IsAdmin }}
@@ -121,7 +122,7 @@
               <td>{{ .StartDate.Format "02/01/06" }}</td>
               <td>{{ .EndDate.Format "02/01/06" }}</td>
               <td>
-                <a href="#" hx-ext="json-enc" class="delete-icon" hx-post="/deleteAdminLeaveReq" hx-vals='js:{"id":"{{ .ID }}"}' hx-swap="outerHTML" hx-target="#roster">🗑️</a>
+                <a href="#" hx-ext="json-enc" class="delete-icon" hx-post="/deleteLeaveReq" hx-vals='js:{"id":"{{ .ID }}"}' hx-swap="outerHTML" hx-target="#roster">🗑️</a>
               </td>
             </tr>
           {{ end }}

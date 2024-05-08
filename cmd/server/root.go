@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 type RootStruct struct {
@@ -20,6 +22,40 @@ func MakeRootStruct(server Server, activeStaff StaffMember) RootStruct {
     server,
     activeStaff,
   }
+}
+
+type RosterDay struct {
+  ID             uuid.UUID
+  DayName        string
+  Rows           []*Row
+  Colour         string
+  Offset         int
+  IsClosed       bool
+  AmeliaOpen     bool
+}
+
+type Row struct {
+  ID     uuid.UUID
+  Amelia  Slot
+  Early  Slot
+  Mid Slot
+  Late   Slot
+}
+
+type Slot struct {
+  ID            uuid.UUID
+  StartTime     string
+  AssignedStaff *uuid.UUID
+  StaffString *string
+  Flag	Highlight
+  Description	string
+}
+
+func (s *Slot) HasThisStaff(staffId uuid.UUID) bool {
+  if s.AssignedStaff != nil && *s.AssignedStaff == staffId {
+    return true
+  }
+  return false
 }
 
 type DayStruct struct {
@@ -47,6 +83,165 @@ func MakeDayStruct(day RosterDay, s Server, activeStaff StaffMember) DayStruct {
   }
 }
 
+func (s *Server) CheckFlags() {
+  for _, staff := range *s.Staff {
+    staff.CurrentShifts = 0
+  }
+  for i, day := range s.Days {
+    // Create a new map for each day to track occurrences of staff IDs within that day
+    staffIDOccurrences := make(map[uuid.UUID]int)
+
+    for _, row := range day.Rows {
+      if day.AmeliaOpen && row.Amelia.AssignedStaff != nil {
+        staffIDOccurrences[*row.Amelia.AssignedStaff]++
+        staff := s.GetStaffByID(*row.Amelia.AssignedStaff)
+        if staff != nil {
+          staff.CurrentShifts += 1
+        }
+      }
+      if row.Early.AssignedStaff != nil {
+        staffIDOccurrences[*row.Early.AssignedStaff]++
+        staff := s.GetStaffByID(*row.Early.AssignedStaff)
+        if staff != nil {
+          staff.CurrentShifts += 1
+        }
+      }
+      if row.Mid.AssignedStaff != nil {
+        staffIDOccurrences[*row.Mid.AssignedStaff]++
+        staff := s.GetStaffByID(*row.Mid.AssignedStaff)
+        if staff != nil {
+          staff.CurrentShifts += 1
+        }
+      }
+      if row.Late.AssignedStaff != nil {
+        staffIDOccurrences[*row.Late.AssignedStaff]++
+        staff := s.GetStaffByID(*row.Late.AssignedStaff)
+        if staff != nil {
+          staff.CurrentShifts += 1
+        }
+      }
+    }
+
+    for _, row := range day.Rows {
+      row.Amelia.Flag = None
+      row.Early.Flag = None
+      row.Mid.Flag = None
+      row.Late.Flag = None
+      date := s.StartDate.AddDate(0, 0, day.Offset)
+
+      if day.AmeliaOpen && row.Amelia.AssignedStaff != nil {
+        if staffIDOccurrences[*row.Amelia.AssignedStaff] > 1 {
+          row.Amelia.Flag = Duplicate
+        } else {
+          staff := s.GetStaffByID(*row.Amelia.AssignedStaff)
+          for _, req := range staff.LeaveRequests {
+            if !req.StartDate.After(date) && req.EndDate.After(date) {
+              row.Amelia.Flag = LeaveConflict
+              break
+            }
+          }
+          if staff != nil {
+            if !staff.Availability[i].Late {
+              row.Amelia.Flag = PrefConflict
+            }
+          }
+        }
+      }
+
+      if row.Early.AssignedStaff != nil {
+        if staffIDOccurrences[*row.Early.AssignedStaff] > 1 {
+          row.Early.Flag = Duplicate
+        } else {
+          staff := s.GetStaffByID(*row.Early.AssignedStaff)
+          for _, req := range staff.LeaveRequests {
+            if !req.StartDate.After(date) && req.EndDate.After(date) {
+              row.Early.Flag = LeaveConflict
+              break
+            }
+          }
+          if staff != nil {
+            if !staff.Availability[i].Early {
+              row.Early.Flag = PrefConflict
+            }
+          }
+        }
+      }
+
+      if row.Mid.AssignedStaff != nil {
+        if staffIDOccurrences[*row.Mid.AssignedStaff] > 1 {
+          row.Mid.Flag = Duplicate
+        } else {
+          staff := s.GetStaffByID(*row.Mid.AssignedStaff)
+          if staff != nil {
+            for _, req := range staff.LeaveRequests {
+              if !req.StartDate.After(date) && req.EndDate.After(date) {
+                row.Mid.Flag = LeaveConflict
+                break
+              }
+            }
+            if !staff.Availability[i].Mid {
+              row.Mid.Flag = PrefConflict
+            }
+          }
+        }
+      }
+
+      if row.Late.AssignedStaff != nil {
+        if staffIDOccurrences[*row.Late.AssignedStaff] > 1 {
+          row.Late.Flag = Duplicate
+        } else {
+          staff := s.GetStaffByID(*row.Late.AssignedStaff)
+          for _, req := range staff.LeaveRequests {
+            if !req.StartDate.After(date) && req.EndDate.After(date) {
+              row.Late.Flag = LeaveConflict
+              break
+            }
+          }
+          if staff != nil {
+            if !staff.Availability[i].Late {
+              row.Late.Flag = PrefConflict
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+func (staff *StaffMember) HasConflict(slot string, offset int) bool {
+  switch slot {
+  case "Early":
+    if !staff.Availability[offset].Early {
+      return true
+    }
+  case "Mid":
+    if !staff.Availability[offset].Mid {
+      return true
+    }
+  case "Late":
+    if !staff.Availability[offset].Late {
+      return true
+    }
+  }
+  return false
+}
+
+func (staff *StaffMember) IsAway(date time.Time) bool {
+  for _, req := range staff.LeaveRequests {
+    if !req.StartDate.After(date) && req.EndDate.After(date) {
+      return true
+    }
+  }
+  return false
+}
+
+func MemberIsAssigned(activeID uuid.UUID, assignedID *uuid.UUID) bool {
+  if assignedID == nil {
+    return false
+  }
+  return *assignedID == activeID
+}
+
 func (s *Server) HandleRoot(w http.ResponseWriter, r *http.Request) {
   thisStaff := s.GetSessionUser(w, r)
   if (thisStaff == nil) {
@@ -58,6 +253,16 @@ func (s *Server) HandleRoot(w http.ResponseWriter, r *http.Request) {
     return
   }
   s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+}
+
+func googleOauthConfig() *oauth2.Config {
+  return &oauth2.Config{
+    ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+    ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+    RedirectURL:  os.Getenv("REDIRECT_URL"),
+    Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email"},
+    Endpoint:     google.Endpoint,
+  }
 }
 
 func (s *Server) HandleGoogleLogin(w http.ResponseWriter, r *http.Request) {
@@ -89,8 +294,12 @@ func (s *Server) HandleGoogleLogout(w http.ResponseWriter, r *http.Request) {
   w.WriteHeader(http.StatusOK)
 }
 
+type GoogleCallbackBody struct {
+  ID            string `json:"id"`
+}
+
 func (s *Server) HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
-  var userInfo GoogleUserInfo
+  var userInfo GoogleCallbackBody
   if (!DEV_MODE) {
     ctx := r.Context()
     code := r.URL.Query().Get("code")
@@ -111,7 +320,7 @@ func (s *Server) HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
       return
     }
   } else {
-    userInfo = GoogleUserInfo{
+    userInfo = GoogleCallbackBody{
       ID: "DEV",
     }
   }
@@ -442,4 +651,68 @@ func (s *Server) HandleAddTrial(w http.ResponseWriter, r *http.Request) {
     return
   }
   s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+}
+
+type ShiftWindowBody struct {
+  Action string `json:"action"`
+}
+
+func (s *Server) HandleShiftWindow(w http.ResponseWriter, r *http.Request) {
+  var reqBody ShiftWindowBody
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
+  switch reqBody.Action {
+  case "+":
+    s.StartDate = s.StartDate.AddDate(0, 0, 7)
+  case "-":
+    s.StartDate = s.StartDate.AddDate(0, 0, -7)
+  default:
+    today := time.Now()
+    daysUntilTuesday := int(time.Tuesday - today.Weekday())
+    if daysUntilTuesday <= 0 {
+      daysUntilTuesday += 7
+    }
+    s.StartDate = today.AddDate(0, 0, daysUntilTuesday)
+  }
+  SaveState(s)
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+}
+
+type ModifyRowsBody struct {
+  Action string `json:"action"`
+  DayID  string `json:"dayID"`
+}
+
+func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
+  var reqBody ModifyRowsBody
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
+
+  dayID, err := uuid.Parse(reqBody.DayID)
+  if err != nil {
+    log.Printf("Invalid dayID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+
+  for i := range s.Days {
+    if s.Days[i].ID == dayID {
+      if reqBody.Action == "+" {
+        s.Days[i].Rows = append(s.Days[i].Rows, newRow())
+      } else {
+        if len(s.Days[i].Rows) > 4 {
+          s.Days[i].Rows = s.Days[i].Rows[:len(s.Days[i].Rows)-1]
+        }
+      }
+      SaveState(s)
+      s.renderTemplate(w, "rosterDay", MakeDayStruct(*s.Days[i], *s, *thisStaff))
+      break
+    }
+  }
 }
