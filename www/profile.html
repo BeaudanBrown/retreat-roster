@@ -4,17 +4,22 @@
   <div class="buttons" id="buttons">
   {{ if .AdminRights }}
     <a href="/">Edit Roster</a>
-    <a href="/" hx-ext='json-enc' hx-post="/deleteAcc" hx-vals='js:{"ID":"{{ .ID }}"}' hx-confirm="Are you sure you want to this staff member's account?">
-        Delete Account
-    </a>
-  {{ else }}
-    {{ if .RosterLive }}
+  {{ else if .RosterLive }}
     <a href="/">View Roster</a>
-    {{end}}
-    <a href="/" hx-ext='json-enc' hx-post="/deleteAcc" hx-vals='js:{"ID":"{{ .ID }}"}' hx-confirm="Are you sure you want to delete your account?">
-        Delete Account
-    </a>
   {{end}}
+    <a href="/timesheet">View Timesheets</a>
+    <a href="/"
+       hx-ext='json-enc'
+       hx-post="/deleteAcc"
+       hx-vals='js:{"ID":"{{ .ID }}"}'
+       hx-confirm=
+       {{if .AdminRights}}
+         "Are you sure you want to this staff member's account?"
+       {{else}}
+        "Are you sure you want to delete your account?"
+       {{end}}>
+      Delete Account
+    </a>
     <a href="#" hx-post="/auth/logout">Logout</a>
   </div>
   <section class="user-profile">

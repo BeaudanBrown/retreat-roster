@@ -11,6 +11,17 @@
     <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
   </head>
   <body class="timesheetBody">
+    <div class="buttons" id="buttons">
+    {{ if $staffMember.IsAdmin }}
+      <a href="/">Edit Roster</a>
+    {{ else }}
+      {{ if .RosterLive }}
+      <a href="/">View Roster</a>
+      {{end}}
+    {{end}}
+      <a href="/profile">Edit Profile</a>
+      <a href="#" hx-post="/auth/logout">Logout</a>
+    </div>
     <div id="timesheet" class="timesheet">
       <div>
         <button hx-post='/shiftTimesheetWindow' hx-ext='json-enc' hx-vals='js:{"action":"-"}' hx-swap='outerHTML' hx-target='#timesheet'>-</button>
@@ -20,10 +31,11 @@
       <div class="week-form">
         <div class="timesheetDay day-header">
           <div>Shift Start</div>
+          <div>Shift Stop</div>
+          <div>Break?</div>
           <div>Break Start</div>
           <div>Break Stop</div>
-          <div>Shift Stop</div>
-          <div>Break</div>
+          <div>Break Length</div>
           <div>Total</div>
           <div>Managing</div>
           <div>Admin</div>
@@ -36,17 +48,79 @@
             <button hx-post='/addTimesheetEntry' hx-ext='json-enc' hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "dayID":"{{.ID}}", "start-date":"{{$startDate}}"}' hx-swap='outerHTML' hx-target='#timesheet'>+</button>
           </div>
           {{ range .Entries }}
-            <div class="timesheetDay" id="{{$dayName}}">
-              <div><input type="time" name="start1_tuesday" value="{{.ShiftStart}}"></div>
-              <div><input type="time" name="stop1_tuesday" value="{{.ShiftEnd}}"></div>
-              <div><input type="time" name="start2_tuesday" value="{{.BreakStart}}"></div>
-              <div><input type="time" name="stop2_tuesday" value="{{.BreakEnd}}"></div>
-              <div class="break">Break</div>
-              <div class="total">Total</div>
-              <div><input type="checkbox" name="managing_tuesday" id="managing_tuesday"{{ if .Managing }}checked{{ end }}></div>
-              <div><input type="checkbox" name="admin_tuesday" id="admin_tuesday"{{ if .Admin }}checked{{ end }}></div>
-              <div><a href="#" hx-ext="json-enc" hx-post="/deleteTimesheetEntry" hx-vals='js:{"entryID":"{{ .ID }}", "staffID":"{{$staffMember.ID}}", "start-date":"{{$startDate}}"}' hx-swap="outerHTML" hx-target="#timesheet">🗑</a></div>
-            </div>
+            {{ if not .Complete}}
+              <form hx-ext='json-enc' hx-post="/modifyTimesheetEntry" hx-target="#timesheet" hx-swap='outerHTML'>
+                <div class="timesheetDay" id='entry-{{.ID}}'>
+                  <input type="hidden" name="staffID" value="{{$staffMember.ID}}" />
+                  <input type="hidden" name="entryID" value="{{.ID}}" />
+                  <input type="hidden" name="start-date" value="{{$startDate}}" />
+                  <div><input type="time" name="shiftStart"
+                              value="{{if .ShiftStart}}{{.ShiftStart.Format "15:04"}}{{end}}"
+                              required></div>
+                  <div><input type="time" name="shiftEnd"
+                              value="{{if .ShiftEnd}}{{.ShiftEnd.Format "15:04"}}{{end}}"
+                              required></div>
+                  <div><input type="checkbox" name="hasBreak"
+                       {{ if .HasBreak }}checked{{ end }}
+                       hx-ext="json-enc" hx-post="/toggleTimesheetEntry"
+                       hx-vals='js:{"field":"hasBreak", "entryID":"{{ .ID }}", "staffID":"{{$staffMember.ID}}", "start-date":"{{$startDate}}"}'
+                       hx-swap="outerHTML"
+                       hx-target="#timesheet">
+                  </div>
+                  <div><input type="time" name="breakStart"
+                              value="{{if .BreakStart}}{{.BreakStart.Format "15:04"}}{{end}}"
+                              {{ if .HasBreak }}required
+                              {{ else }}disabled{{ end }}></div>
+                  <div><input type="time" name="breakEnd"
+                              value="{{if .BreakEnd}}{{.BreakEnd.Format "15:04"}}{{end}}"
+                              {{ if .HasBreak }}required
+                              {{ else }}disabled{{ end }}></div>
+                  <div class="break">{{.BreakLength}}</div>
+                  <div class="total">{{.ShiftLength}}</div>
+                  <div><input type="checkbox" name="managing"
+                       {{ if .Managing }}checked{{ end }}
+                       hx-ext="json-enc" hx-post="/toggleTimesheetEntry"
+                       hx-vals='js:{"field":"managing", "entryID":"{{ .ID }}", "staffID":"{{$staffMember.ID}}", "start-date":"{{$startDate}}"}'
+                       hx-swap="outerHTML"
+                       hx-target="#timesheet">
+                  </div>
+                  <div><input type="checkbox" name="admin"
+                       {{ if .Admin }}checked{{ end }}
+                       hx-ext="json-enc" hx-post="/toggleTimesheetEntry"
+                       hx-vals='js:{"field":"admin", "entryID":"{{ .ID }}", "staffID":"{{$staffMember.ID}}", "start-date":"{{$startDate}}"}'
+                       hx-swap="outerHTML"
+                       hx-target="#timesheet">
+                  </div>
+                  <div>
+                    <a href="#" hx-ext="json-enc" hx-post="/deleteTimesheetEntry" hx-vals='js:{"entryID":"{{ .ID }}", "staffID":"{{$staffMember.ID}}", "start-date":"{{$startDate}}"}' hx-swap="outerHTML" hx-target="#timesheet">🗑</a>
+                  </div>
+                  <button type="submit">Submit</button>
+                </div>
+              </form>
+            {{ else }}
+              <div class="timesheetDay" id='entry-{{.ID}}'>
+                  <input type="hidden" name="staffID" value="{{$staffMember.ID}}" />
+                  <input type="hidden" name="entryID" value="{{.ID}}" />
+                  <input type="hidden" name="start-date" value="{{$startDate}}" />
+                  <label>{{if .ShiftStart}}{{.ShiftStart.Format "15:04"}}{{else}}N/A{{end}}</label>
+                  <label>{{if .ShiftEnd}}{{.ShiftEnd.Format "15:04"}}{{else}}N/A{{end}}</label>
+                  <input type="checkbox" disabled {{ if .HasBreak }}checked{{ end }}>
+                  <label>{{if .HasBreak}}{{if .BreakStart}}{{.BreakStart.Format "15:04"}}{{else}}N/A{{end}}{{else}}-{{end}}</label>
+                  <label>{{if .HasBreak}}{{if .BreakEnd}}{{.BreakEnd.Format "15:04"}}{{else}}N/A{{end}}{{else}}-{{end}}</label>
+                  <label>{{.BreakLength}}</label>
+                  <label>{{.ShiftLength}}</label>
+                  <input type="checkbox" disabled {{ if .Managing }}checked{{ end }}>
+                  <input type="checkbox" disabled {{ if .Admin }}checked{{ end }}>
+                  <div>
+                      <a href="#"
+                         hx-ext="json-enc"
+                         hx-post="/toggleTimesheetEntry"
+                         hx-vals='js:{"field":"complete", "entryID":"{{ .ID }}", "staffID":"{{$staffMember.ID}}", "start-date":"{{$startDate}}"}'
+                         hx-swap="outerHTML"
+                         hx-target="#timesheet">✏️</a>
+                  </div>
+              </div>
+            {{ end }}
           {{ end }}
         {{ end }}
       </div>

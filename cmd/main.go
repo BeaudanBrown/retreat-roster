@@ -54,6 +54,7 @@ func main() {
   http.HandleFunc("/addTimesheetEntry", s.VerifySession(s.HandleAddTimesheetEntry))
   http.HandleFunc("/deleteTimesheetEntry", s.VerifySession(s.HandleDeleteTimesheetEntry))
   http.HandleFunc("/modifyTimesheetEntry", s.VerifySession(s.HandleModifyTimesheetEntry))
+  http.HandleFunc("/toggleTimesheetEntry", s.VerifySession(s.HandleToggleTimesheetEntry))
 
   log.Println(http.ListenAndServe(":6969", nil))
 }

@@ -29,19 +29,21 @@ type TimesheetDay struct {
   DayName        string
   Offset       int
   Entries      []*TimesheetEntry
-  Approved       bool
 }
 
 type TimesheetEntry struct {
   ID uuid.UUID
-  ShiftStart  time.Time   `json:"shiftStart"`
-  ShiftEnd  time.Time   `json:"shiftEnd"`
-  BreakStart  time.Time   `json:"breakStart"`
-  BreakEnd  time.Time   `json:"breakEnd"`
+  ShiftStart  *time.Time   `json:"shiftStart"`
+  ShiftEnd  *time.Time   `json:"shiftEnd"`
+  BreakStart  *time.Time   `json:"breakStart"`
+  BreakEnd  *time.Time   `json:"breakEnd"`
   BreakLength float64 `json:"breakLength"`
   ShiftLength float64 `json:"shiftLength"`
   Managing         bool `json:"managing"`
   Admin         bool `json:"admin"`
+  Approved         bool `json:"approved"`
+  Complete         bool `json:"complete"`
+  HasBreak         bool `json:"hasBreak"`
 }
 
 type TimesheetData struct {
@@ -322,6 +324,7 @@ type ModifyTimesheetEntryBody struct {
     BreakEnd  CustomDate     `json:"breakEnd"`
     Managing      string       `json:"managing"`
     Admin         string       `json:"admin"`
+    HasBreak         string       `json:"hasBreak"`
 }
 
 func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Request) {
@@ -358,19 +361,86 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
         found = true
         entry.Admin = reqBody.Admin == "on"
         entry.Managing = reqBody.Managing == "on"
-        entry.ShiftStart = reqBody.ShiftStart.Time
-        entry.ShiftEnd = reqBody.ShiftEnd.Time
-        entry.BreakStart = reqBody.BreakStart.Time
-        entry.BreakEnd = reqBody.BreakEnd.Time
-        if entry.BreakEnd.After(entry.BreakStart) {
-            entry.BreakLength = math.Round(entry.BreakEnd.Sub(entry.BreakStart).Hours() * 100) / 100
+        entry.HasBreak = reqBody.HasBreak == "on"
+        entry.ShiftStart = &reqBody.ShiftStart.Time
+        entry.ShiftEnd = &reqBody.ShiftEnd.Time
+        if entry.HasBreak {
+          entry.BreakStart = &reqBody.BreakStart.Time
+          entry.BreakEnd = &reqBody.BreakEnd.Time
+          if entry.BreakEnd.After(*entry.BreakStart) {
+              entry.BreakLength = math.Round(entry.BreakEnd.Sub(*entry.BreakStart).Hours() * 100) / 100
+          } else {
+              entry.BreakLength = 0
+          }
         } else {
-            entry.BreakLength = 0
+          entry.BreakStart = nil
+          entry.BreakEnd = nil
         }
-        if entry.ShiftEnd.After(entry.ShiftStart) {
-            entry.ShiftLength = math.Round((entry.ShiftEnd.Sub(entry.ShiftStart).Hours() - entry.BreakLength) * 100) / 100
+        if entry.ShiftEnd.After(*entry.ShiftStart) {
+            entry.ShiftLength = math.Round((entry.ShiftEnd.Sub(*entry.ShiftStart).Hours() - entry.BreakLength) * 100) / 100
         } else {
             entry.ShiftLength = 0
+        }
+        entry.Complete = true
+        SaveTimesheetState(t)
+        break
+      }
+    }
+    if found { break }
+  }
+  data := MakeTimesheetStruct(*thisStaff, *week, s.TimesheetStartDate)
+  s.renderTemplate(w, "timesheet", data)
+}
+
+
+type ToggleTimesheetEntryBody struct {
+    StaffID       string     `json:"staffID"`
+    EntryID         string     `json:"entryID"`
+    StartDate     CustomDate `json:"start-date"`
+    ToggleField      string       `json:"field"`
+}
+
+func (s *Server) HandleToggleTimesheetEntry(w http.ResponseWriter, r *http.Request) {
+  var reqBody ToggleTimesheetEntryBody
+  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { log.Printf("Error parsing body: %v", err); return }
+  staffID, err := uuid.Parse(reqBody.StaffID)
+  if err != nil {
+    log.Printf("Invalid staffID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  entryID, err := uuid.Parse(reqBody.EntryID)
+  if err != nil {
+    log.Printf("Invalid entryID: %v", err)
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+
+  t, err := LoadWeek(reqBody.StartDate.Time)
+  if err != nil {
+    log.Printf("Failed to load timesheet week: %v", err)
+    return
+  }
+  week := t.getTimesheetWeek(staffID)
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+
+  found := false
+  for _, day := range week.Days {
+    for _, entry := range day.Entries {
+      if entry.ID == entryID {
+        found = true
+        switch reqBody.ToggleField {
+        case "managing":
+          entry.Managing = !entry.Managing
+        case "admin":
+          entry.Admin = !entry.Admin
+        case "hasBreak":
+          entry.HasBreak = !entry.HasBreak
+        case "complete":
+          entry.Complete = !entry.Complete
         }
         SaveTimesheetState(t)
         break
