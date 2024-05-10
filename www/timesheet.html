@@ -10,7 +10,7 @@
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
   </head>
-  <body class="timesheetBody">
+  <body id="timesheet" class="timesheetBody">
     <div class="buttons" id="buttons">
     {{ if $staffMember.IsAdmin }}
       <a href="/">Edit Roster</a>
@@ -20,9 +20,10 @@
       {{end}}
     {{end}}
       <a href="/profile">Edit Profile</a>
+      <a href="/approveTimesheets">Approve Timesheets</a>
       <a href="#" hx-post="/auth/logout">Logout</a>
     </div>
-    <div id="timesheet" class="timesheet">
+    <div class="timesheet">
       <div>
         <button hx-post='/shiftTimesheetWindow' hx-ext='json-enc' hx-vals='js:{"action":"-"}' hx-swap='outerHTML' hx-target='#timesheet'>-</button>
         <button hx-post='/shiftTimesheetWindow' hx-ext='json-enc' hx-vals='js:{"action":"0"}' hx-swap='outerHTML' hx-target='#timesheet'>This Week</button>
@@ -54,24 +55,32 @@
                   <input type="hidden" name="staffID" value="{{$staffMember.ID}}" />
                   <input type="hidden" name="entryID" value="{{.ID}}" />
                   <input type="hidden" name="start-date" value="{{$startDate}}" />
-                  <div><input type="time" name="shiftStart"
+                  <div><input type="time" name="shiftStart" id="shiftStart-{{.ID}}"
                               value="{{if .ShiftStart}}{{.ShiftStart.Format "15:04"}}{{end}}"
                               required></div>
-                  <div><input type="time" name="shiftEnd"
+                  <div><input type="time" name="shiftEnd" id="shiftEnd-{{.ID}}"
                               value="{{if .ShiftEnd}}{{.ShiftEnd.Format "15:04"}}{{end}}"
                               required></div>
                   <div><input type="checkbox" name="hasBreak"
                        {{ if .HasBreak }}checked{{ end }}
                        hx-ext="json-enc" hx-post="/toggleTimesheetEntry"
-                       hx-vals='js:{"field":"hasBreak", "entryID":"{{ .ID }}", "staffID":"{{$staffMember.ID}}", "start-date":"{{$startDate}}"}'
+                       hx-vals='js:{
+                                "field":"hasBreak",
+                                "entryID":"{{ .ID }}",
+                                "staffID":"{{$staffMember.ID}}",
+                                "shiftStart":document.getElementById("shiftStart-{{.ID}}").value,
+                                "shiftEnd":document.getElementById("shiftEnd-{{.ID}}").value,
+                                "breakStart":document.getElementById("breakStart-{{.ID}}").value,
+                                "breakEnd":document.getElementById("breakEnd-{{.ID}}").value,
+                                "start-date":"{{$startDate}}"}'
                        hx-swap="outerHTML"
                        hx-target="#timesheet">
                   </div>
-                  <div><input type="time" name="breakStart"
+                  <div><input type="time" name="breakStart" id="breakStart-{{.ID}}"
                               value="{{if .BreakStart}}{{.BreakStart.Format "15:04"}}{{end}}"
                               {{ if .HasBreak }}required
                               {{ else }}disabled{{ end }}></div>
-                  <div><input type="time" name="breakEnd"
+                  <div><input type="time" name="breakEnd" id="breakEnd-{{.ID}}"
                               value="{{if .BreakEnd}}{{.BreakEnd.Format "15:04"}}{{end}}"
                               {{ if .HasBreak }}required
                               {{ else }}disabled{{ end }}></div>

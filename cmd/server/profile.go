@@ -60,7 +60,7 @@ type StaffMember struct {
 }
 
 type CustomDate struct {
-  time.Time
+  *time.Time
 }
 
 func (cd *CustomDate) UnmarshalJSON(input []byte) error {
@@ -78,11 +78,13 @@ func (cd *CustomDate) UnmarshalJSON(input []byte) error {
     var newTime time.Time
     newTime, parseErr = time.Parse(format, strInput)
     if parseErr == nil {
-      cd.Time = newTime
+      cd.Time = &newTime
       return nil
     }
   }
-  return parseErr
+  log.Printf("Invalid time: %v", parseErr)
+  cd.Time = nil
+  return nil
 }
 
 type LeaveRequest struct {
@@ -208,7 +210,8 @@ func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
   var reqBody LeaveRequest
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
   reqBody.ID = uuid.New()
-  reqBody.CreationDate = CustomDate{time.Now()}
+  now := time.Now()
+  reqBody.CreationDate = CustomDate{&now}
   staff := s.GetSessionUser(w, r)
   if (staff == nil) {
     return
@@ -217,7 +220,7 @@ func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
     AdminRights: staff.IsAdmin,
     RosterLive: s.IsLive,
   }
-  if reqBody.StartDate.After(reqBody.EndDate.Time) {
+  if reqBody.StartDate.After(*reqBody.EndDate.Time) {
     data.ShowLeaveError = true
   } else {
     data.ShowLeaveSuccess = true
