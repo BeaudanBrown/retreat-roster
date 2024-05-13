@@ -335,6 +335,17 @@ type ModifyTimesheetEntryBody struct {
     AdminView         bool       `json:"adminView"`
 }
 
+func getAdjustedTime(t CustomDate, dayDate time.Time) (*time.Time) {
+  year, month, day := dayDate.Date()
+  if t.Time != nil {
+    hour, min, _ := t.Clock()
+    newBreakStart := time.Date(year, month, day, hour, min, 0, 0, dayDate.Location())
+    return &newBreakStart
+  } else {
+    return nil
+  }
+}
+
 func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Request) {
   var reqBody ModifyTimesheetEntryBody
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { log.Printf("Error parsing body: %v", err); return }
@@ -362,32 +373,41 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
   for _, day := range week.Days {
     for _, entry := range day.Entries {
       if entry.ID == entryID {
+        dayDate := t.StartDate.AddDate(0, 0, day.Offset)
         found = true
         entry.Admin = reqBody.Admin == "on"
         entry.Managing = reqBody.Managing == "on"
         entry.HasBreak = reqBody.HasBreak == "on"
-        entry.ShiftStart = reqBody.ShiftStart.Time
-        entry.ShiftEnd = reqBody.ShiftEnd.Time
+
         if entry.HasBreak {
-          entry.BreakStart = reqBody.BreakStart.Time
-          entry.BreakEnd = reqBody.BreakEnd.Time
+          entry.BreakStart = getAdjustedTime(reqBody.BreakStart, dayDate)
+          entry.BreakEnd = getAdjustedTime(reqBody.BreakEnd, dayDate)
           if entry.BreakStart != nil && entry.BreakEnd != nil {
-            if entry.BreakEnd.After(*entry.BreakStart) {
-                entry.BreakLength = math.Round(entry.BreakEnd.Sub(*entry.BreakStart).Hours() * 100) / 100
-            } else {
-                entry.BreakLength = 0
+            if entry.BreakStart.After(*entry.BreakEnd) {
+              newBreakEnd := entry.BreakEnd.AddDate(0, 0, 1)
+              entry.BreakEnd = &newBreakEnd
             }
+            entry.BreakLength = math.Round(entry.BreakEnd.Sub(*entry.BreakStart).Hours() * 100) / 100
           } else {
             entry.BreakLength = 0
           }
         } else {
           entry.BreakStart = nil
           entry.BreakEnd = nil
+          entry.BreakLength = 0
         }
-        if entry.ShiftEnd.After(*entry.ShiftStart) {
-            entry.ShiftLength = math.Round((entry.ShiftEnd.Sub(*entry.ShiftStart).Hours() - entry.BreakLength) * 100) / 100
+
+        entry.ShiftStart = getAdjustedTime(reqBody.ShiftStart, dayDate)
+        entry.ShiftEnd = getAdjustedTime(reqBody.ShiftEnd, dayDate)
+
+        if entry.ShiftStart != nil && entry.ShiftEnd != nil {
+          if entry.ShiftStart.After(*entry.ShiftEnd) {
+            newShiftEnd := entry.ShiftEnd.AddDate(0, 0, 1)
+            entry.ShiftEnd = &newShiftEnd
+          }
+          entry.ShiftLength = math.Round(entry.ShiftEnd.Sub(*entry.ShiftStart).Hours() * 100) / 100
         } else {
-            entry.ShiftLength = 0
+          entry.ShiftLength = 0
         }
         entry.Complete = true
         SaveTimesheetState(t)
@@ -449,6 +469,8 @@ func (s *Server) HandleToggleTimesheetEntry(w http.ResponseWriter, r *http.Reque
           entry.HasBreak = !entry.HasBreak
         case "complete":
           entry.Complete = !entry.Complete
+        case "approved":
+          entry.Approved = !entry.Approved
         }
         entry.ShiftStart = reqBody.ShiftStart.Time
         entry.ShiftEnd = reqBody.ShiftEnd.Time
@@ -467,11 +489,16 @@ func (s *Server) HandleToggleTimesheetEntry(w http.ResponseWriter, r *http.Reque
         } else {
           entry.BreakStart = nil
           entry.BreakEnd = nil
+          entry.BreakLength = 0
         }
-        if entry.ShiftEnd.After(*entry.ShiftStart) {
+        if entry.BreakStart != nil && entry.BreakEnd != nil {
+          if entry.ShiftEnd.After(*entry.ShiftStart) {
             entry.ShiftLength = math.Round((entry.ShiftEnd.Sub(*entry.ShiftStart).Hours() - entry.BreakLength) * 100) / 100
-        } else {
+          } else {
             entry.ShiftLength = 0
+          }
+        } else {
+          entry.ShiftLength = 0
         }
         SaveTimesheetState(t)
         break
