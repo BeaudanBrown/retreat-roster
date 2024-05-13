@@ -3,6 +3,7 @@
 {{ $startDate := .StartDate }}
 {{ $staffTimesheets := .StaffTimesheets }}
 {{ $staffStringMap := .StaffStringMap }}
+{{ $hideApproved := .HideApproved }}
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html>
   <head>
@@ -29,6 +30,16 @@
         <button hx-post='/shiftTimesheetWindow' hx-ext='json-enc' hx-vals='js:{"action":"-", "adminView":true}' hx-swap='outerHTML' hx-target='#approveTimesheets'>-</button>
         <button hx-post='/shiftTimesheetWindow' hx-ext='json-enc' hx-vals='js:{"action":"0", "adminView":true}' hx-swap='outerHTML' hx-target='#approveTimesheets'>This Week</button>
         <button hx-post='/shiftTimesheetWindow' hx-ext='json-enc' hx-vals='js:{"action":"+", "adminView":true}' hx-swap='outerHTML' hx-target='#approveTimesheets'>+</button>
+      </div>
+      <div class="buttons" id="filters">
+        <label>
+          <input type="checkbox" {{ if .HideApproved }}checked{{ end }}
+            hx-get="/toggleHideApproved"
+            hx-target="#approveTimesheets"
+            hx-trigger="change"
+            hx-swap='outerHTML'>
+            Hide approved
+        </label>
       </div>
       <div class="week-form">
         <div class="timesheetDay day-header">
@@ -143,7 +154,7 @@
                         </button>
                       </div>
                     </form>
-                  {{ else }}
+                  {{ else if not $hideApproved }}
                     <div class="timesheetDay" id='entry-{{.ID}}'>
                         <label>{{ index $staffStringMap $staffID }}</label>
                         <label>{{if .ShiftStart}}{{.ShiftStart.Format "15:04"}}{{else}}-{{end}}</label>

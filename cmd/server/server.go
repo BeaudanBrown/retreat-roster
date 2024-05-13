@@ -181,6 +181,7 @@ type ServerDisc struct {
   HideByIdeal         bool `json:"hideByIdeal"`
   HideByPrefs         bool `json:"hideByPrefs"`
   HideByLeave         bool `json:"hideByLeave"`
+  HideApproved  bool `json:"hideIdeal"`
 }
 
 func newRow() *Row {

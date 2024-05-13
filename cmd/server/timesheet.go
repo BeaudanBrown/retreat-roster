@@ -51,14 +51,16 @@ type TimesheetData struct {
   RosterLive  bool
   StartDate  time.Time
   StaffMember StaffMember
+  HideApproved  bool
 }
 
-func MakeTimesheetStruct(rosterLive bool, staffMember StaffMember, week TimesheetWeek, startDate time.Time) TimesheetData {
+func (s *Server) MakeTimesheetStruct(rosterLive bool, staffMember StaffMember, week TimesheetWeek, startDate time.Time) TimesheetData {
   return TimesheetData{
     RosterLive: rosterLive,
     TimesheetWeek: week,
     StartDate: startDate,
     StaffMember: staffMember,
+    HideApproved: s.HideApproved,
   }
 }
 
@@ -100,7 +102,7 @@ func (s *Server) HandleTimesheet(w http.ResponseWriter, r *http.Request) {
   if (thisStaffWeek == nil) {
     return
   }
-  data := MakeTimesheetStruct(s.IsLive, *thisStaff, *thisStaffWeek, s.TimesheetStartDate)
+  data := s.MakeTimesheetStruct(s.IsLive, *thisStaff, *thisStaffWeek, s.TimesheetStartDate)
   s.renderTemplate(w, "timesheet", data)
 }
 
@@ -199,7 +201,7 @@ func (s *Server) RenderTimesheetTemplate(w http.ResponseWriter, r *http.Request,
     if (thisStaffWeek == nil) {
       return
     }
-    data := MakeTimesheetStruct(s.IsLive, *thisStaff, *thisStaffWeek, s.TimesheetStartDate)
+    data := s.MakeTimesheetStruct(s.IsLive, *thisStaff, *thisStaffWeek, s.TimesheetStartDate)
     s.renderTemplate(w, "timesheet", data)
   }
 }
@@ -514,6 +516,7 @@ type ApproveTimesheetData struct {
   StaffMember StaffMember
   DayNames []string
   StaffStringMap map[uuid.UUID]string
+  HideApproved  bool
 }
 
 func (s *Server) MakeApproveTimesheetsStruct(state TimesheetWeekState, staffMember StaffMember) ApproveTimesheetData {
@@ -534,10 +537,27 @@ func (s *Server) MakeApproveTimesheetsStruct(state TimesheetWeekState, staffMemb
     StaffMember: staffMember,
     DayNames: []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"},
     StaffStringMap: staffStringMap,
+    HideApproved: s.HideApproved,
   }
 }
 
 func (s *Server) HandleApproveTimesheets(w http.ResponseWriter, r *http.Request) {
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  t, err := LoadWeek(s.TimesheetStartDate)
+  if err != nil {
+    log.Printf("Failed to load timesheet week: %v", err)
+    return
+  }
+  data := s.MakeApproveTimesheetsStruct(*t, *thisStaff)
+  s.renderTemplate(w, "approveTimesheets", data)
+}
+
+func (s *Server) HandleToggleHideApproved(w http.ResponseWriter, r *http.Request) {
+  s.HideApproved = !s.HideApproved
+  SaveState(s)
   thisStaff := s.GetSessionUser(w, r)
   if (thisStaff == nil) {
     return
