@@ -331,9 +331,9 @@ type ModifyTimesheetEntryBody struct {
     ShiftEnd  CustomDate     `json:"shiftEnd"`
     BreakStart CustomDate     `json:"breakStart"`
     BreakEnd  CustomDate     `json:"breakEnd"`
-    Managing      bool       `json:"managing"`
-    Admin         bool       `json:"admin"`
-    HasBreak         bool       `json:"hasBreak"`
+    Managing      string       `json:"managing"`
+    Admin         string       `json:"admin"`
+    HasBreak         string       `json:"hasBreak"`
     Complete         bool       `json:"complete"`
     AdminView         bool       `json:"adminView"`
 }
@@ -378,9 +378,9 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
       if entry.ID == entryID {
         dayDate := t.StartDate.AddDate(0, 0, day.Offset)
         found = true
-        entry.Admin = reqBody.Admin
-        entry.Managing = reqBody.Managing
-        entry.HasBreak = reqBody.HasBreak
+        entry.Admin = reqBody.Admin == "on"
+        entry.Managing = reqBody.Managing == "on"
+        entry.HasBreak = reqBody.HasBreak == "on"
         entry.Complete = reqBody.Complete
 
         if entry.HasBreak {
@@ -497,4 +497,3 @@ func MakeTimesheetEntryStruct(entry TimesheetEntry, staffMember StaffMember, sta
     StaffMember: staffMember,
   }
 }
-
