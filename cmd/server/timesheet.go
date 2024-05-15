@@ -331,9 +331,10 @@ type ModifyTimesheetEntryBody struct {
     ShiftEnd  CustomDate     `json:"shiftEnd"`
     BreakStart CustomDate     `json:"breakStart"`
     BreakEnd  CustomDate     `json:"breakEnd"`
-    Managing      string       `json:"managing"`
-    Admin         string       `json:"admin"`
-    HasBreak         string       `json:"hasBreak"`
+    Managing      bool       `json:"managing"`
+    Admin         bool       `json:"admin"`
+    HasBreak         bool       `json:"hasBreak"`
+    Complete         bool       `json:"complete"`
     AdminView         bool       `json:"adminView"`
 }
 
@@ -377,9 +378,10 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
       if entry.ID == entryID {
         dayDate := t.StartDate.AddDate(0, 0, day.Offset)
         found = true
-        entry.Admin = reqBody.Admin == "on"
-        entry.Managing = reqBody.Managing == "on"
-        entry.HasBreak = reqBody.HasBreak == "on"
+        entry.Admin = reqBody.Admin
+        entry.Managing = reqBody.Managing
+        entry.HasBreak = reqBody.HasBreak
+        entry.Complete = reqBody.Complete
 
         if entry.HasBreak {
           entry.BreakStart = getAdjustedTime(reqBody.BreakStart, dayDate)
@@ -407,98 +409,7 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
             newShiftEnd := entry.ShiftEnd.AddDate(0, 0, 1)
             entry.ShiftEnd = &newShiftEnd
           }
-          entry.ShiftLength = math.Round(entry.ShiftEnd.Sub(*entry.ShiftStart).Hours() * 100) / 100
-        } else {
-          entry.ShiftLength = 0
-        }
-        entry.Complete = true
-        SaveTimesheetState(t)
-        break
-      }
-    }
-    if found { break }
-  }
-  s.RenderTimesheetTemplate(w, r, reqBody.AdminView)
-}
-
-
-type ToggleTimesheetEntryBody struct {
-    StaffID       string     `json:"staffID"`
-    EntryID         string     `json:"entryID"`
-    StartDate     CustomDate `json:"start-date"`
-    ShiftStart CustomDate     `json:"shiftStart"`
-    ShiftEnd  CustomDate     `json:"shiftEnd"`
-    BreakStart CustomDate     `json:"breakStart"`
-    BreakEnd  CustomDate     `json:"breakEnd"`
-    ToggleField      string       `json:"field"`
-    AdminView      bool       `json:"adminView"`
-}
-
-func (s *Server) HandleToggleTimesheetEntry(w http.ResponseWriter, r *http.Request) {
-  var reqBody ToggleTimesheetEntryBody
-  if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { log.Printf("Error parsing body: %v", err); return }
-  staffID, err := uuid.Parse(reqBody.StaffID)
-  if err != nil {
-    log.Printf("Invalid staffID: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
-  entryID, err := uuid.Parse(reqBody.EntryID)
-  if err != nil {
-    log.Printf("Invalid entryID: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
-
-  t, err := LoadWeek(*reqBody.StartDate.Time)
-  if err != nil {
-    log.Printf("Failed to load timesheet week: %v", err)
-    return
-  }
-  week := t.getTimesheetWeek(staffID)
-
-  found := false
-  for _, day := range week.Days {
-    for _, entry := range day.Entries {
-      if entry.ID == entryID {
-        found = true
-        switch reqBody.ToggleField {
-        case "managing":
-          entry.Managing = !entry.Managing
-        case "admin":
-          entry.Admin = !entry.Admin
-        case "hasBreak":
-          entry.HasBreak = !entry.HasBreak
-        case "complete":
-          entry.Complete = !entry.Complete
-        case "approved":
-          entry.Approved = !entry.Approved
-        }
-        entry.ShiftStart = reqBody.ShiftStart.Time
-        entry.ShiftEnd = reqBody.ShiftEnd.Time
-        if entry.HasBreak {
-          entry.BreakStart = reqBody.BreakStart.Time
-          entry.BreakEnd = reqBody.BreakEnd.Time
-          if entry.BreakStart != nil && entry.BreakEnd != nil {
-            if entry.BreakEnd.After(*entry.BreakStart) {
-                entry.BreakLength = math.Round(entry.BreakEnd.Sub(*entry.BreakStart).Hours() * 100) / 100
-            } else {
-                entry.BreakLength = 0
-            }
-          } else {
-            entry.BreakLength = 0
-          }
-        } else {
-          entry.BreakStart = nil
-          entry.BreakEnd = nil
-          entry.BreakLength = 0
-        }
-        if entry.BreakStart != nil && entry.BreakEnd != nil {
-          if entry.ShiftEnd.After(*entry.ShiftStart) {
-            entry.ShiftLength = math.Round((entry.ShiftEnd.Sub(*entry.ShiftStart).Hours() - entry.BreakLength) * 100) / 100
-          } else {
-            entry.ShiftLength = 0
-          }
+          entry.ShiftLength = math.Round(entry.ShiftEnd.Sub(*entry.ShiftStart).Hours() - entry.BreakLength * 100) / 100
         } else {
           entry.ShiftLength = 0
         }
@@ -572,3 +483,18 @@ func (s *Server) HandleToggleHideApproved(w http.ResponseWriter, r *http.Request
   data := s.MakeApproveTimesheetsStruct(*t, *thisStaff)
   s.renderTemplate(w, "approveTimesheets", data)
 }
+
+type TimesheetEntryData struct {
+  TimesheetEntry
+  StartDate  time.Time
+  StaffMember StaffMember
+}
+
+func MakeTimesheetEntryStruct(entry TimesheetEntry, staffMember StaffMember, startDate time.Time) TimesheetEntryData {
+  return TimesheetEntryData{
+    TimesheetEntry: entry,
+    StartDate: startDate,
+    StaffMember: staffMember,
+  }
+}
+

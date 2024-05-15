@@ -22,7 +22,7 @@ func main() {
   http.HandleFunc("/app.css", func(w http.ResponseWriter, r *http.Request) {
     http.ServeFile(w, r, "./www/app.css")
   })
-  http.HandleFunc("/timesheet", s.VerifySession(s.HandleTimesheet))
+  http.HandleFunc("/timesheets", s.VerifySession(s.HandleTimesheet))
   http.HandleFunc("/root", s.VerifySession(s.HandleRoot))
   http.HandleFunc("/submitLeave", s.VerifySession(s.HandleSubmitLeave))
   http.HandleFunc("/profile", s.VerifySession(s.HandleProfileIndex))
@@ -54,7 +54,6 @@ func main() {
   http.HandleFunc("/addTimesheetEntry", s.VerifySession(s.HandleAddTimesheetEntry))
   http.HandleFunc("/deleteTimesheetEntry", s.VerifySession(s.HandleDeleteTimesheetEntry))
   http.HandleFunc("/modifyTimesheetEntry", s.VerifySession(s.HandleModifyTimesheetEntry))
-  http.HandleFunc("/toggleTimesheetEntry", s.VerifySession(s.HandleToggleTimesheetEntry))
   http.HandleFunc("/approveTimesheets", s.VerifyAdmin(s.HandleApproveTimesheets))
   http.HandleFunc("/toggleHideApproved", s.VerifyAdmin(s.HandleToggleHideApproved))
 

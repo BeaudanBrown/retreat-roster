@@ -1,0 +1,187 @@
+{{ define "timesheetEntry" }}
+{{ if not .Complete}}
+  <form>
+    <div class="timesheetDay" id='entry-{{.ID}}'>
+      <div><input type="time" name="shiftStart" id="shiftStart-{{.ID}}"
+                  value="{{if .ShiftStart}}{{.ShiftStart.Format "15:04"}}{{end}}"
+                  hx-ext="json-enc" hx-post="/modifyTimesheetEntry"
+                  hx-vals='js:{
+                           "entryID":"{{ .ID }}",
+                           "staffID":"{{.StaffMember.ID}}",
+                           "shiftStart":document.getElementById("shiftStart-{{.ID}}").value,
+                           "shiftEnd":document.getElementById("shiftEnd-{{.ID}}").value,
+                           "breakStart":document.getElementById("breakStart-{{.ID}}").value,
+                           "breakEnd":document.getElementById("breakEnd-{{.ID}}").value,
+                           "managing":document.getElementById("managing-{{.ID}}").checked,
+                           "admin":document.getElementById("admin-{{.ID}}").checked,
+                           "hasBreak":document.getElementById("hasBreak-{{.ID}}").checked,
+                           "start-date":"{{.StartDate}}"}'
+                  hx-swap="outerHTML"
+                  hx-target="#timesheet"
+                  required></div>
+      <div><input type="time" name="shiftEnd" id="shiftEnd-{{.ID}}"
+                  value="{{if .ShiftEnd}}{{.ShiftEnd.Format "15:04"}}{{end}}"
+                  hx-ext="json-enc" hx-post="/modifyTimesheetEntry"
+                  hx-vals='js:{
+                           "entryID":"{{ .ID }}",
+                           "staffID":"{{.StaffMember.ID}}",
+                           "shiftStart":document.getElementById("shiftStart-{{.ID}}").value,
+                           "shiftEnd":document.getElementById("shiftEnd-{{.ID}}").value,
+                           "breakStart":document.getElementById("breakStart-{{.ID}}").value,
+                           "breakEnd":document.getElementById("breakEnd-{{.ID}}").value,
+                           "managing":document.getElementById("managing-{{.ID}}").checked,
+                           "admin":document.getElementById("admin-{{.ID}}").checked,
+                           "hasBreak":document.getElementById("hasBreak-{{.ID}}").checked,
+                           "start-date":"{{.StartDate}}"}'
+                  hx-swap="outerHTML"
+                  hx-target="#timesheet"
+                  required></div>
+      <div><input type="checkbox" name="hasBreak" id="hasBreak-{{.ID}}"
+           {{ if .HasBreak }}checked{{ end }}
+                  hx-ext="json-enc" hx-post="/modifyTimesheetEntry"
+                  hx-vals='js:{
+                           "entryID":"{{ .ID }}",
+                           "staffID":"{{.StaffMember.ID}}",
+                           "shiftStart":document.getElementById("shiftStart-{{.ID}}").value,
+                           "shiftEnd":document.getElementById("shiftEnd-{{.ID}}").value,
+                           "breakStart":document.getElementById("breakStart-{{.ID}}").value,
+                           "breakEnd":document.getElementById("breakEnd-{{.ID}}").value,
+                           "managing":document.getElementById("managing-{{.ID}}").checked,
+                           "admin":document.getElementById("admin-{{.ID}}").checked,
+                           "hasBreak":document.getElementById("hasBreak-{{.ID}}").checked,
+                           "start-date":"{{.StartDate}}"}'
+                  hx-swap="outerHTML"
+                  hx-target="#timesheet">
+      </div>
+      <div><input type="time" name="breakStart" id="breakStart-{{.ID}}"
+                  value="{{if .BreakStart}}{{.BreakStart.Format "15:04"}}{{end}}"
+                  hx-ext="json-enc" hx-post="/modifyTimesheetEntry"
+                  hx-vals='js:{
+                           "entryID":"{{ .ID }}",
+                           "staffID":"{{.StaffMember.ID}}",
+                           "shiftStart":document.getElementById("shiftStart-{{.ID}}").value,
+                           "shiftEnd":document.getElementById("shiftEnd-{{.ID}}").value,
+                           "breakStart":document.getElementById("breakStart-{{.ID}}").value,
+                           "breakEnd":document.getElementById("breakEnd-{{.ID}}").value,
+                           "managing":document.getElementById("managing-{{.ID}}").checked,
+                           "admin":document.getElementById("admin-{{.ID}}").checked,
+                           "hasBreak":document.getElementById("hasBreak-{{.ID}}").checked,
+                           "start-date":"{{.StartDate}}"}'
+                  hx-swap="outerHTML"
+                  hx-target="#timesheet"
+                  {{ if .HasBreak }}required
+                  {{ else }}disabled{{ end }}></div>
+      <div><input type="time" name="breakEnd" id="breakEnd-{{.ID}}"
+                  value="{{if .BreakEnd}}{{.BreakEnd.Format "15:04"}}{{end}}"
+                  hx-ext="json-enc" hx-post="/modifyTimesheetEntry"
+                  hx-vals='js:{
+                           "entryID":"{{ .ID }}",
+                           "staffID":"{{.StaffMember.ID}}",
+                           "shiftStart":document.getElementById("shiftStart-{{.ID}}").value,
+                           "shiftEnd":document.getElementById("shiftEnd-{{.ID}}").value,
+                           "breakStart":document.getElementById("breakStart-{{.ID}}").value,
+                           "breakEnd":document.getElementById("breakEnd-{{.ID}}").value,
+                           "managing":document.getElementById("managing-{{.ID}}").checked,
+                           "admin":document.getElementById("admin-{{.ID}}").checked,
+                           "hasBreak":document.getElementById("hasBreak-{{.ID}}").checked,
+                           "start-date":"{{.StartDate}}"
+               }'
+               hx-swap="outerHTML"
+               hx-target="#timesheet"
+               {{ if .HasBreak }}required
+               {{ else }}disabled{{ end }}>
+      </div>
+      <div class="break">{{.BreakLength}}</div>
+      <div class="total">{{.ShiftLength}}</div>
+      <div><input type="checkbox" name="managing" id="managing-{{.ID}}"
+           {{ if .Managing }}checked{{ end }}
+               hx-ext="json-enc" hx-post="/modifyTimesheetEntry"
+               hx-vals='js:{
+                 "entryID":"{{ .ID }}",
+                 "staffID":"{{.StaffMember.ID}}",
+                 "shiftStart":document.getElementById("shiftStart-{{.ID}}").value,
+                 "shiftEnd":document.getElementById("shiftEnd-{{.ID}}").value,
+                 "breakStart":document.getElementById("breakStart-{{.ID}}").value,
+                 "breakEnd":document.getElementById("breakEnd-{{.ID}}").value,
+                 "managing":document.getElementById("managing-{{.ID}}").checked,
+                 "admin":document.getElementById("admin-{{.ID}}").checked,
+                 "hasBreak":document.getElementById("hasBreak-{{.ID}}").checked,
+                 "start-date":"{{.StartDate}}"
+               }'
+               hx-swap="outerHTML"
+               hx-target="#timesheet"
+              hx-target="#timesheet">
+      </div>
+      <div><input type="checkbox" name="admin" id="admin-{{.ID}}"
+           {{ if .Admin }}checked{{ end }}
+              hx-ext="json-enc" hx-post="/modifyTimesheetEntry"
+              hx-vals='js:{
+                       "entryID":"{{ .ID }}",
+                       "staffID":"{{.StaffMember.ID}}",
+                       "shiftStart":document.getElementById("shiftStart-{{.ID}}").value,
+                       "shiftEnd":document.getElementById("shiftEnd-{{.ID}}").value,
+                       "breakStart":document.getElementById("breakStart-{{.ID}}").value,
+                       "breakEnd":document.getElementById("breakEnd-{{.ID}}").value,
+                       "managing":document.getElementById("managing-{{.ID}}").checked,
+                       "admin":document.getElementById("admin-{{.ID}}").checked,
+                       "hasBreak":document.getElementById("hasBreak-{{.ID}}").checked,
+                       "start-date":"{{.StartDate}}"}'
+              hx-swap="outerHTML"
+              hx-target="#timesheet">
+      </div>
+      <div>
+        <a href="#" hx-ext="json-enc" hx-post="/deleteTimesheetEntry" hx-vals='js:{"entryID":"{{ .ID }}", "staffID":"{{.StaffMember.ID}}", "start-date":"{{.StartDate}}"}' hx-swap="outerHTML" hx-target="#timesheet">🗑</a>
+      </div>
+      <button
+        hx-ext="json-enc" hx-post="/modifyTimesheetEntry"
+        hx-vals='js:{
+                 "entryID":"{{ .ID }}",
+                 "staffID":"{{.StaffMember.ID}}",
+                 "shiftStart":document.getElementById("shiftStart-{{.ID}}").value,
+                 "shiftEnd":document.getElementById("shiftEnd-{{.ID}}").value,
+                 "breakStart":document.getElementById("breakStart-{{.ID}}").value,
+                 "breakEnd":document.getElementById("breakEnd-{{.ID}}").value,
+                 "managing":document.getElementById("managing-{{.ID}}").checked,
+                 "admin":document.getElementById("admin-{{.ID}}").checked,
+                 "hasBreak":document.getElementById("hasBreak-{{.ID}}").checked,
+                 "complete":true,
+                 "start-date":"{{.StartDate}}"}'
+       hx-swap="outerHTML"
+       hx-target="#timesheet"
+      >
+        Submit
+      </button>
+    </div>
+  </form>
+{{ else }}
+  <div class="timesheetDay" id='entry-{{.ID}}'>
+      <label>{{if .ShiftStart}}{{.ShiftStart.Format "15:04"}}{{else}}-{{end}}</label>
+      <label>{{if .ShiftEnd}}{{.ShiftEnd.Format "15:04"}}{{else}}-{{end}}</label>
+      <input type="checkbox" disabled {{ if .HasBreak }}checked{{ end }}>
+      <label>{{if (and .HasBreak .BreakStart)}}{{.BreakStart.Format "15:04"}}{{else}}-{{end}}</label>
+      <label>{{if (and .HasBreak .BreakEnd)}}{{.BreakEnd.Format "15:04"}}{{else}}-{{end}}</label>
+      <label>{{.BreakLength}}</label>
+      <label>{{.ShiftLength}}</label>
+      <input type="checkbox" disabled {{ if .Managing }}checked{{ end }}>
+      <input type="checkbox" disabled {{ if .Admin }}checked{{ end }}>
+      <div>
+        <a href="#"
+           hx-ext="json-enc" hx-post="/modifyTimesheetEntry"
+           hx-vals='js:{
+                    "entryID":"{{ .ID }}",
+                    "staffID":"{{.StaffMember.ID}}",
+                    "shiftStart":"{{.ShiftStart}}",
+                    "shiftEnd":"{{.ShiftEnd}}",
+                    "breakStart":"{{.BreakStart}}",
+                    "breakEnd":"{{.BreakEnd}}",
+                    "managing":{{.Managing}},
+                    "admin":{{.Admin}},
+                    "hasBreak":{{.HasBreak}},
+                    "complete":false,
+                    "start-date":"{{.StartDate}}"}'
+           hx-swap="outerHTML"
+           hx-target="#timesheet">✏️</a>
+      </div>
+  </div>
+{{ end }}
+{{ end }}
