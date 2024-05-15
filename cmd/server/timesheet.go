@@ -517,6 +517,7 @@ type ApproveTimesheetData struct {
   DayNames []string
   StaffStringMap map[uuid.UUID]string
   HideApproved  bool
+  RosterLive  bool
 }
 
 func (s *Server) MakeApproveTimesheetsStruct(state TimesheetWeekState, staffMember StaffMember) ApproveTimesheetData {
@@ -538,6 +539,7 @@ func (s *Server) MakeApproveTimesheetsStruct(state TimesheetWeekState, staffMemb
     DayNames: []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"},
     StaffStringMap: staffStringMap,
     HideApproved: s.HideApproved,
+    RosterLive: s.IsLive,
   }
 }
 

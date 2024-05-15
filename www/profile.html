@@ -1,27 +1,7 @@
 {{ define "profile" }}
 <div id="profileBody" class="profileBody">
 <div id="profile" class="profile-container">
-  <div class="buttons" id="buttons">
-  {{ if .AdminRights }}
-    <a href="/">Edit Roster</a>
-  {{ else if .RosterLive }}
-    <a href="/">View Roster</a>
-  {{end}}
-    <a href="/timesheet">View Timesheets</a>
-    <a href="/"
-       hx-ext='json-enc'
-       hx-post="/deleteAcc"
-       hx-vals='js:{"ID":"{{ .ID }}"}'
-       hx-confirm=
-       {{if .AdminRights}}
-         "Are you sure you want to this staff member's account?"
-       {{else}}
-        "Are you sure you want to delete your account?"
-       {{end}}>
-      Delete Account
-    </a>
-    <a href="#" hx-post="/auth/logout">Logout</a>
-  </div>
+  {{ template "header" (MakeHeaderStruct .AdminRights .RosterLive) }}
   <section class="user-profile">
     <h1>Update Your Profile</h1>
     <form hx-ext='json-enc' hx-post="/modifyProfile" hx-swap="outerHTML" hx-target="#profileBody">
@@ -164,6 +144,18 @@
       {{ end }}
     </tbody>
   </table>
+  <a href="/"
+     hx-ext='json-enc'
+     hx-post="/deleteAcc"
+     hx-vals='js:{"ID":"{{ .ID }}"}'
+     hx-confirm=
+     {{if .AdminRights}}
+       "Are you sure you want to this staff member's account?"
+     {{else}}
+      "Are you sure you want to delete your account?"
+     {{end}}>
+    Delete Account
+  </a>
 </div>
 </div>
 {{ end }}

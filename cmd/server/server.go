@@ -158,6 +158,7 @@ func LoadState(filename string) (*Server, error) {
   log.Println("Loaded state")
   state.CacheBust = fmt.Sprintf("%v", time.Now().UnixNano())
   state.Templates = template.New("").Funcs(template.FuncMap{
+    "MakeHeaderStruct": MakeHeaderStruct,
     "MakeDayStruct": MakeDayStruct,
     "GetHighlightCol": GetHighlightCol,
     "MakeRootStruct": MakeRootStruct,
@@ -316,4 +317,16 @@ func (s *Server) HandleLanding(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
   s.renderTemplate(w, "index", s.CacheBust)
+}
+
+type HeaderData struct {
+  RosterLive  bool
+  IsAdmin  bool
+}
+
+func MakeHeaderStruct(isAdmin bool, rosterLive bool) HeaderData {
+  return HeaderData{
+    RosterLive: rosterLive,
+    IsAdmin: isAdmin,
+  }
 }

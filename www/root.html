@@ -5,11 +5,7 @@
   {{ $isLive := .IsLive }}
   {{ $activeStaff := .ActiveStaff }}
   {{ $server := .Server }}
-  <div class="buttons" id="buttons">
-    <a href="/profile">Edit Profile</a>
-    <a href="/timesheet">View Timesheets</a>
-    <a href="#" hx-post="/auth/logout">Logout</a>
-  </div>
+  {{ template "header" (MakeHeaderStruct .ActiveStaff.IsAdmin .IsLive) }}
   {{ if not .ActiveStaff.IsAdmin }}
     <div id="roster-jpg">
     {{ range .Days }}

@@ -14,17 +14,7 @@
     <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
   </head>
   <body id="approveTimesheets" class="timesheetBody">
-    <div class="buttons" id="buttons">
-    {{ if $staffMember.IsAdmin }}
-      <a href="/">Edit Roster</a>
-    {{ else }}
-      {{ if .RosterLive }}
-      <a href="/">View Roster</a>
-      {{end}}
-    {{end}}
-      <a href="/profile">Edit Profile</a>
-      <a href="#" hx-post="/auth/logout">Logout</a>
-    </div>
+    {{ template "header" (MakeHeaderStruct $staffMember.IsAdmin .RosterLive) }}
     <div class="timesheet">
       <div>
         <button hx-post='/shiftTimesheetWindow' hx-ext='json-enc' hx-vals='js:{"action":"-", "adminView":true}' hx-swap='outerHTML' hx-target='#approveTimesheets'>-</button>
