@@ -1,5 +1,5 @@
 {{ define "timesheetEntry" }}
-{{ $adminView := and .ApprovalMode .StaffMember.IsAdmin }}
+{{ $adminView := and .ApprovalMode .IsAdmin }}
 {{ $canEdit := or (and $adminView (eq .Status 1)) (and (not $adminView) (eq .Status 0)) }}
 {{ $canView := or (and $adminView (eq .Status 2)) (and (not $adminView) (or (eq .Status 1) (eq .Status 2))) }}
 

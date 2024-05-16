@@ -4,7 +4,7 @@
 {{ $startDate := .StartDate }}
 {{ $approvalMode := .ApprovalMode }}
 {{ $adminView := and .ApprovalMode .StaffMember.IsAdmin }}
-{{ $staffStringMap := .StaffStringMap }}
+{{ $staffMap := .StaffMap }}
 {{ $hideApproved := .HideApproved }}
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html>
@@ -91,13 +91,13 @@
             {{ if not $approvalMode }}
               {{ if (eq $staffID $staffMember.ID) }}
                 {{ range $day.Entries }}
-                  {{ template "timesheetEntry" (MakeTimesheetEntryStruct . $staffMember $startDate $approvalMode) }}
+                  {{ template "timesheetEntry" (MakeTimesheetEntryStruct . (index $staffMap $staffID) $startDate $approvalMode $staffMember.IsAdmin) }}
                 {{ end }}
               {{ end }}
             {{ else }}
               {{ range $day.Entries }}
                 {{ if not (and (eq .Status 2) $hideApproved)}}
-                  {{ template "timesheetEntry" (MakeTimesheetEntryStruct . $staffMember $startDate $approvalMode) }}
+                  {{ template "timesheetEntry" (MakeTimesheetEntryStruct . (index $staffMap $staffID) $startDate $approvalMode $staffMember.IsAdmin) }}
                 {{ end }}
               {{ end }}
             {{ end }}

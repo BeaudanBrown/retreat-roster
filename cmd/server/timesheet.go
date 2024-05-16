@@ -77,7 +77,7 @@ type TimesheetData struct {
   TimesheetWeekState
   StaffMember StaffMember
   DayNames []string
-  StaffStringMap map[uuid.UUID]string
+  StaffMap map[uuid.UUID]StaffMember
   HideApproved  bool
   RosterLive  bool
   ApprovalMode  bool
@@ -95,6 +95,7 @@ func (s *Server) MakeTimesheetStruct(staffMember StaffMember) TimesheetData {
     StaffMember: staffMember,
     DayNames: []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"},
     HideApproved: s.HideApproved,
+    StaffMap: s.GetStaffMap(),
     ApprovalMode: s.ApprovalMode,
     CacheBust: s.CacheBust,
   }
@@ -457,13 +458,15 @@ type TimesheetEntryData struct {
   StartDate  time.Time
   StaffMember StaffMember
   ApprovalMode bool
+  IsAdmin  bool
 }
 
-func MakeTimesheetEntryStruct(entry TimesheetEntry, staffMember StaffMember, startDate time.Time, approvalMode bool) TimesheetEntryData {
+func MakeTimesheetEntryStruct(entry TimesheetEntry, staffMember StaffMember, startDate time.Time, approvalMode bool, isAdmin bool) TimesheetEntryData {
   return TimesheetEntryData{
     TimesheetEntry: entry,
     StartDate: startDate,
     StaffMember: staffMember,
     ApprovalMode: approvalMode,
+    IsAdmin: isAdmin,
   }
 }

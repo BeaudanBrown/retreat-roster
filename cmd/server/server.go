@@ -334,3 +334,11 @@ func MakeHeaderStruct(isAdmin bool, rosterLive bool) HeaderData {
     IsAdmin: isAdmin,
   }
 }
+
+func (s *Server) GetStaffMap() map[uuid.UUID]StaffMember {
+  staffMap := map[uuid.UUID]StaffMember{}
+  for _, staff := range *s.Staff {
+    staffMap[staff.ID] = *staff
+  }
+  return staffMap
+}
