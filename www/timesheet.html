@@ -38,9 +38,30 @@
     {{ end }}
     <div class="timesheet">
       <div>
-        <button hx-post='/shiftTimesheetWindow' hx-ext='json-enc' hx-vals='js:{"action":"-"}' hx-swap='outerHTML' hx-target='#timesheet'>-</button>
-        <button hx-post='/shiftTimesheetWindow' hx-ext='json-enc' hx-vals='js:{"action":"0"}' hx-swap='outerHTML' hx-target='#timesheet'>This Week</button>
-        <button hx-post='/shiftTimesheetWindow' hx-ext='json-enc' hx-vals='js:{"action":"+"}' hx-swap='outerHTML' hx-target='#timesheet'>+</button>
+        <button hx-post='/shiftTimesheetWindow'
+                hx-ext='json-enc'
+                hx-vals='js:{"action":"-"}'
+                hx-swap='outerHTML'
+                hx-target='#timesheet'>
+          -
+        </button>
+        <button hx-post='/shiftTimesheetWindow'
+                hx-ext='json-enc'
+                hx-vals='js:{"action":"0"}'
+                hx-swap='outerHTML'
+                hx-target='#timesheet'>
+          This Week
+        </button>
+        <button hx-post='/shiftTimesheetWindow'
+                hx-ext='json-enc'
+                hx-vals='js:{"action":"+"}'
+                hx-swap='outerHTML'
+                hx-target='#timesheet'>
+          +
+        </button>
+      </div>
+      <div>
+        <h3>Week {{$startDate.Format "02/01"}} - {{(addDays $startDate 7).Format "02/01"}}</h3>
       </div>
       <div class="week-form">
         <div class="timesheetDay day-header">

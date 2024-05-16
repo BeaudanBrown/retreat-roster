@@ -165,6 +165,9 @@ func LoadState(filename string) (*Server, error) {
     "MakeProfileStruct": MakeProfileStruct,
     "MemberIsAssigned": MemberIsAssigned,
     "MakeTimesheetEntryStruct": MakeTimesheetEntryStruct,
+    "addDays": func(t time.Time, days int) time.Time {
+      return t.AddDate(0, 0, days)
+    },
   })
   state.Templates, err = state.Templates.ParseGlob("./www/*.html")
   if err != nil {

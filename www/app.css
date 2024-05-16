@@ -460,6 +460,8 @@ h1 {
 
 .timesheetEl {
   word-wrap: break-word;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .day-name {
