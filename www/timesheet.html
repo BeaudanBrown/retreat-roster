@@ -43,6 +43,7 @@
       </div>
       <div class="week-form">
         <div class="timesheetDay day-header">
+          <div>Staff</div>
           <div>Shift Start</div>
           <div>Shift Stop</div>
           <div>Break?</div>
@@ -51,17 +52,18 @@
           <div>Break Length</div>
           <div>Total</div>
           <div>Managing</div>
-          <div>Admin</div>
-          <div>Delete</div>
+          <div>Non-Bar</div>
+          <div>Action</div>
         </div>
         {{ range $idx, $dayName := .DayNames }}
-          <div>
-            <h2>{{$dayName}}</h2>
+          <div class="day-name">
             {{ if not $approvalMode }}
-              <button hx-post='/addTimesheetEntry' hx-ext='json-enc'
+              <button class="add-entry-btn"
+                      hx-post='/addTimesheetEntry' hx-ext='json-enc'
                       hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "dayIdx":{{$idx}}, "start-date":"{{$startDate}}"}'
                       hx-swap='outerHTML' hx-target='#timesheet'>+</button>
             {{ end }}
+            <h3>{{$dayName}}</h3>
           </div>
           {{ range $staffID, $week := $staffTimesheets }}
             {{ $day := index $week.Days $idx }}

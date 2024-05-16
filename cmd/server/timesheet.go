@@ -48,7 +48,7 @@ type TimesheetEntry struct {
   BreakLength float64 `json:"breakLength"`
   ShiftLength float64 `json:"shiftLength"`
   Managing         bool `json:"managing"`
-  Admin         bool `json:"admin"`
+  NonBar         bool `json:"nonBar"`
   Status        ApprovalStatus  `json:"status"`
   HasBreak         bool `json:"hasBreak"`
 }
@@ -327,7 +327,7 @@ type ModifyTimesheetEntryBody struct {
     BreakStart CustomDate     `json:"breakStart"`
     BreakEnd  CustomDate     `json:"breakEnd"`
     Managing      string       `json:"managing"`
-    Admin         string       `json:"admin"`
+    NonBar         string       `json:"nonBar"`
     HasBreak         string       `json:"hasBreak"`
     Status         ApprovalStatus       `json:"status"`
     AdminView         bool       `json:"adminView"`
@@ -367,7 +367,7 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
         if entry.ID == entryID {
           dayDate := t.StartDate.AddDate(0, 0, day.Offset)
           found = true
-          entry.Admin = reqBody.Admin == "on"
+          entry.NonBar = reqBody.NonBar == "on"
           entry.Managing = reqBody.Managing == "on"
           entry.HasBreak = reqBody.HasBreak == "on"
           log.Println(entry.Status)

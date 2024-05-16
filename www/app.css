@@ -1,3 +1,7 @@
+html, body {
+  overflow: hidden;
+}
+
 form {
   display: flex;
   justify-content: center;
@@ -33,6 +37,24 @@ select {
   select {
     font-size: 16px; /* Maximum font size */
   }
+}
+
+.actions a, label {
+  padding-left: 5px; /* Adds padding around each link */
+  padding-right: 5px; /* Adds padding around each link */
+}
+
+.actionBtn {
+  width: 80px;
+  margin: 5px, 5px, 5px, 5px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  align-items: center;
 }
 
 .buttons a, label {
@@ -375,38 +397,24 @@ h1 {
 }
 
 .timesheetBody {
-  height: 100%;
-  width: 100%;
-  padding: 0; /* Optional: Adjusts padding */
-  margin: 0; /* Removes default margin */
-  /* background-color: #000033; /1* Deep navy blue *1/ */
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  margin: 0;
 }
 
 .timesheet {
-  max-height: 100vw;
-  max-width: 100vw;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.week-form {
-  display: flex;
-  flex-direction: column;
-  max-width: 1000px;
-  margin: auto;
+  max-height: 100vh;
+  max-width: min(100vw, 1200px);
   width: 100%;
-}
-
-.timesheetDay {
+  overflow: hidden;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 10px;
-  border: 1px solid #ccc;
-  margin: 5px;
 }
 
 .day-header {
@@ -428,5 +436,113 @@ h1 {
   .timesheetDay {
     flex-direction: row;
     justify-content: space-between;
+  }
+}
+
+.timesheet-container {
+  height: 100%;
+  width: 100%;
+}
+
+.week-form {
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  width: 100%;
+  margin: 0px;
+  padding: 0px;
+}
+
+.timesheetDay {
+  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  align-items: center;
+  justify-content: space-around;
+  gap: 1rem;
+  border-bottom: 1px solid #ccc;
+  padding: 1rem 0rem 1rem 0rem;
+  margin: 0rem 2rem 0rem 2rem;
+  grid-column: span 11;
+}
+
+.day-header {
+  font-weight: bold;
+  background-color: #f4f4f4;
+  text-align: center;
+  grid-column: span 11;
+}
+
+.timesheetEl {
+  word-wrap: break-word;
+}
+
+.day-name {
+  grid-column: span 11;
+  display: flex;
+  justify-content: flex-start;
+  gap: 1rem;
+  align-items: center;
+  margin: 0rem 2rem 0rem 2rem;
+  border-bottom: 1px solid #ccc;
+}
+
+/* Timesheet Entry Styles */
+.timesheetDay form {
+  display: contents;
+}
+
+.timesheetDay > div,
+.timesheetDay > label {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Responsive media queries */
+@media (max-width: 768px) {
+  .timesheetDay {
+    grid-template-columns: repeat(2, 1fr);
+    grid-auto-rows: minmax(50px, auto);
+  }
+
+  .timesheetDay > div,
+  .timesheetDay > label {
+    padding: 0.5rem;
+    width: 100%;
+    justify-content: left;
+  }
+
+  .day-header {
+    display: none;
+  }
+
+  .timesheetDay > div:last-child,
+  .timesheetDay > label:last-child {
+    border-bottom: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .timesheetDay {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+  }
+
+  .day-name {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .timesheetDay > div,
+  .timesheetDay > label {
+    padding: 0.5rem 0;
+    width: 100%;
+    justify-content: left;
+  }
+
+  .timesheetDay > div:last-child,
+  .timesheetDay > label:last-child {
+    border-bottom: none;
   }
 }
