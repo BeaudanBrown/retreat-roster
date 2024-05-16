@@ -48,16 +48,13 @@
       <div class="break">{{.BreakLength}}</div>
       <div class="total">{{.ShiftLength}}</div>
       <div>
-        <input type="checkbox" name="managing" id="managing-{{.ID}}"
-               hx-post="/modifyTimesheetEntry"
-               hx-vals='js:{"status": {{.Status}}}'
-               {{ if .Managing }}checked{{ end }}>
-      </div>
-      <div>
-        <input type="checkbox" name="nonBar" id="nonbar-{{.ID}}"
-               hx-post="/modifyTimesheetEntry"
-               hx-vals='js:{"status": {{.Status}}}'
-               {{ if .NonBar }}checked{{ end }}>
+        <select name="shiftType"
+                hx-post="/modifyTimesheetEntry"
+                hx-vals='js:{"status": {{.Status}}}'>
+            <option value=0 {{ if eq .ShiftType 0 }}selected{{ end }}>Bar</option>
+            <option value=1 {{ if eq .ShiftType 1 }}selected{{ end }}>Manager</option>
+            <option value=2 {{ if eq .ShiftType 2 }}selected{{ end }}>Admin</option>
+        </select>
       </div>
       <div class="actions">
         <button type="button"
@@ -86,8 +83,13 @@
       <label class="timesheetEl">{{if (and .HasBreak .BreakEnd)}}{{.BreakEnd.Format "3:04 PM"}}{{else}}-{{end}}</label>
       <label class="timesheetEl">{{.BreakLength}}</label>
       <label class="timesheetEl">{{.ShiftLength}}</label>
-      <input class="timesheetEl" type="checkbox" disabled {{ if .Managing }}checked{{ end }}>
-      <input class="timesheetEl" type="checkbox" disabled {{ if .NonBar }}checked{{ end }}>
+      <div>
+        <select disabled>
+            <option value=0 {{ if eq .ShiftType 0 }}selected{{ end }}>Bar</option>
+            <option value=1 {{ if eq .ShiftType 1 }}selected{{ end }}>Manager</option>
+            <option value=2 {{ if eq .ShiftType 2 }}selected{{ end }}>Admin</option>
+        </select>
+      </div>
       {{ if not (and (not $adminView) (eq .Status 2)) }}
         <div class="actions">
           <button type="button"
@@ -101,8 +103,6 @@
                             "shiftEnd":"{{.ShiftEnd}}",
                             "breakStart":"{{.BreakStart}}",
                             "breakEnd":"{{.BreakEnd}}",
-                            "managing":{{if .Managing}}"on"{{else}}""{{end}},
-                            "nonBar":{{if .NonBar}}"on"{{else}}""{{end}},
                             "hasBreak":{{if .HasBreak}}"on"{{else}}""{{end}},
                             "status": {{.Status}} - 1,
                             "start-date":"{{.StartDate}}"}'

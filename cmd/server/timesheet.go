@@ -39,6 +39,27 @@ const (
     Approved
 )
 
+type ShiftType int
+
+const (
+    Bar ShiftType = iota
+    Managing
+    Admin
+)
+
+func stringToShiftType(typeStr string) ShiftType {
+  switch typeStr {
+  case "0":
+    return Bar
+  case "1":
+    return Managing
+  case "2":
+    return Admin
+  default:
+    return Bar
+  }
+}
+
 type TimesheetEntry struct {
   ID uuid.UUID
   ShiftStart  *time.Time   `json:"shiftStart"`
@@ -47,9 +68,8 @@ type TimesheetEntry struct {
   BreakEnd  *time.Time   `json:"breakEnd"`
   BreakLength float64 `json:"breakLength"`
   ShiftLength float64 `json:"shiftLength"`
-  Managing         bool `json:"managing"`
-  NonBar         bool `json:"nonBar"`
   Status        ApprovalStatus  `json:"status"`
+  ShiftType        ShiftType  `json:"shiftType"`
   HasBreak         bool `json:"hasBreak"`
 }
 
@@ -326,10 +346,9 @@ type ModifyTimesheetEntryBody struct {
     ShiftEnd  CustomDate     `json:"shiftEnd"`
     BreakStart CustomDate     `json:"breakStart"`
     BreakEnd  CustomDate     `json:"breakEnd"`
-    Managing      string       `json:"managing"`
-    NonBar         string       `json:"nonBar"`
     HasBreak         string       `json:"hasBreak"`
     Status         ApprovalStatus       `json:"status"`
+    ShiftType        string  `json:"shiftType"`
     AdminView         bool       `json:"adminView"`
 }
 
@@ -367,12 +386,9 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
         if entry.ID == entryID {
           dayDate := t.StartDate.AddDate(0, 0, day.Offset)
           found = true
-          entry.NonBar = reqBody.NonBar == "on"
-          entry.Managing = reqBody.Managing == "on"
           entry.HasBreak = reqBody.HasBreak == "on"
-          log.Println(entry.Status)
           entry.Status = reqBody.Status
-          log.Println(entry.Status)
+          entry.ShiftType = stringToShiftType(reqBody.ShiftType)
 
           if entry.HasBreak {
             entry.BreakStart = getAdjustedTime(reqBody.BreakStart, dayDate)

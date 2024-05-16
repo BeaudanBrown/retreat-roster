@@ -16,27 +16,13 @@ form {
 }
 
 select {
-  text-align: right;
+  text-align: center;
   width: 100%;
   height: 100%;
   border: none; /* Removes the border */
   padding: 0; /* Optional: Adjusts padding */
   margin: 0; /* Removes default margin */
   box-sizing: border-box; /* Include padding and border in the element's width and height */
-  font-size: 3vw;
-}
-
-/* You might still want to use media queries to set minimum and maximum font sizes */
-@media (max-width: 600px) {
-  select {
-    font-size: 11px; /* Minimum font size */
-  }
-}
-
-@media (min-width: 1000px) {
-  select {
-    font-size: 16px; /* Maximum font size */
-  }
 }
 
 .actions a, label {
@@ -446,7 +432,7 @@ h1 {
 
 .week-form {
   display: grid;
-  grid-template-columns: repeat(11, 1fr);
+  grid-template-columns: repeat(10, 1fr);
   width: 100%;
   margin: 0px;
   padding: 0px;
@@ -455,21 +441,21 @@ h1 {
 .timesheetDay {
   align-items: center;
   display: grid;
-  grid-template-columns: repeat(11, 1fr);
+  grid-template-columns: repeat(10, 1fr);
   align-items: center;
   justify-content: space-around;
   gap: 1rem;
   border-bottom: 1px solid #ccc;
   padding: 1rem 0rem 1rem 0rem;
   margin: 0rem 2rem 0rem 2rem;
-  grid-column: span 11;
+  grid-column: span 10;
 }
 
 .day-header {
   font-weight: bold;
   background-color: #f4f4f4;
   text-align: center;
-  grid-column: span 11;
+  grid-column: span 10;
 }
 
 .timesheetEl {
@@ -477,7 +463,7 @@ h1 {
 }
 
 .day-name {
-  grid-column: span 11;
+  grid-column: span 10;
   display: flex;
   justify-content: flex-start;
   gap: 1rem;

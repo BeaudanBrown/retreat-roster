@@ -3,6 +3,7 @@
 {{ $staffTimesheets := .StaffTimesheets }}
 {{ $startDate := .StartDate }}
 {{ $approvalMode := .ApprovalMode }}
+{{ $adminView := and .ApprovalMode .StaffMember.IsAdmin }}
 {{ $staffStringMap := .StaffStringMap }}
 {{ $hideApproved := .HideApproved }}
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
@@ -51,13 +52,12 @@
           <div>Break Stop</div>
           <div>Break Length</div>
           <div>Total</div>
-          <div>Managing</div>
-          <div>Non-Bar</div>
+          <div>Role</div>
           <div>Action</div>
         </div>
         {{ range $idx, $dayName := .DayNames }}
           <div class="day-name">
-            {{ if not $approvalMode }}
+            {{ if not $adminView }}
               <button class="add-entry-btn"
                       hx-post='/addTimesheetEntry' hx-ext='json-enc'
                       hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "dayIdx":{{$idx}}, "start-date":"{{$startDate}}"}'
