@@ -9,42 +9,46 @@
         hx-post="/modifyTimesheetEntry"
         hx-vals='js:{"entryID":"{{ .ID }}", "staffID":"{{.StaffMember.ID}}", "start-date":"{{.StartDate}}", "status": {{.Status}} + 1}'>
       <label>{{if .StaffMember.NickName}}{{.StaffMember.NickName}}{{else}}{{.StaffMember.FirstName}}{{end}}</label>
-      <input type="time" name="shiftStart" id="shiftStart-{{.ID}}"
-             class="timesheetEl"
-             hx-post="/modifyTimesheetEntry"
-             hx-vals='js:{"status": {{.Status}}}'
-             value="{{if .ShiftStart}}{{.ShiftStart.Format "15:04"}}{{end}}"
-             required>
-      <input type="time" name="shiftEnd" id="shiftEnd-{{.ID}}"
-             class="timesheetEl"
-             hx-post="/modifyTimesheetEntry"
-             hx-vals='js:{"status": {{.Status}}}'
-             value="{{if .ShiftEnd}}{{.ShiftEnd.Format "15:04"}}{{end}}"
-             required>
-      <input type="checkbox" name="hasBreak" id="hasBreak-{{.ID}}"
-             class="timesheetEl"
-             hx-post="/modifyTimesheetEntry"
-             hx-vals='js:{"status": {{.Status}}}'
-             {{ if .HasBreak }}checked{{ end }}>
-      <input type="time" name="breakStart" id="breakStart-{{.ID}}"
-             class="timesheetEl"
-             hx-post="/modifyTimesheetEntry"
-             hx-vals='js:{"status": {{.Status}}}'
-             value="{{if .BreakStart}}{{.BreakStart.Format "15:04"}}{{end}}"
-             {{ if .HasBreak }}required
-             {{ else }}disabled{{ end }}>
-      <input type="time" name="breakEnd" id="breakEnd-{{.ID}}"
-             class="timesheetEl"
-             hx-post="/modifyTimesheetEntry"
-             hx-vals='js:{"status": {{.Status}}}'
-             value="{{if .BreakEnd}}{{.BreakEnd.Format "15:04"}}{{end}}"
-             {{ if .HasBreak }}required
-             {{ else }}disabled{{ end }}>
-      <div class="break">{{.BreakLength}}</div>
-      <div class="total">{{.ShiftLength}}</div>
+      <div class="timesheetEl">
+        <input type="time" name="shiftStart" id="shiftStart-{{.ID}}"
+               hx-post="/modifyTimesheetEntry"
+               hx-vals='js:{"status": {{.Status}}}'
+               value="{{if .ShiftStart}}{{.ShiftStart.Format "15:04"}}{{end}}"
+               required>
+      </div>
+      <div class="timesheetEl">
+        <input type="time" name="shiftEnd" id="shiftEnd-{{.ID}}"
+               hx-post="/modifyTimesheetEntry"
+               hx-vals='js:{"status": {{.Status}}}'
+               value="{{if .ShiftEnd}}{{.ShiftEnd.Format "15:04"}}{{end}}"
+               required>
+      </div>
+      <div class="timesheetEl">
+        <input type="checkbox" name="hasBreak" id="hasBreak-{{.ID}}"
+               hx-post="/modifyTimesheetEntry"
+               hx-vals='js:{"status": {{.Status}}}'
+               {{ if .HasBreak }}checked{{ end }}>
+      </div>
+      <div class="timesheetEl">
+        <input type="time" name="breakStart" id="breakStart-{{.ID}}"
+               hx-post="/modifyTimesheetEntry"
+               hx-vals='js:{"status": {{.Status}}}'
+               value="{{if .BreakStart}}{{.BreakStart.Format "15:04"}}{{end}}"
+               {{ if .HasBreak }}required
+               {{ else }}disabled{{ end }}>
+      </div>
+      <div class="timesheetEl">
+        <input type="time" name="breakEnd" id="breakEnd-{{.ID}}"
+               hx-post="/modifyTimesheetEntry"
+               hx-vals='js:{"status": {{.Status}}}'
+               value="{{if .BreakEnd}}{{.BreakEnd.Format "15:04"}}{{end}}"
+               {{ if .HasBreak }}required
+               {{ else }}disabled{{ end }}>
+      </div>
+      <div class="timesheetEl" class="break">{{.BreakLength}}</div>
+      <div class="timesheetEl" class="total">{{.ShiftLength}}</div>
       <div class="timesheetEl">
         <select name="shiftType"
-                class="timesheetEl"
                 hx-post="/modifyTimesheetEntry"
                 hx-vals='js:{"status": {{.Status}}}'>
             <option value=0 {{ if eq .ShiftType 0 }}selected{{ end }}>Bar</option>
@@ -72,15 +76,15 @@
 {{ else if $canView }}
   <div class="timesheetDay" id='entry-{{.ID}}'>
       <label class="timesheetEl">{{if .StaffMember.NickName}}{{.StaffMember.NickName}}{{else}}{{.StaffMember.FirstName}}{{end}}</label>
-      <label class="timesheetEl">{{if .ShiftStart}}{{.ShiftStart.Format "3:04 PM"}}{{else}}-{{end}}</label>
-      <label class="timesheetEl">{{if .ShiftEnd}}{{.ShiftEnd.Format "3:04 PM"}}{{else}}-{{end}}</label>
+      <label class="timesheetEl">{{if .ShiftStart}}{{.ShiftStart.Format "3:04PM"}}{{else}}-{{end}}</label>
+      <label class="timesheetEl">{{if .ShiftEnd}}{{.ShiftEnd.Format "3:04PM"}}{{else}}-{{end}}</label>
       <input class="timesheetEl" type="checkbox" disabled {{ if .HasBreak }}checked{{ end }}>
-      <label class="timesheetEl">{{if (and .HasBreak .BreakStart)}}{{.BreakStart.Format "3:04 PM"}}{{else}}-{{end}}</label>
-      <label class="timesheetEl">{{if (and .HasBreak .BreakEnd)}}{{.BreakEnd.Format "3:04 PM"}}{{else}}-{{end}}</label>
+      <label class="timesheetEl">{{if (and .HasBreak .BreakStart)}}{{.BreakStart.Format "3:04PM"}}{{else}}-{{end}}</label>
+      <label class="timesheetEl">{{if (and .HasBreak .BreakEnd)}}{{.BreakEnd.Format "3:04PM"}}{{else}}-{{end}}</label>
       <label class="timesheetEl">{{.BreakLength}}</label>
       <label class="timesheetEl">{{.ShiftLength}}</label>
       <div>
-        <select class="timesheetEl" disabled>
+        <select disabled>
             <option value=0 {{ if eq .ShiftType 0 }}selected{{ end }}>Bar</option>
             <option value=1 {{ if eq .ShiftType 1 }}selected{{ end }}>Manager</option>
             <option value=2 {{ if eq .ShiftType 2 }}selected{{ end }}>Admin</option>

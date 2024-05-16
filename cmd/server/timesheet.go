@@ -81,6 +81,7 @@ type TimesheetData struct {
   HideApproved  bool
   RosterLive  bool
   ApprovalMode  bool
+  CacheBust  string
 }
 
 func (s *Server) MakeTimesheetStruct(staffMember StaffMember) TimesheetData {
@@ -95,6 +96,7 @@ func (s *Server) MakeTimesheetStruct(staffMember StaffMember) TimesheetData {
     DayNames: []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"},
     HideApproved: s.HideApproved,
     ApprovalMode: s.ApprovalMode,
+    CacheBust: s.CacheBust,
   }
 }
 

@@ -403,15 +403,6 @@ h1 {
   justify-content: center;
 }
 
-.day-header {
-  font-weight: bold;
-  background-color: #f4f4f4;
-}
-
-.day-header > div, .day > div {
-  flex: 1;
-}
-
 .timesheetDay > * {
   flex: 1; /* Assigns equal space to each child */
   text-align: center; /* Centers the content of each child */
@@ -444,6 +435,7 @@ h1 {
   grid-template-columns: repeat(10, 1fr);
   align-items: center;
   justify-content: space-around;
+  max-width: 100%;
   gap: 1rem;
   border-bottom: 1px solid #ccc;
   padding: 1rem 0rem 1rem 0rem;
@@ -455,13 +447,22 @@ h1 {
   font-weight: bold;
   background-color: #f4f4f4;
   text-align: center;
-  grid-column: span 10;
 }
 
 .timesheetEl {
   word-wrap: break-word;
   max-width: 100%;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+input[type="time"] {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .day-name {
@@ -480,6 +481,7 @@ h1 {
 }
 
 .timesheetDay > div,
+.timesheetDay > input,
 .timesheetDay > label {
   display: flex;
   justify-content: center;
@@ -498,10 +500,6 @@ h1 {
     padding: 0.5rem;
     width: 100%;
     justify-content: left;
-  }
-
-  .day-header {
-    display: none;
   }
 
   .timesheetDay > div:last-child,
