@@ -88,7 +88,7 @@
           </div>
           {{ range $staffID, $week := $staffTimesheets }}
             {{ $day := index $week.Days $idx }}
-            {{ if not $approvalMode }}
+            {{ if not $adminView }}
               {{ if (eq $staffID $staffMember.ID) }}
                 {{ range $day.Entries }}
                   {{ template "timesheetEntry" (MakeTimesheetEntryStruct . (index $staffMap $staffID) $startDate $approvalMode $staffMember.IsAdmin) }}
