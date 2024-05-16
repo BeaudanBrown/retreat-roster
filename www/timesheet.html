@@ -1,6 +1,10 @@
 {{ define "timesheet" }}
 {{ $staffMember := .StaffMember }}
+{{ $staffTimesheets := .StaffTimesheets }}
 {{ $startDate := .StartDate }}
+{{ $approvalMode := .ApprovalMode }}
+{{ $staffStringMap := .StaffStringMap }}
+{{ $hideApproved := .HideApproved }}
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html>
   <head>
@@ -12,6 +16,25 @@
   </head>
   <body id="timesheet" class="timesheetBody">
     {{ template "header" (MakeHeaderStruct $staffMember.IsAdmin .RosterLive) }}
+    {{ if $staffMember.IsAdmin }}
+      <div class="buttons" id="filters">
+        <label>
+          <input type="checkbox" {{ if .ApprovalMode }}checked{{ end }}
+            hx-get="/toggleApprovalMode"
+            hx-target="#timesheet"
+            hx-swap='outerHTML'>
+            Approval mode
+        </label>
+        <label>
+          <input type="checkbox" {{ if .HideApproved }}checked{{ end }}
+            hx-get="/toggleHideApproved"
+            hx-target="#timesheet"
+            hx-trigger="change"
+            hx-swap='outerHTML'>
+            Hide approved
+        </label>
+      </div>
+    {{ end }}
     <div class="timesheet">
       <div>
         <button hx-post='/shiftTimesheetWindow' hx-ext='json-enc' hx-vals='js:{"action":"-"}' hx-swap='outerHTML' hx-target='#timesheet'>-</button>
@@ -31,14 +54,30 @@
           <div>Admin</div>
           <div>Delete</div>
         </div>
-        {{ range .Days }}
-          {{ $dayName := .DayName }}
+        {{ range $idx, $dayName := .DayNames }}
           <div>
             <h2>{{$dayName}}</h2>
-            <button hx-post='/addTimesheetEntry' hx-ext='json-enc' hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "dayID":"{{.ID}}", "start-date":"{{$startDate}}"}' hx-swap='outerHTML' hx-target='#timesheet'>+</button>
+            {{ if not $approvalMode }}
+              <button hx-post='/addTimesheetEntry' hx-ext='json-enc'
+                      hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "dayIdx":{{$idx}}, "start-date":"{{$startDate}}"}'
+                      hx-swap='outerHTML' hx-target='#timesheet'>+</button>
+            {{ end }}
           </div>
-          {{ range .Entries }}
-            {{ template "timesheetEntry" (MakeTimesheetEntryStruct . $staffMember $startDate) }}
+          {{ range $staffID, $week := $staffTimesheets }}
+            {{ $day := index $week.Days $idx }}
+            {{ if not $approvalMode }}
+              {{ if (eq $staffID $staffMember.ID) }}
+                {{ range $day.Entries }}
+                  {{ template "timesheetEntry" (MakeTimesheetEntryStruct . $staffMember $startDate $approvalMode) }}
+                {{ end }}
+              {{ end }}
+            {{ else }}
+              {{ range $day.Entries }}
+                {{ if not (and (eq .Status 2) $hideApproved)}}
+                  {{ template "timesheetEntry" (MakeTimesheetEntryStruct . $staffMember $startDate $approvalMode) }}
+                {{ end }}
+              {{ end }}
+            {{ end }}
           {{ end }}
         {{ end }}
       </div>

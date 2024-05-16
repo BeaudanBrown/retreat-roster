@@ -31,6 +31,14 @@ type TimesheetDay struct {
   Entries      []*TimesheetEntry
 }
 
+type ApprovalStatus int
+
+const (
+    Incomplete ApprovalStatus = iota
+    Complete
+    Approved
+)
+
 type TimesheetEntry struct {
   ID uuid.UUID
   ShiftStart  *time.Time   `json:"shiftStart"`
@@ -41,26 +49,32 @@ type TimesheetEntry struct {
   ShiftLength float64 `json:"shiftLength"`
   Managing         bool `json:"managing"`
   Admin         bool `json:"admin"`
-  Approved         bool `json:"approved"`
-  Complete         bool `json:"complete"`
+  Status        ApprovalStatus  `json:"status"`
   HasBreak         bool `json:"hasBreak"`
 }
 
 type TimesheetData struct {
-  TimesheetWeek
-  RosterLive  bool
-  StartDate  time.Time
+  TimesheetWeekState
   StaffMember StaffMember
+  DayNames []string
+  StaffStringMap map[uuid.UUID]string
   HideApproved  bool
+  RosterLive  bool
+  ApprovalMode  bool
 }
 
-func (s *Server) MakeTimesheetStruct(rosterLive bool, staffMember StaffMember, week TimesheetWeek, startDate time.Time) TimesheetData {
+func (s *Server) MakeTimesheetStruct(staffMember StaffMember) TimesheetData {
+  t, err := LoadWeek(s.TimesheetStartDate)
+  if err != nil {
+    log.Fatalf("Failed to load timesheet week: %v", err)
+  }
   return TimesheetData{
-    RosterLive: rosterLive,
-    TimesheetWeek: week,
-    StartDate: startDate,
+    RosterLive: s.IsLive,
+    TimesheetWeekState: *t,
     StaffMember: staffMember,
+    DayNames: []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"},
     HideApproved: s.HideApproved,
+    ApprovalMode: s.ApprovalMode,
   }
 }
 
@@ -102,7 +116,7 @@ func (s *Server) HandleTimesheet(w http.ResponseWriter, r *http.Request) {
   if (thisStaffWeek == nil) {
     return
   }
-  data := s.MakeTimesheetStruct(s.IsLive, *thisStaff, *thisStaffWeek, s.TimesheetStartDate)
+  data := s.MakeTimesheetStruct(*thisStaff)
   s.renderTemplate(w, "timesheet", data)
 }
 
@@ -188,22 +202,9 @@ func (s *Server) RenderTimesheetTemplate(w http.ResponseWriter, r *http.Request,
   if (thisStaff == nil) {
     return
   }
-  if adminView {
-    t, err := LoadWeek(s.TimesheetStartDate)
-    if err != nil {
-      log.Printf("Failed to load timesheet week: %v", err)
-      return
-    }
-    data := s.MakeApproveTimesheetsStruct(*t, *thisStaff)
-    s.renderTemplate(w, "approveTimesheets", data)
-  } else {
-    thisStaffWeek := getStaffTimesheetWeek(s.TimesheetStartDate, thisStaff.ID)
-    if (thisStaffWeek == nil) {
-      return
-    }
-    data := s.MakeTimesheetStruct(s.IsLive, *thisStaff, *thisStaffWeek, s.TimesheetStartDate)
-    s.renderTemplate(w, "timesheet", data)
-  }
+
+  data := s.MakeTimesheetStruct(*thisStaff)
+  s.renderTemplate(w, "timesheet", data)
 }
 
 type ShiftTimesheetWindowBody struct {
@@ -284,7 +285,7 @@ func (s *Server) HandleDeleteTimesheetEntry(w http.ResponseWriter, r *http.Reque
 
 type AddTimesheetEntryBody struct {
   StaffID string `json:"staffID"`
-  DayID string `json:"dayID"`
+  DayIdx int `json:"dayIdx"`
   StartDate CustomDate	`json:"start-date"`
   AdminView bool `json:"adminView"`
 }
@@ -298,19 +299,13 @@ func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request)
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  dayID, err := uuid.Parse(reqBody.DayID)
-  if err != nil {
-    log.Printf("Invalid dayID: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
   t, err := LoadWeek(*reqBody.StartDate.Time)
   if err != nil {
     log.Printf("Failed to load timesheet week: %v", err)
     return
   }
   week := t.getTimesheetWeek(staffID)
-  day := week.getDayByID(dayID)
+  day := week.Days[reqBody.DayIdx]
   if day == nil {
     log.Printf("Could not find day: %v", err)
     w.WriteHeader(http.StatusBadRequest)
@@ -334,7 +329,7 @@ type ModifyTimesheetEntryBody struct {
     Managing      string       `json:"managing"`
     Admin         string       `json:"admin"`
     HasBreak         string       `json:"hasBreak"`
-    Complete         bool       `json:"complete"`
+    Status         ApprovalStatus       `json:"status"`
     AdminView         bool       `json:"adminView"`
 }
 
@@ -352,12 +347,6 @@ func getAdjustedTime(t CustomDate, dayDate time.Time) (*time.Time) {
 func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Request) {
   var reqBody ModifyTimesheetEntryBody
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { log.Printf("Error parsing body: %v", err); return }
-  staffID, err := uuid.Parse(reqBody.StaffID)
-  if err != nil {
-    log.Printf("Invalid staffID: %v", err)
-    w.WriteHeader(http.StatusBadRequest)
-    return
-  }
   entryID, err := uuid.Parse(reqBody.EntryID)
   if err != nil {
     log.Printf("Invalid entryID: %v", err)
@@ -370,102 +359,69 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
     log.Printf("Failed to load timesheet week: %v", err)
     return
   }
-  week := t.getTimesheetWeek(staffID)
 
   found := false
-  for _, day := range week.Days {
-    for _, entry := range day.Entries {
-      if entry.ID == entryID {
-        dayDate := t.StartDate.AddDate(0, 0, day.Offset)
-        found = true
-        entry.Admin = reqBody.Admin == "on"
-        entry.Managing = reqBody.Managing == "on"
-        entry.HasBreak = reqBody.HasBreak == "on"
-        entry.Complete = reqBody.Complete
+  for _, week := range t.StaffTimesheets {
+    for _, day := range week.Days {
+      for _, entry := range day.Entries {
+        if entry.ID == entryID {
+          dayDate := t.StartDate.AddDate(0, 0, day.Offset)
+          found = true
+          entry.Admin = reqBody.Admin == "on"
+          entry.Managing = reqBody.Managing == "on"
+          entry.HasBreak = reqBody.HasBreak == "on"
+          log.Println(entry.Status)
+          entry.Status = reqBody.Status
+          log.Println(entry.Status)
 
-        if entry.HasBreak {
-          entry.BreakStart = getAdjustedTime(reqBody.BreakStart, dayDate)
-          entry.BreakEnd = getAdjustedTime(reqBody.BreakEnd, dayDate)
-          if entry.BreakStart != nil && entry.BreakEnd != nil {
-            if entry.BreakStart.After(*entry.BreakEnd) {
-              newBreakEnd := entry.BreakEnd.AddDate(0, 0, 1)
-              entry.BreakEnd = &newBreakEnd
+          if entry.HasBreak {
+            entry.BreakStart = getAdjustedTime(reqBody.BreakStart, dayDate)
+            entry.BreakEnd = getAdjustedTime(reqBody.BreakEnd, dayDate)
+            if entry.BreakStart != nil && entry.BreakEnd != nil {
+              if entry.BreakStart.After(*entry.BreakEnd) {
+                newBreakEnd := entry.BreakEnd.AddDate(0, 0, 1)
+                entry.BreakEnd = &newBreakEnd
+              }
+              entry.BreakLength = math.Round(entry.BreakEnd.Sub(*entry.BreakStart).Hours() * 100) / 100
+            } else {
+              entry.BreakLength = 0
             }
-            entry.BreakLength = math.Round(entry.BreakEnd.Sub(*entry.BreakStart).Hours() * 100) / 100
           } else {
+            entry.BreakStart = nil
+            entry.BreakEnd = nil
             entry.BreakLength = 0
           }
-        } else {
-          entry.BreakStart = nil
-          entry.BreakEnd = nil
-          entry.BreakLength = 0
-        }
 
-        entry.ShiftStart = getAdjustedTime(reqBody.ShiftStart, dayDate)
-        entry.ShiftEnd = getAdjustedTime(reqBody.ShiftEnd, dayDate)
+          entry.ShiftStart = getAdjustedTime(reqBody.ShiftStart, dayDate)
+          entry.ShiftEnd = getAdjustedTime(reqBody.ShiftEnd, dayDate)
 
-        if entry.ShiftStart != nil && entry.ShiftEnd != nil {
-          if entry.ShiftStart.After(*entry.ShiftEnd) {
-            newShiftEnd := entry.ShiftEnd.AddDate(0, 0, 1)
-            entry.ShiftEnd = &newShiftEnd
+          if entry.ShiftStart != nil && entry.ShiftEnd != nil {
+            if entry.ShiftStart.After(*entry.ShiftEnd) {
+              newShiftEnd := entry.ShiftEnd.AddDate(0, 0, 1)
+              entry.ShiftEnd = &newShiftEnd
+            }
+            entry.ShiftLength = math.Round((entry.ShiftEnd.Sub(*entry.ShiftStart).Hours() - entry.BreakLength) * 100) / 100
+          } else {
+            entry.ShiftLength = 0
           }
-          entry.ShiftLength = math.Round(entry.ShiftEnd.Sub(*entry.ShiftStart).Hours() - entry.BreakLength * 100) / 100
-        } else {
-          entry.ShiftLength = 0
+          SaveTimesheetState(t)
+          break
         }
-        SaveTimesheetState(t)
-        break
       }
+      if found { break }
     }
-    if found { break }
   }
   s.RenderTimesheetTemplate(w, r, reqBody.AdminView)
 }
 
-type ApproveTimesheetData struct {
-  TimesheetWeekState
-  StaffMember StaffMember
-  DayNames []string
-  StaffStringMap map[uuid.UUID]string
-  HideApproved  bool
-  RosterLive  bool
-}
-
-func (s *Server) MakeApproveTimesheetsStruct(state TimesheetWeekState, staffMember StaffMember) ApproveTimesheetData {
-  staffStringMap := map[uuid.UUID]string{}
-  for id := range state.StaffTimesheets {
-    for _, staff := range *s.Staff {
-      if id == staff.ID {
-        if staff.NickName != "" {
-          staffStringMap[id] = staff.NickName
-        } else {
-          staffStringMap[id] = staff.FirstName
-        }
-      }
-    }
-  }
-  return ApproveTimesheetData{
-    TimesheetWeekState: state,
-    StaffMember: staffMember,
-    DayNames: []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"},
-    StaffStringMap: staffStringMap,
-    HideApproved: s.HideApproved,
-    RosterLive: s.IsLive,
-  }
-}
-
-func (s *Server) HandleApproveTimesheets(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleToggleApprovalMode(w http.ResponseWriter, r *http.Request) {
+  s.ApprovalMode = !s.ApprovalMode
+  SaveState(s)
   thisStaff := s.GetSessionUser(w, r)
   if (thisStaff == nil) {
     return
   }
-  t, err := LoadWeek(s.TimesheetStartDate)
-  if err != nil {
-    log.Printf("Failed to load timesheet week: %v", err)
-    return
-  }
-  data := s.MakeApproveTimesheetsStruct(*t, *thisStaff)
-  s.renderTemplate(w, "approveTimesheets", data)
+  s.RenderTimesheetTemplate(w, r, thisStaff.IsAdmin)
 }
 
 func (s *Server) HandleToggleHideApproved(w http.ResponseWriter, r *http.Request) {
@@ -475,25 +431,21 @@ func (s *Server) HandleToggleHideApproved(w http.ResponseWriter, r *http.Request
   if (thisStaff == nil) {
     return
   }
-  t, err := LoadWeek(s.TimesheetStartDate)
-  if err != nil {
-    log.Printf("Failed to load timesheet week: %v", err)
-    return
-  }
-  data := s.MakeApproveTimesheetsStruct(*t, *thisStaff)
-  s.renderTemplate(w, "approveTimesheets", data)
+  s.RenderTimesheetTemplate(w, r, thisStaff.IsAdmin)
 }
 
 type TimesheetEntryData struct {
   TimesheetEntry
   StartDate  time.Time
   StaffMember StaffMember
+  ApprovalMode bool
 }
 
-func MakeTimesheetEntryStruct(entry TimesheetEntry, staffMember StaffMember, startDate time.Time) TimesheetEntryData {
+func MakeTimesheetEntryStruct(entry TimesheetEntry, staffMember StaffMember, startDate time.Time, approvalMode bool) TimesheetEntryData {
   return TimesheetEntryData{
     TimesheetEntry: entry,
     StartDate: startDate,
     StaffMember: staffMember,
+    ApprovalMode: approvalMode,
   }
 }

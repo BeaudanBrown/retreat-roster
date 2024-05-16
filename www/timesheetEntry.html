@@ -1,28 +1,40 @@
 {{ define "timesheetEntry" }}
-{{ if not .Complete}}
+{{ $adminView := and .ApprovalMode .StaffMember.IsAdmin }}
+{{ $canEdit := or (and $adminView (eq .Status 1)) (and (not $adminView) (eq .Status 0)) }}
+{{ $canView := or (and $adminView (eq .Status 2)) (and (not $adminView) (or (eq .Status 1) (eq .Status 2))) }}
+
+{{ if $canEdit }}
   <form hx-ext="json-enc" hx-swap="outerHTML" hx-target="#timesheet"
-        hx-vals='{"entryID":"{{ .ID }}", "staffID":"{{.StaffMember.ID}}", "start-date":"{{.StartDate}}"}'>
+        hx-post="/modifyTimesheetEntry"
+        hx-vals='js:{"entryID":"{{ .ID }}", "staffID":"{{.StaffMember.ID}}", "start-date":"{{.StartDate}}", "status": {{.Status}} + 1}'>
     <div class="timesheetDay" id='entry-{{.ID}}'>
+      {{ if $adminView }}
+        <label>{{if .StaffMember.NickName}}{{.StaffMember.NickName}}{{else}}{{.StaffMember.FirstName}}{{end}}</label>
+      {{ end }}
       <div>
         <input type="time" name="shiftStart" id="shiftStart-{{.ID}}"
                hx-post="/modifyTimesheetEntry"
+               hx-vals='js:{"status": {{.Status}}}'
                value="{{if .ShiftStart}}{{.ShiftStart.Format "15:04"}}{{end}}"
                required>
       </div>
       <div>
         <input type="time" name="shiftEnd" id="shiftEnd-{{.ID}}"
                hx-post="/modifyTimesheetEntry"
+               hx-vals='js:{"status": {{.Status}}}'
                value="{{if .ShiftEnd}}{{.ShiftEnd.Format "15:04"}}{{end}}"
                required>
       </div>
       <div>
         <input type="checkbox" name="hasBreak" id="hasBreak-{{.ID}}"
                hx-post="/modifyTimesheetEntry"
+               hx-vals='js:{"status": {{.Status}}}'
                {{ if .HasBreak }}checked{{ end }}>
       </div>
       <div>
         <input type="time" name="breakStart" id="breakStart-{{.ID}}"
                hx-post="/modifyTimesheetEntry"
+               hx-vals='js:{"status": {{.Status}}}'
                value="{{if .BreakStart}}{{.BreakStart.Format "15:04"}}{{end}}"
                {{ if .HasBreak }}required
                {{ else }}disabled{{ end }}>
@@ -30,6 +42,7 @@
       <div>
         <input type="time" name="breakEnd" id="breakEnd-{{.ID}}"
                hx-post="/modifyTimesheetEntry"
+               hx-vals='js:{"status": {{.Status}}}'
                value="{{if .BreakEnd}}{{.BreakEnd.Format "15:04"}}{{end}}"
                {{ if .HasBreak }}required
                {{ else }}disabled{{ end }}>
@@ -39,11 +52,13 @@
       <div>
         <input type="checkbox" name="managing" id="managing-{{.ID}}"
                hx-post="/modifyTimesheetEntry"
+               hx-vals='js:{"status": {{.Status}}}'
                {{ if .Managing }}checked{{ end }}>
       </div>
       <div>
         <input type="checkbox" name="admin" id="admin-{{.ID}}"
                hx-post="/modifyTimesheetEntry"
+               hx-vals='js:{"status": {{.Status}}}'
                {{ if .Admin }}checked{{ end }}>
       </div>
       <div>
@@ -51,41 +66,45 @@
                     hx-vals='js:{"entryID":"{{ .ID }}", "staffID":"{{.StaffMember.ID}}", "start-date":"{{.StartDate}}"}'
                     hx-swap="outerHTML" hx-target="#timesheet">🗑</a>
       </div>
-      <button hx-vals='{"complete": true}'
-              hx-post="/modifyTimesheetEntry">
-        Submit
+      <button type=submit>
+        {{ if $adminView }}Approve{{else}}Submit{{end}}
       </button>
     </div>
   </form>
-{{ else }}
+{{ else if $canView }}
   <div class="timesheetDay" id='entry-{{.ID}}'>
-      <label>{{if .ShiftStart}}{{.ShiftStart.Format "15:04"}}{{else}}-{{end}}</label>
-      <label>{{if .ShiftEnd}}{{.ShiftEnd.Format "15:04"}}{{else}}-{{end}}</label>
+      {{ if $adminView }}
+        <label>{{if .StaffMember.NickName}}{{.StaffMember.NickName}}{{else}}{{.StaffMember.FirstName}}{{end}}</label>
+      {{ end }}
+      <label>{{if .ShiftStart}}{{.ShiftStart.Format "03:04 PM"}}{{else}}-{{end}}</label>
+      <label>{{if .ShiftEnd}}{{.ShiftEnd.Format "03:04 PM"}}{{else}}-{{end}}</label>
       <input type="checkbox" disabled {{ if .HasBreak }}checked{{ end }}>
-      <label>{{if (and .HasBreak .BreakStart)}}{{.BreakStart.Format "15:04"}}{{else}}-{{end}}</label>
-      <label>{{if (and .HasBreak .BreakEnd)}}{{.BreakEnd.Format "15:04"}}{{else}}-{{end}}</label>
+      <label>{{if (and .HasBreak .BreakStart)}}{{.BreakStart.Format "03:04 PM"}}{{else}}-{{end}}</label>
+      <label>{{if (and .HasBreak .BreakEnd)}}{{.BreakEnd.Format "03:04 PM"}}{{else}}-{{end}}</label>
       <label>{{.BreakLength}}</label>
       <label>{{.ShiftLength}}</label>
       <input type="checkbox" disabled {{ if .Managing }}checked{{ end }}>
       <input type="checkbox" disabled {{ if .Admin }}checked{{ end }}>
-      <div>
-        <a href="#"
-           hx-ext="json-enc" hx-post="/modifyTimesheetEntry"
-           hx-vals='js:{
-                    "entryID":"{{ .ID }}",
-                    "staffID":"{{.StaffMember.ID}}",
-                    "shiftStart":"{{.ShiftStart}}",
-                    "shiftEnd":"{{.ShiftEnd}}",
-                    "breakStart":"{{.BreakStart}}",
-                    "breakEnd":"{{.BreakEnd}}",
-                    "managing":{{if .Managing}}"on"{{else}}""{{end}},
-                    "admin":{{if .Admin}}"on"{{else}}""{{end}},
-                    "hasBreak":{{if .HasBreak}}"on"{{else}}""{{end}},
-                    "complete":false,
-                    "start-date":"{{.StartDate}}"}'
-           hx-swap="outerHTML"
-           hx-target="#timesheet">✏️</a>
-      </div>
+      {{ if not (and (not $adminView) (eq .Status 2)) }}
+        <div>
+          <a href="#"
+             hx-ext="json-enc" hx-post="/modifyTimesheetEntry"
+             hx-vals='js:{
+                      "entryID":"{{ .ID }}",
+                      "staffID":"{{.StaffMember.ID}}",
+                      "shiftStart":"{{.ShiftStart}}",
+                      "shiftEnd":"{{.ShiftEnd}}",
+                      "breakStart":"{{.BreakStart}}",
+                      "breakEnd":"{{.BreakEnd}}",
+                      "managing":{{if .Managing}}"on"{{else}}""{{end}},
+                      "admin":{{if .Admin}}"on"{{else}}""{{end}},
+                      "hasBreak":{{if .HasBreak}}"on"{{else}}""{{end}},
+                      "status": {{.Status}} - 1,
+                      "start-date":"{{.StartDate}}"}'
+             hx-swap="outerHTML"
+             hx-target="#timesheet">✏️</a>
+        </div>
+      {{ end }}
   </div>
 {{ end }}
 {{ end }}
