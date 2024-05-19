@@ -70,7 +70,6 @@ type TimesheetEntry struct {
   ShiftLength float64 `json:"shiftLength"`
   Status        ApprovalStatus  `json:"status"`
   ShiftType        ShiftType  `json:"shiftType"`
-  HasBreak         bool `json:"hasBreak"`
 }
 
 type TimesheetData struct {
@@ -349,7 +348,6 @@ type ModifyTimesheetEntryBody struct {
     ShiftEnd  CustomDate     `json:"shiftEnd"`
     BreakStart CustomDate     `json:"breakStart"`
     BreakEnd  CustomDate     `json:"breakEnd"`
-    HasBreak         string       `json:"hasBreak"`
     Status         ApprovalStatus       `json:"status"`
     ShiftType        string  `json:"shiftType"`
     AdminView         bool       `json:"adminView"`
@@ -389,25 +387,18 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
         if entry.ID == entryID {
           dayDate := t.StartDate.AddDate(0, 0, day.Offset)
           found = true
-          entry.HasBreak = reqBody.HasBreak == "on"
           entry.Status = reqBody.Status
           entry.ShiftType = stringToShiftType(reqBody.ShiftType)
+          entry.BreakStart = getAdjustedTime(reqBody.BreakStart, dayDate)
+          entry.BreakEnd = getAdjustedTime(reqBody.BreakEnd, dayDate)
 
-          if entry.HasBreak {
-            entry.BreakStart = getAdjustedTime(reqBody.BreakStart, dayDate)
-            entry.BreakEnd = getAdjustedTime(reqBody.BreakEnd, dayDate)
-            if entry.BreakStart != nil && entry.BreakEnd != nil {
-              if entry.BreakStart.After(*entry.BreakEnd) {
-                newBreakEnd := entry.BreakEnd.AddDate(0, 0, 1)
-                entry.BreakEnd = &newBreakEnd
-              }
-              entry.BreakLength = math.Round(entry.BreakEnd.Sub(*entry.BreakStart).Hours() * 100) / 100
-            } else {
-              entry.BreakLength = 0
+          if entry.BreakStart != nil && entry.BreakEnd != nil {
+            if entry.BreakStart.After(*entry.BreakEnd) {
+              newBreakEnd := entry.BreakEnd.AddDate(0, 0, 1)
+              entry.BreakEnd = &newBreakEnd
             }
+            entry.BreakLength = math.Round(entry.BreakEnd.Sub(*entry.BreakStart).Hours() * 100) / 100
           } else {
-            entry.BreakStart = nil
-            entry.BreakEnd = nil
             entry.BreakLength = 0
           }
 

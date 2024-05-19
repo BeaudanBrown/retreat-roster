@@ -12,29 +12,31 @@
     <base href="/">
     <title>Retreat Roster</title>
     <link rel="stylesheet" href="app.css?v={{ .CacheBust }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
   </head>
-  <body id="timesheet" class="timesheetBody">
+  <body id="timesheet" class="rootBody">
     {{ template "header" (MakeHeaderStruct $staffMember.IsAdmin .RosterLive) }}
     {{ if $staffMember.IsAdmin }}
+      </br>
       <div class="buttons" id="filters">
-        <label>
-          <input type="checkbox" {{ if .ApprovalMode }}checked{{ end }}
-            hx-get="/toggleApprovalMode"
-            hx-target="#timesheet"
-            hx-swap='outerHTML'>
-            Approval mode
-        </label>
-        <label>
-          <input type="checkbox" {{ if .HideApproved }}checked{{ end }}
-            hx-get="/toggleHideApproved"
-            hx-target="#timesheet"
-            hx-trigger="change"
-            hx-swap='outerHTML'>
-            Hide approved
-        </label>
+        <button class="checkLabel"
+                hx-get="/toggleApprovalMode"
+                hx-target="#timesheet"
+                hx-swap='outerHTML'>
+          <input type="checkbox" {{ if .ApprovalMode }}checked{{ end }}>
+          <label>Approval mode</label>
+        </button>
+        <button class="checkLabel"
+                hx-get="/toggleHideApproved"
+                hx-target="#timesheet"
+                hx-swap='outerHTML'>
+          <input type="checkbox" {{ if .HideApproved }}checked{{ end }}>
+          <label>Hide approved</label>
+        </button>
       </div>
+      </br>
     {{ end }}
     <div class="timesheet">
       <div>
@@ -65,16 +67,12 @@
       </div>
       <div class="week-form">
         <div class="timesheetDay day-header">
-          <div>Staff</div>
-          <div>Shift Start</div>
-          <div>Shift Stop</div>
-          <div>Break?</div>
-          <div>Break Start</div>
-          <div>Break Stop</div>
-          <div>Break Length</div>
-          <div>Total</div>
-          <div>Role</div>
-          <div>Action</div>
+          <div class="timesheetEl">Staff</div>
+          <div class="timesheetEl">Type</div>
+          <div class="timesheetEl">Shift</div>
+          <div class="timesheetEl">Break</div>
+          <div class="timesheetEl">Total</div>
+          <div class="timesheetEl">Action</div>
         </div>
         {{ range $idx, $dayName := .DayNames }}
           <div class="day-name">

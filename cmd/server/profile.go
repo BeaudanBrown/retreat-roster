@@ -376,7 +376,7 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
   for _, staff := range *s.Staff {
     for i, leaveReq := range staff.LeaveRequests {
       if leaveReq.ID == leaveID {
-        if thisStaff.IsAdmin && staff.ID == thisStaff.ID {
+        if thisStaff.IsAdmin && staff.ID != thisStaff.ID {
           adminDelete = true
         }
         if thisStaff.IsAdmin || staff.ID == thisStaff.ID {
@@ -392,7 +392,7 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
     }
   }
   if adminDelete {
-    s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+    s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
   } else {
     data := ProfileData{
       StaffMember: *thisStaff,

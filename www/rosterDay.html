@@ -22,27 +22,27 @@
       <button class="rowButton" hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"dayID":"{{$dayID}}", "action":"-"}' hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>-</button>
       <button class="rowButton" hx-post='/modifyRows' hx-ext='json-enc' hx-vals='js:{"dayID":"{{$dayID}}", "action":"+"}' hx-swap='outerHTML' hx-target='#d-{{$dayID}}'>+</button>
       {{else if eq $index 1}}
-        <label>
-            <input type="checkbox" {{ if $isClosed }}checked{{ end }}
-                hx-post="/toggleClosed"
-                hx-target="#roster"
-                hx-trigger="change"
-                hx-ext='json-enc'
-                hx-swap='outerHTML'
-                hx-vals='js:{"dayID":"{{$dayID}}"}'>
-            Closed
-        </label>
+        <div class="checkLabel">
+          <input type="checkbox" {{ if $isClosed }}checked{{ end }}
+              hx-post="/toggleClosed"
+              hx-target="#roster"
+              hx-trigger="change"
+              hx-ext='json-enc'
+              hx-swap='outerHTML'
+              hx-vals='js:{"dayID":"{{$dayID}}"}'>
+          <label>Closed</label>
+        </div>
       {{else if eq $index 2}}
-        <label>
-            <input type="checkbox" {{ if $ameliaOpen }}checked{{ end }}
-                hx-post="/toggleAmelia"
-                hx-target="#roster"
-                hx-trigger="change"
-                hx-ext='json-enc'
-                hx-swap='outerHTML'
-                hx-vals='js:{"dayID":"{{$dayID}}"}'>
-            A/S
-        </label>
+        <div class="checkLabel">
+          <input type="checkbox" {{ if $ameliaOpen }}checked{{ end }}
+              hx-post="/toggleAmelia"
+              hx-target="#roster"
+              hx-trigger="change"
+              hx-ext='json-enc'
+              hx-swap='outerHTML'
+              hx-vals='js:{"dayID":"{{$dayID}}"}'>
+          <label>A/S</label>
+        </div>
       {{end}}
       </div>
     {{end}}

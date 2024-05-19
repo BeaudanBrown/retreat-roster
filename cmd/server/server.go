@@ -161,7 +161,6 @@ func LoadState(filename string) (*Server, error) {
     "MakeHeaderStruct": MakeHeaderStruct,
     "MakeDayStruct": MakeDayStruct,
     "GetHighlightCol": GetHighlightCol,
-    "MakeRootStruct": MakeRootStruct,
     "MakeProfileStruct": MakeProfileStruct,
     "MemberIsAssigned": MemberIsAssigned,
     "MakeTimesheetEntryStruct": MakeTimesheetEntryStruct,
@@ -320,7 +319,11 @@ func (s *Server) HandleLanding(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
-  s.renderTemplate(w, "index", s.CacheBust)
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  s.renderTemplate(w, "index", s.MakeRootStruct(*s, *thisStaff))
 }
 
 type HeaderData struct {

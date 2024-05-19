@@ -13,12 +13,14 @@ import (
 )
 
 type RootStruct struct {
+  CacheBust string
   Server
   ActiveStaff StaffMember
 }
 
-func MakeRootStruct(server Server, activeStaff StaffMember) RootStruct {
+func (s *Server) MakeRootStruct(server Server, activeStaff StaffMember) RootStruct {
   return RootStruct{
+    s.CacheBust,
     server,
     activeStaff,
   }
@@ -252,7 +254,7 @@ func (s *Server) HandleRoot(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusOK)
     return
   }
-  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
 }
 
 func googleOauthConfig() *oauth2.Config {
@@ -455,7 +457,7 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
   }
 
   SaveState(s)
-  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
 }
 
 type ToggleAdminBody struct {
@@ -482,7 +484,7 @@ func (s *Server) HandleToggleAdmin(w http.ResponseWriter, r *http.Request) {
   if (thisStaff == nil) {
     return
   }
-  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
 }
 
 type ToggleHiddenBody struct {
@@ -530,7 +532,7 @@ func (s *Server) HandleToggleHidden(w http.ResponseWriter, r *http.Request) {
   if (thisStaff == nil) {
     return
   }
-  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
 }
 
 func (s *Server) HandleToggleHideByIdeal(w http.ResponseWriter, r *http.Request) {
@@ -540,7 +542,7 @@ func (s *Server) HandleToggleHideByIdeal(w http.ResponseWriter, r *http.Request)
   if (thisStaff == nil) {
     return
   }
-  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
 }
 
 func (s *Server) HandleToggleHideByPreferences(w http.ResponseWriter, r *http.Request) {
@@ -550,7 +552,7 @@ func (s *Server) HandleToggleHideByPreferences(w http.ResponseWriter, r *http.Re
   if (thisStaff == nil) {
     return
   }
-  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
 }
 
 func (s *Server) HandleToggleHideByLeave(w http.ResponseWriter, r *http.Request) {
@@ -560,7 +562,7 @@ func (s *Server) HandleToggleHideByLeave(w http.ResponseWriter, r *http.Request)
   if (thisStaff == nil) {
     return
   }
-  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
 }
 
 func (s *Server) HandleToggleLive(w http.ResponseWriter, r *http.Request) {
@@ -570,7 +572,7 @@ func (s *Server) HandleToggleLive(w http.ResponseWriter, r *http.Request) {
   if (thisStaff == nil) {
     return
   }
-  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
 }
 
 type ToggleAmeliaBody struct {
@@ -598,7 +600,7 @@ func (s *Server) HandleToggleAmelia(w http.ResponseWriter, r *http.Request) {
   if (thisStaff == nil) {
     return
   }
-  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
 }
 
 type ToggleClosedBody struct {
@@ -650,7 +652,7 @@ func (s *Server) HandleAddTrial(w http.ResponseWriter, r *http.Request) {
   if (thisStaff == nil) {
     return
   }
-  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
 }
 
 type ShiftWindowBody struct {
@@ -678,7 +680,7 @@ func (s *Server) HandleShiftWindow(w http.ResponseWriter, r *http.Request) {
   if (thisStaff == nil) {
     return
   }
-  s.renderTemplate(w, "root", MakeRootStruct(*s, *thisStaff))
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
 }
 
 type ModifyRowsBody struct {

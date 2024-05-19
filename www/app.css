@@ -1,3 +1,38 @@
+html {
+/*   font-size: calc(0rem + 2vw); */
+  font-size: 1.8vw;
+  font-family: Arial, sans-serif;
+}
+
+@media (min-width: 1000px) {
+  html {
+    font-size: 1vw;
+  }
+}
+
+body,
+input,
+select,
+option,
+textarea,
+button,
+h1, h2, h3, h4, h5, h6,
+p, a,
+ul, ol, li,
+label,
+table, th, td {
+  font-size: inherit; /* Inherit base font size */
+}
+h1 {
+  font-size: 2rem; /* 32px */
+}
+h2 {
+  font-size: 1.5rem; /* 24px */
+}
+h3 {
+  font-size: 1.25rem; /* 20px */
+}
+
 form {
   display: flex;
   justify-content: center;
@@ -27,7 +62,7 @@ select {
 }
 
 .actionBtn {
-  width: 80px;
+  width: 100%;
   margin: 5px, 5px, 5px, 5px;
 }
 
@@ -39,15 +74,11 @@ select {
   align-items: center;
 }
 
-.buttons a, label {
-  padding-left: 5px; /* Adds padding around each link */
-  padding-right: 5px; /* Adds padding around each link */
-}
-
 .buttons {
   display: flex;
   justify-content: center;
   align-items: center;
+  gap: 10px;
 }
 
 fieldset {
@@ -77,12 +108,6 @@ fieldset {
   align-items: center;
 }
 
-.rootBody {
-  padding: 0; /* Optional: Adjusts padding */
-  margin: 0; /* Removes default margin */
-  /* background-color: #000033; /1* Deep navy blue *1/ */
-}
-
 .rosterInput  {
   text-align: right;
   width: 100%;
@@ -94,50 +119,7 @@ fieldset {
   box-sizing: border-box; /* Include padding and border in the element's width and height */
 }
 
-input[type="email"] {
-  font-size: 3vw;
-  width: 100%;
-}
-
-/* You might still want to use media queries to set minimum and maximum font sizes */
-@media (max-width: 600px) {
-  input[type="email"] {
-    font-size: 11px; /* Minimum font size */
-  }
-}
-
-@media (min-width: 1000px) {
-  input[type="email"] {
-    font-size: 14px; /* Maximum font size */
-  }
-}
-
-input[type="text"] {
-  max-width: 100%;
-  font-size: 3vw;
-}
-
-/* You might still want to use media queries to set minimum and maximum font sizes */
-@media (max-width: 600px) {
-  input[type="text"] {
-    font-size: 11px; /* Minimum font size */
-  }
-}
-
-@media (min-width: 1000px) {
-  input[type="text"] {
-    font-size: 14px; /* Maximum font size */
-  }
-}
-
 .profile {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-}
-
-.profileBody {
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -158,12 +140,12 @@ input[type="text"] {
 }
 
 .roster-container {
-  font-size: 3vw; /* Adjust base font size to viewport width */
+  /* font-size: 3vw; /1* Adjust base font size to viewport width *1/ */
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  width: 800px;
+  max-width: min(100vw, 1200px);
   margin-left: 3px auto;
   margin-right: 3px auto;
 }
@@ -173,22 +155,19 @@ input[type="text"] {
     }
 }
 
-/* You might still want to use media queries to set minimum and maximum font sizes */
-@media (max-width: 600px) {
-  .roster-container {
-    font-size: 11px; /* Minimum font size */
-  }
+input[type="checkbox"] {
+  width: 1em;
+  height: 1em;
 }
 
-@media (min-width: 1000px) {
-  .roster-container {
-    font-size: 16px; /* Maximum font size */
-  }
+.checkLabel {
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .availCheckbox {
   margin: 0;
-  transform: scale(0.8); /* Scales the checkbox to 1.5 times its original size */
   vertical-align: middle; /* Ensures vertical alignment with adjacent text or inline elements */
 }
 
@@ -216,14 +195,7 @@ input[type="text"] {
 }
 
 .rowButton {
-  padding: 0px 4px; /* Reduces padding around the text */
-  /* font-size: 12px; /1* Smaller font size *1/ */
-  /* Optionally, you can explicitly set the height and width */
-  /* height: 20px;
-  width: 40px; */
-  /* Additional stylings to make the button look better */
-  /* border-radius: 3px; /1* Rounded corners *1/ */
-  /* border: 1px solid #ccc; /1* Light grey border *1/ */
+  padding: 0px 4px;
 }
 
 .ctrlCell{
@@ -307,17 +279,12 @@ input[type="text"] {
   margin-right: 10px; /* Spacing between columns */
 }
 
-.delete-icon {
-  cursor: pointer;
-  font-size: 20px; /* Adjust size of the trash can emoji as needed */
+.header {
+  margin: 5px;
 }
 
-/* Optional: reduce the size of the emoji and add padding on smaller screens */
-@media (max-width: 600px) {
-  .delete-icon {
-    font-size: 16px; /* Smaller emoji on small screens */
-    padding: 5px; /* Easier to tap on touch devices */
-  }
+.headerLinks {
+  font-weight: bold;
 }
 
 .staff-container {
@@ -327,8 +294,6 @@ input[type="text"] {
   justify-content: center;
   align-items: center;
   overflow: auto; /* Adds scrollbar if table exceeds container width */
-  /* margin-left: 3px auto; */
-  /* margin-right: 3px auto; */
 }
 
 table {
@@ -343,6 +308,7 @@ th, td {
   text-align: center;
   word-wrap: break-word;
   word-break: break-word;
+  text-align: center;
   /* font-size: 1.5vw; /1* Adjust base font size to viewport width *1/ */
 }
 
@@ -352,7 +318,13 @@ h1 {
 
 .blank-table th, .blank-table td {
   border: 0px;
+  width: 100%;
 }
+
+.blank-table td > * {
+  width: 100%;
+}
+
 
 .timeoff {
   display: flex;
@@ -378,31 +350,23 @@ h1 {
   display: none;
 }
 
-.timesheetBody {
-  height: 100vh;
-  width: 100vw;
+.rootBody {
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0;
-  margin: 0;
 }
 
 .timesheet {
-  max-height: 100vh;
   max-width: min(100vw, 1200px);
   width: 100%;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-}
-
-.timesheetDay > * {
-  flex: 1; /* Assigns equal space to each child */
-  text-align: center; /* Centers the content of each child */
-  margin: 0 4px; /* Adds some margin between elements */
 }
 
 @media (max-width: 768px) {
@@ -418,38 +382,49 @@ h1 {
 }
 
 .week-form {
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
   width: 100%;
   margin: 0px;
   padding: 0px;
 }
 
 .timesheetDay {
+  text-align: center;
   align-items: center;
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  grid-template-columns: 1fr 1fr 2fr 2fr 2fr 1fr;
   align-items: center;
   justify-content: space-around;
+  max-width: 100%;
   max-width: 100%;
   gap: 1rem;
   border-bottom: 1px solid #ccc;
   padding: 1rem 0rem 1rem 0rem;
   margin: 0rem 2rem 0rem 2rem;
-  grid-column: span 10;
+  grid-column: span 6;
 }
 
 .day-header {
   font-weight: bold;
   background-color: #f4f4f4;
-  text-align: center;
+}
+
+.doubleCol {
+  grid-template-columns: 1fr 2fr;
+}
+
+.splitCol {
+  grid-template-columns: 1fr 1fr;
 }
 
 .timesheetEl {
   word-wrap: break-word;
+  word-break: break-word;
+  text-align: center;
+  margin: 0px;
   max-width: 100%;
   box-sizing: border-box;
-  display: flex;
+  display: grid;
+  row-gap: 0.5rem;
   align-items: center;
   justify-content: center;
 }
@@ -474,57 +449,4 @@ input[type="time"] {
 /* Timesheet Entry Styles */
 .timesheetDay form {
   display: contents;
-}
-
-.timesheetDay > div,
-.timesheetDay > input,
-.timesheetDay > label {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-/* Responsive media queries */
-@media (max-width: 768px) {
-  .timesheetDay {
-    grid-template-columns: repeat(2, 1fr);
-    grid-auto-rows: minmax(50px, auto);
-  }
-
-  .timesheetDay > div,
-  .timesheetDay > label {
-    padding: 0.5rem;
-    width: 100%;
-    justify-content: left;
-  }
-
-  .timesheetDay > div:last-child,
-  .timesheetDay > label:last-child {
-    border-bottom: none;
-  }
-}
-
-@media (max-width: 480px) {
-  .timesheetDay {
-    grid-template-columns: 1fr;
-    grid-auto-rows: auto;
-  }
-
-  .day-name {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-
-  .timesheetDay > div,
-  .timesheetDay > label {
-    padding: 0.5rem 0;
-    width: 100%;
-    justify-content: left;
-  }
-
-  .timesheetDay > div:last-child,
-  .timesheetDay > label:last-child {
-    border-bottom: none;
-  }
 }
