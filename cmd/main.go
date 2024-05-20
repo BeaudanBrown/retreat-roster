@@ -12,7 +12,7 @@ func main() {
   if err := godotenv.Load(); err != nil {
     log.Printf("No .env file found")
   }
-  s, err := server.LoadState(server.STATE_FILE)
+  s, err := server.LoadServerState()
   if err != nil {
     log.Fatalf("Error loading state: %v", err)
   }
@@ -55,6 +55,7 @@ func main() {
   http.HandleFunc("/modifyTimesheetEntry", s.VerifySession(s.HandleModifyTimesheetEntry))
   http.HandleFunc("/toggleHideApproved", s.VerifyAdmin(s.HandleToggleHideApproved))
   http.HandleFunc("/toggleApprovalMode", s.VerifyAdmin(s.HandleToggleApprovalMode))
+  http.HandleFunc("/importRosterWeek", s.VerifyAdmin(s.HandleImportRosterWeek))
 
   log.Println(http.ListenAndServe(":6969", nil))
 }

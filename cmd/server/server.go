@@ -15,7 +15,8 @@ import (
 )
 
 const SESSION_KEY = "sessionToken"
-const STATE_FILE = "./data/state.json"
+const STAFF_STATE_FILE = "./data/staff.json"
+const ROSTER_DIR = "./data/rosters/"
 const DEV_MODE = false
 
 type Server struct {
@@ -138,66 +139,123 @@ func ReadAndUnmarshal(w http.ResponseWriter, r *http.Request, reqBody interface{
   return nil
 }
 
-func SaveState(s *Server) error {
-  s.CheckFlags()
-  data, err := json.Marshal(s.ServerDisc)
+func GetRosterWeekFilename(startDate time.Time) string {
+    formattedDate := startDate.Format("2006-01-02") // Go uses this specific date as the layout pattern
+    return ROSTER_DIR + formattedDate + ".json"
+}
+
+func (w *RosterWeek) Save() error {
+  s, err := LoadServerState()
+  w.CheckFlags(s.StaffState)
   if err != nil {
+    log.Println("Failed to load server state")
     return err
   }
-  log.Println("Saving state")
-  if err := os.WriteFile(STATE_FILE, data, 0666); err != nil {
+  data, err := json.Marshal(w)
+  if err != nil {
+    log.Println("Failed to marshal rosterWeek")
+    return err
+  }
+  log.Println("Saving roster week")
+  filename := GetRosterWeekFilename(w.StartDate)
+  if err := os.WriteFile(filename, data, 0666); err != nil {
+    log.Println("Error saving roster week")
+    log.Println(err)
     return err
   }
   return nil
 }
 
-func LoadState(filename string) (*Server, error) {
-  var state *Server
+func LoadRosterWeek(startDate time.Time) RosterWeek {
+  var rosterWeek RosterWeek
   var err error
+  filename := GetRosterWeekFilename(startDate)
   if _, err = os.Stat(filename); err != nil {
-    state = newState()
-    SaveState(state)
+    log.Println("No file")
+    rosterWeek = newRosterWeek(startDate)
+    rosterWeek.Save()
   } else {
     var data []byte
     if data, err = os.ReadFile(filename); err != nil {
-      return nil, err
-    }
-    if err = json.Unmarshal(data, &state); err != nil {
-      return nil, err
+      log.Println("No read file")
+      rosterWeek = newRosterWeek(startDate)
+      rosterWeek.Save()
+    } else if err = json.Unmarshal(data, &rosterWeek); err != nil {
+      log.Println("No json file")
+      rosterWeek = newRosterWeek(startDate)
+      rosterWeek.Save()
+      // TODO: check for save errors?
     }
   }
 
-  log.Println("Loaded state")
-  state.CacheBust = fmt.Sprintf("%v", time.Now().UnixNano())
-  state.Templates = template.New("").Funcs(template.FuncMap{
-    "MakeHeaderStruct": MakeHeaderStruct,
-    "MakeDayStruct": MakeDayStruct,
-    "GetHighlightCol": GetHighlightCol,
-    "MakeProfileStruct": MakeProfileStruct,
-    "MemberIsAssigned": MemberIsAssigned,
-    "MakeTimesheetEntryStruct": MakeTimesheetEntryStruct,
-    "addDays": func(t time.Time, days int) time.Time {
-      return t.AddDate(0, 0, days)
-    },
-  })
-  state.Templates, err = state.Templates.ParseGlob("./www/*.html")
+  log.Println("Loaded rosterWeek")
+  return rosterWeek
+}
+
+func (s *StaffState) Save() error {
+  data, err := json.Marshal(s)
+  if err != nil {
+    return err
+  }
+  log.Println("Saving staff state")
+  if err := os.WriteFile(STAFF_STATE_FILE, data, 0666); err != nil {
+    return err
+  }
+  return nil
+}
+
+func NewServerState() (*Server) {
+    staffState := NewStaffState()
+    staffState.Save()
+    return &Server{
+      CacheBust: fmt.Sprintf("%v", time.Now().UnixNano()),
+      StaffState: staffState,
+    }
+}
+
+func LoadStaffState() (StaffState) {
+  var staffState StaffState
+  var err error
+  if _, err = os.Stat(STAFF_STATE_FILE); err != nil {
+    log.Println(err)
+    staffState = NewStaffState()
+  } else {
+    var data []byte
+    if data, err = os.ReadFile(STAFF_STATE_FILE); err != nil {
+      log.Println(err)
+      staffState = NewStaffState()
+    }
+    if err = json.Unmarshal(data, &staffState); err != nil {
+      log.Println(err)
+      staffState = NewStaffState()
+    }
+  }
+  return staffState
+}
+
+func LoadServerState() (*Server, error) {
+  var serverState Server
+  var err error
+  serverState = Server{
+    CacheBust: fmt.Sprintf("%v", time.Now().UnixNano()),
+    Templates: template.New("").Funcs(template.FuncMap{
+      "MakeHeaderStruct": MakeHeaderStruct,
+      "MakeDayStruct": MakeDayStruct,
+      "GetHighlightCol": GetHighlightCol,
+      "MakeProfileStruct": MakeProfileStruct,
+      "MemberIsAssigned": MemberIsAssigned,
+      "MakeTimesheetEntryStruct": MakeTimesheetEntryStruct,
+      "addDays": func(t time.Time, days int) time.Time {
+        return t.AddDate(0, 0, days)
+      },
+    }),
+    StaffState: LoadStaffState(),
+  }
+  serverState.Templates, err = serverState.Templates.ParseGlob("./www/*.html")
   if err != nil {
     return nil, err
   }
-  return state, nil
-}
-
-type ServerDisc struct {
-  StartDate  time.Time   `json:"startDate"`
-  TimesheetStartDate  time.Time   `json:"timesheetStartDate"`
-  Days  []*RosterDay   `json:"days"`
-  Staff *[]*StaffMember `json:"staff"`
-  IsLive         bool `json:"isLive"`
-  HideByIdeal         bool `json:"hideByIdeal"`
-  HideByPrefs         bool `json:"hideByPrefs"`
-  HideByLeave         bool `json:"hideByLeave"`
-  HideApproved  bool `json:"hideIdeal"`
-  ApprovalMode  bool `json:"approvalMode"`
+  return &serverState, nil
 }
 
 func newRow() *Row {
@@ -218,19 +276,10 @@ func newSlot() Slot {
   }
 }
 
-func newState() *Server {
+func newRosterWeek(startDate time.Time) RosterWeek {
   dayNames := []string{"Tues", "Wed", "Thurs", "Fri", "Sat", "Sun", "Mon"}
-  today := time.Now()
-  daysUntilTuesday := int(time.Tuesday - today.Weekday())
-  if daysUntilTuesday <= 0 {
-    daysUntilTuesday += 7
-  }
-  nextTuesday := today.AddDate(0, 0, daysUntilTuesday)
-
   var Days []*RosterDay
-  staff := []*StaffMember{}
 
-  // Loop over dayNames to fill Days slice
   for i, dayName := range dayNames {
     var colour string
     if i%2 == 0 {
@@ -239,7 +288,7 @@ func newState() *Server {
       colour = "#ffffff"
     }
     Days = append(Days, &RosterDay{
-      ID:      uuid.New(), // Generates a new UUID
+      ID:      uuid.New(),
       DayName: dayName,
       Rows: []*Row{
         newRow(),
@@ -251,15 +300,21 @@ func newState() *Server {
       Offset:         i,
     })
   }
-
-  s := &Server{
-    CacheBust: fmt.Sprintf("%v", time.Now().UnixNano()),
-    ServerDisc: ServerDisc{
-      Days:  Days,
-      Staff: &staff,
-      StartDate: nextTuesday,
-    },
+  week := RosterWeek{
+    uuid.New(),
+    startDate,
+    Days,
+    false,
   }
+  return week
+}
+
+func NewStaffState() StaffState {
+  staff := []*StaffMember{}
+  s := StaffState{
+    &staff,
+  }
+  s.Save()
   return s
 }
 
@@ -286,18 +341,18 @@ func (s *Server) GetSessionUser(w http.ResponseWriter, r *http.Request) *StaffMe
   return staff
 }
 
-func (s *Server) GetStaffByID(staffID uuid.UUID) *StaffMember {
-  for i := range *s.Staff {
-    if (*s.Staff)[i].ID == staffID {
-      return (*s.Staff)[i]
+func GetStaffByID(staffID uuid.UUID, allStaff []*StaffMember) *StaffMember {
+  for i := range allStaff {
+    if (allStaff)[i].ID == staffID {
+      return (allStaff)[i]
     }
   }
   return nil
 }
 
-func (s *Server) GetSlotByID(slotID uuid.UUID) *Slot {
-  for i := range s.Days {
-    day := s.Days[i]
+func (week *RosterWeek) GetSlotByID(slotID uuid.UUID) *Slot {
+  for i := range week.Days {
+    day := week.Days[i]
     for j := range day.Rows {
       row := day.Rows[j]
       if row.Amelia.ID == slotID {
@@ -317,10 +372,10 @@ func (s *Server) GetSlotByID(slotID uuid.UUID) *Slot {
   return nil
 }
 
-func (s *Server) GetDayByID(dayID uuid.UUID) *RosterDay {
-  for i := range s.Days {
-    if s.Days[i].ID == dayID {
-      return s.Days[i]
+func (week *RosterWeek) GetDayByID(dayID uuid.UUID) *RosterDay {
+  for i := range week.Days {
+    if week.Days[i].ID == dayID {
+      return week.Days[i]
     }
   }
   return nil

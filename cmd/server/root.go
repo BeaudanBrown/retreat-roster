@@ -16,13 +16,15 @@ type RootStruct struct {
   CacheBust string
   Server
   ActiveStaff StaffMember
+  RosterWeek
 }
 
-func (s *Server) MakeRootStruct(server Server, activeStaff StaffMember) RootStruct {
+func (s *Server) MakeRootStruct(server Server, activeStaff StaffMember, week RosterWeek) RootStruct {
   return RootStruct{
     s.CacheBust,
     server,
     activeStaff,
+    week,
   }
 }
 
@@ -79,39 +81,40 @@ func MakeDayStruct(isLive bool, day RosterDay, s Server, activeStaff StaffMember
   }
 }
 
-func (s *Server) CheckFlags() {
-  for _, staff := range *s.Staff {
+func (week *RosterWeek) CheckFlags(staffState StaffState) {
+  allStaff := staffState.Staff
+  for _, staff := range *allStaff {
     staff.CurrentShifts = 0
   }
-  for i, day := range s.Days {
+  for i, day := range week.Days {
     // Create a new map for each day to track occurrences of staff IDs within that day
     staffIDOccurrences := make(map[uuid.UUID]int)
 
     for _, row := range day.Rows {
       if day.AmeliaOpen && row.Amelia.AssignedStaff != nil {
         staffIDOccurrences[*row.Amelia.AssignedStaff]++
-        staff := s.GetStaffByID(*row.Amelia.AssignedStaff)
+        staff := GetStaffByID(*row.Amelia.AssignedStaff, *allStaff)
         if staff != nil {
           staff.CurrentShifts += 1
         }
       }
       if row.Early.AssignedStaff != nil {
         staffIDOccurrences[*row.Early.AssignedStaff]++
-        staff := s.GetStaffByID(*row.Early.AssignedStaff)
+        staff := GetStaffByID(*row.Early.AssignedStaff, *allStaff)
         if staff != nil {
           staff.CurrentShifts += 1
         }
       }
       if row.Mid.AssignedStaff != nil {
         staffIDOccurrences[*row.Mid.AssignedStaff]++
-        staff := s.GetStaffByID(*row.Mid.AssignedStaff)
+        staff := GetStaffByID(*row.Mid.AssignedStaff, *allStaff)
         if staff != nil {
           staff.CurrentShifts += 1
         }
       }
       if row.Late.AssignedStaff != nil {
         staffIDOccurrences[*row.Late.AssignedStaff]++
-        staff := s.GetStaffByID(*row.Late.AssignedStaff)
+        staff := GetStaffByID(*row.Late.AssignedStaff, *allStaff)
         if staff != nil {
           staff.CurrentShifts += 1
         }
@@ -123,13 +126,13 @@ func (s *Server) CheckFlags() {
       row.Early.Flag = None
       row.Mid.Flag = None
       row.Late.Flag = None
-      date := s.StartDate.AddDate(0, 0, day.Offset)
+      date := week.StartDate.AddDate(0, 0, day.Offset)
 
       if day.AmeliaOpen && row.Amelia.AssignedStaff != nil {
         if staffIDOccurrences[*row.Amelia.AssignedStaff] > 1 {
           row.Amelia.Flag = Duplicate
         } else {
-          staff := s.GetStaffByID(*row.Amelia.AssignedStaff)
+          staff := GetStaffByID(*row.Amelia.AssignedStaff, *allStaff)
           for _, req := range staff.LeaveRequests {
             if !req.StartDate.After(date) && req.EndDate.After(date) {
               row.Amelia.Flag = LeaveConflict
@@ -148,7 +151,7 @@ func (s *Server) CheckFlags() {
         if staffIDOccurrences[*row.Early.AssignedStaff] > 1 {
           row.Early.Flag = Duplicate
         } else {
-          staff := s.GetStaffByID(*row.Early.AssignedStaff)
+          staff := GetStaffByID(*row.Early.AssignedStaff, *allStaff)
           for _, req := range staff.LeaveRequests {
             if !req.StartDate.After(date) && req.EndDate.After(date) {
               row.Early.Flag = LeaveConflict
@@ -171,7 +174,7 @@ func (s *Server) CheckFlags() {
         if staffIDOccurrences[*row.Mid.AssignedStaff] > 1 {
           row.Mid.Flag = Duplicate
         } else {
-          staff := s.GetStaffByID(*row.Mid.AssignedStaff)
+          staff := GetStaffByID(*row.Mid.AssignedStaff, *allStaff)
           if staff != nil {
             for _, req := range staff.LeaveRequests {
               if !req.StartDate.After(date) && req.EndDate.After(date) {
@@ -194,7 +197,7 @@ func (s *Server) CheckFlags() {
         if staffIDOccurrences[*row.Late.AssignedStaff] > 1 {
           row.Late.Flag = Duplicate
         } else {
-          staff := s.GetStaffByID(*row.Late.AssignedStaff)
+          staff := GetStaffByID(*row.Late.AssignedStaff, *allStaff)
           for _, req := range staff.LeaveRequests {
             if !req.StartDate.After(date) && req.EndDate.After(date) {
               row.Late.Flag = LeaveConflict
@@ -214,6 +217,7 @@ func (s *Server) CheckFlags() {
       }
     }
   }
+  staffState.Save()
 }
 
 func (staff *StaffMember) HasConflict(slot string, offset int) bool {
@@ -365,11 +369,15 @@ func (s *Server) HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
     s.Staff = &new
   }
 
-  SaveState(s)
+  s.Save()
   http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (s *Server) HandleModifyDescriptionSlot(w http.ResponseWriter, r *http.Request) {
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
   if err := r.ParseForm(); err != nil {
     log.Printf("Error parsing form: %v", err)
     w.WriteHeader(http.StatusBadRequest)
@@ -383,7 +391,8 @@ func (s *Server) HandleModifyDescriptionSlot(w http.ResponseWriter, r *http.Requ
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  slot := s.GetSlotByID(slotID)
+  week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+  slot := week.GetSlotByID(slotID)
   if slot == nil {
     log.Printf("Invalid slotID: %v", err)
     w.WriteHeader(http.StatusBadRequest)
@@ -391,10 +400,14 @@ func (s *Server) HandleModifyDescriptionSlot(w http.ResponseWriter, r *http.Requ
   }
 
   slot.Description = descVal
-  SaveState(s)
+  week.Save()
 }
 
 func (s *Server) HandleModifyTimeSlot(w http.ResponseWriter, r *http.Request) {
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
   if err := r.ParseForm(); err != nil {
     log.Printf("Error parsing form: %v", err)
     w.WriteHeader(http.StatusBadRequest)
@@ -409,7 +422,8 @@ func (s *Server) HandleModifyTimeSlot(w http.ResponseWriter, r *http.Request) {
     return
   }
   log.Printf("Modify %v timeslot id: %v", slotID, timeVal)
-  slot := s.GetSlotByID(slotID)
+  week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+  slot := week.GetSlotByID(slotID)
   if slot == nil {
     log.Printf("Invalid slotID: %v", err)
     w.WriteHeader(http.StatusBadRequest)
@@ -417,7 +431,7 @@ func (s *Server) HandleModifyTimeSlot(w http.ResponseWriter, r *http.Request) {
   }
 
   slot.StartTime = timeVal
-  SaveState(s)
+  week.Save()
 }
 
 func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
@@ -439,7 +453,8 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  slot := s.GetSlotByID(slotID)
+  week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+  slot := week.GetSlotByID(slotID)
   if slot == nil {
     log.Printf("Invalid slotID: %v", err)
     w.WriteHeader(http.StatusBadRequest)
@@ -452,7 +467,7 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
     slot.StaffString = nil
   } else {
     log.Printf("Modify %v slot id: %v, staffid: %v", slotID, slotID, staffID)
-    member := s.GetStaffByID(staffID)
+    member := GetStaffByID(staffID, *s.Staff)
     if member != nil {
       slot.AssignedStaff = &member.ID
       if member.NickName != "" {
@@ -463,8 +478,8 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
     }
   }
 
-  SaveState(s)
-  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
+  week.Save()
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff, week))
 }
 
 type ToggleAdminBody struct {
@@ -486,12 +501,13 @@ func (s *Server) HandleToggleAdmin(w http.ResponseWriter, r *http.Request) {
       break
     }
   }
-  SaveState(s)
+  s.Save()
   thisStaff := s.GetSessionUser(w, r)
   if (thisStaff == nil) {
     return
   }
-  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
+  week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff, week))
 }
 
 type ToggleHiddenBody struct {
@@ -513,7 +529,12 @@ func (s *Server) HandleToggleHidden(w http.ResponseWriter, r *http.Request) {
       break
     }
   }
-  for _, day := range s.Days {
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+  for _, day := range week.Days {
     for _, row := range day.Rows {
       if row.Amelia.AssignedStaff != nil && *row.Amelia.AssignedStaff == accID {
         row.Amelia.AssignedStaff = nil
@@ -534,52 +555,52 @@ func (s *Server) HandleToggleHidden(w http.ResponseWriter, r *http.Request) {
     }
   }
 
-  SaveState(s)
-  thisStaff := s.GetSessionUser(w, r)
-  if (thisStaff == nil) {
-    return
-  }
-  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
+  week.Save()
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff, week))
 }
 
 func (s *Server) HandleToggleHideByIdeal(w http.ResponseWriter, r *http.Request) {
-  s.HideByIdeal = !s.HideByIdeal
-  SaveState(s)
   thisStaff := s.GetSessionUser(w, r)
   if (thisStaff == nil) {
     return
   }
-  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
+  thisStaff.Config.HideByIdeal = !thisStaff.Config.HideByIdeal
+  s.Save()
+  week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff, week))
 }
 
 func (s *Server) HandleToggleHideByPreferences(w http.ResponseWriter, r *http.Request) {
-  s.HideByPrefs = !s.HideByPrefs
-  SaveState(s)
   thisStaff := s.GetSessionUser(w, r)
   if (thisStaff == nil) {
     return
   }
-  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
+  thisStaff.Config.HideByPrefs = !thisStaff.Config.HideByPrefs
+  s.Save()
+  week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff, week))
 }
 
 func (s *Server) HandleToggleHideByLeave(w http.ResponseWriter, r *http.Request) {
-  s.HideByLeave = !s.HideByLeave
-  SaveState(s)
   thisStaff := s.GetSessionUser(w, r)
   if (thisStaff == nil) {
     return
   }
-  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
+  thisStaff.Config.HideByLeave = !thisStaff.Config.HideByLeave
+  s.Save()
+  week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff, week))
 }
 
 func (s *Server) HandleToggleLive(w http.ResponseWriter, r *http.Request) {
-  s.IsLive = !s.IsLive
-  SaveState(s)
   thisStaff := s.GetSessionUser(w, r)
   if (thisStaff == nil) {
     return
   }
-  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
+  week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+  week.IsLive = !week.IsLive
+  week.Save()
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff, week))
 }
 
 type ToggleAmeliaBody struct {
@@ -595,19 +616,20 @@ func (s *Server) HandleToggleAmelia(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  day := s.GetDayByID(dayID)
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+  day := week.GetDayByID(dayID)
   if day == nil {
     log.Printf("Invalid dayID: %v", err)
     w.WriteHeader(http.StatusBadRequest)
     return
   }
   day.AmeliaOpen = !day.AmeliaOpen
-  SaveState(s)
-  thisStaff := s.GetSessionUser(w, r)
-  if (thisStaff == nil) {
-    return
-  }
-  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
+  week.Save()
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff, week))
 }
 
 type ToggleClosedBody struct {
@@ -623,19 +645,20 @@ func (s *Server) HandleToggleClosed(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  day := s.GetDayByID(dayID)
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+  day := week.GetDayByID(dayID)
   if day == nil {
     log.Printf("Invalid dayID: %v", err)
     w.WriteHeader(http.StatusBadRequest)
     return
   }
   day.IsClosed = !day.IsClosed
-  SaveState(s)
-  thisStaff := s.GetSessionUser(w, r)
-  if (thisStaff == nil) {
-    return
-  }
-  s.renderTemplate(w, "rosterDat", MakeDayStruct(*day, *s, *thisStaff))
+  week.Save()
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff, week))
 }
 
 type AddTrialBody struct {
@@ -654,12 +677,13 @@ func (s *Server) HandleAddTrial(w http.ResponseWriter, r *http.Request) {
   }))
   s.Staff = &newStaff
 
-  SaveState(s)
+  s.Save()
   thisStaff := s.GetSessionUser(w, r)
   if (thisStaff == nil) {
     return
   }
-  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
+  week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff, week))
 }
 
 type ShiftWindowBody struct {
@@ -667,27 +691,28 @@ type ShiftWindowBody struct {
 }
 
 func (s *Server) HandleShiftWindow(w http.ResponseWriter, r *http.Request) {
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
   var reqBody ShiftWindowBody
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
   switch reqBody.Action {
   case "+":
-    s.StartDate = s.StartDate.AddDate(0, 0, 7)
+    thisStaff.Config.RosterStartDate = thisStaff.Config.RosterStartDate.AddDate(0, 0, 7)
   case "-":
-    s.StartDate = s.StartDate.AddDate(0, 0, -7)
+    thisStaff.Config.RosterStartDate = thisStaff.Config.RosterStartDate.AddDate(0, 0, -7)
   default:
     today := time.Now()
     daysUntilTuesday := int(time.Tuesday - today.Weekday())
     if daysUntilTuesday <= 0 {
       daysUntilTuesday += 7
     }
-    s.StartDate = today.AddDate(0, 0, daysUntilTuesday)
+    thisStaff.Config.RosterStartDate = today.AddDate(0, 0, daysUntilTuesday)
   }
-  SaveState(s)
-  thisStaff := s.GetSessionUser(w, r)
-  if (thisStaff == nil) {
-    return
-  }
-  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
+  s.Save()
+  week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff, week))
 }
 
 type ModifyRowsBody struct {
@@ -710,18 +735,90 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
     return
   }
 
-  for i := range s.Days {
-    if s.Days[i].ID == dayID {
+  week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+  for i := range week.Days {
+    if week.Days[i].ID == dayID {
       if reqBody.Action == "+" {
-        s.Days[i].Rows = append(s.Days[i].Rows, newRow())
+        week.Days[i].Rows = append(week.Days[i].Rows, newRow())
       } else {
-        if len(s.Days[i].Rows) > 4 {
-          s.Days[i].Rows = s.Days[i].Rows[:len(s.Days[i].Rows)-1]
+        if len(week.Days[i].Rows) > 4 {
+          week.Days[i].Rows = week.Days[i].Rows[:len(week.Days[i].Rows)-1]
         }
       }
-      SaveState(s)
-      s.renderTemplate(w, "rosterDay", MakeDayStruct(*s.Days[i], *s, *thisStaff))
+      week.Save()
+      s.renderTemplate(w, "rosterDay", MakeDayStruct(week.IsLive, *week.Days[i], *s, *thisStaff))
       break
     }
   }
+}
+
+
+func duplicateRosterWeek(startDate time.Time, src RosterWeek) RosterWeek {
+  newWeek := RosterWeek{
+    ID:        uuid.New(),
+    StartDate: startDate,
+    IsLive:    false,
+    Days:      make([]*RosterDay, len(src.Days)),
+  }
+
+  for i, day := range src.Days {
+    newDay := &RosterDay{
+      ID:          uuid.New(),
+      DayName:     day.DayName,
+      Colour:      day.Colour,
+      Offset:      day.Offset,
+      IsClosed:    day.IsClosed,
+      AmeliaOpen:  day.AmeliaOpen,
+      Rows:        make([]*Row, len(day.Rows)),
+    }
+    for j, row := range day.Rows {
+      newRow := &Row{
+        ID:    uuid.New(),
+        Amelia: duplicateSlot(row.Amelia),
+        Early:  duplicateSlot(row.Early),
+        Mid:    duplicateSlot(row.Mid),
+        Late:   duplicateSlot(row.Late),
+      }
+      newDay.Rows[j] = newRow
+    }
+    newWeek.Days[i] = newDay
+  }
+
+  return newWeek
+}
+
+func duplicateSlot(src Slot) Slot {
+  var newAssignedStaff *uuid.UUID
+  if src.AssignedStaff != nil {
+    newStaffID := *src.AssignedStaff // Copy the UUID value
+    newAssignedStaff = &newStaffID
+  }
+
+  var newStaffString *string
+  if src.StaffString != nil {
+    newString := *src.StaffString // Copy the string value
+    newStaffString = &newString
+  }
+
+  return Slot{
+    ID:            uuid.New(),
+    StartTime:     src.StartTime,
+    AssignedStaff: newAssignedStaff,
+    StaffString:   newStaffString,
+    Flag:          src.Flag,
+    Description:   src.Description,
+  }
+}
+
+func (s *Server) HandleImportRosterWeek(w http.ResponseWriter, r *http.Request) {
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
+  log.Println("Importing")
+  lastWeekDate := thisStaff.Config.RosterStartDate.AddDate(0, 0, -7)
+  lastWeek := LoadRosterWeek(lastWeekDate)
+  thisWeek := duplicateRosterWeek(thisStaff.Config.RosterStartDate, lastWeek)
+  thisWeek.Save()
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff, thisWeek))
 }

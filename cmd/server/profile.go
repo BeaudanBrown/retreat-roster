@@ -176,7 +176,7 @@ func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(http.StatusBadRequest)
         return
       }
-      staff := s.GetStaffByID(editStaffId)
+      staff := GetStaffByID(editStaffId, *s.Staff)
       if staff != nil {
         editStaff = staff
       } else {
@@ -193,7 +193,7 @@ func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
     CacheBust: s.CacheBust,
     StaffMember: *editStaff,
     AdminRights: adminRights,
-    RosterLive: s.IsLive,
+    RosterLive: LoadRosterWeek(editStaff.Config.RosterStartDate).IsLive,
   }
 
   err := s.Templates.ExecuteTemplate(w, "profileIndex", data)
@@ -208,11 +208,10 @@ func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
   if (staff == nil) {
     return
   }
-
   data := ProfileData{
     AdminRights: staff.IsAdmin,
     StaffMember: *staff,
-    RosterLive: s.IsLive,
+    RosterLive: LoadRosterWeek(staff.Config.RosterStartDate).IsLive,
   }
   s.renderTemplate(w, "profile", data)
 }
@@ -230,14 +229,14 @@ func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
   }
   data := ProfileData{
     AdminRights: staff.IsAdmin,
-    RosterLive: s.IsLive,
+    RosterLive: LoadRosterWeek(staff.Config.RosterStartDate).IsLive,
   }
   if reqBody.StartDate.After(*reqBody.EndDate.Time) {
     data.ShowLeaveError = true
   } else {
     data.ShowLeaveSuccess = true
     staff.LeaveRequests = append(staff.LeaveRequests, reqBody)
-    SaveState(s)
+    s.Save()
   }
   data.StaffMember = *staff
   s.renderTemplate(w, "profile", data)
@@ -286,7 +285,7 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  staff := s.GetStaffByID(staffID)
+  staff := GetStaffByID(staffID, *s.Staff)
   if (staff == nil) {
     return
   }
@@ -356,10 +355,10 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
   data := ProfileData{
     AdminRights: activeStaff.IsAdmin,
     StaffMember: *staff,
-    RosterLive: s.IsLive,
+    RosterLive: LoadRosterWeek(staff.Config.RosterStartDate).IsLive,
     ShowUpdateSuccess: true,
   }
-  SaveState(s)
+  s.Save()
   s.renderTemplate(w, "profile", data)
 }
 
@@ -392,7 +391,7 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
         }
         if thisStaff.IsAdmin || staff.ID == thisStaff.ID {
           staff.LeaveRequests = append(staff.LeaveRequests[:i], staff.LeaveRequests[i+1:]...)
-          SaveState(s)
+          s.Save()
           found = true
         }
         break
@@ -403,12 +402,13 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
     }
   }
   if adminDelete {
-    s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
+    week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+    s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff, week))
   } else {
     data := ProfileData{
       StaffMember: *thisStaff,
       AdminRights: thisStaff.IsAdmin,
-      RosterLive: s.IsLive,
+      RosterLive: LoadRosterWeek(thisStaff.Config.RosterStartDate).IsLive,
     }
     s.renderTemplate(w, "profile", data)
   }
@@ -437,7 +437,9 @@ func (s *Server) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
     }
   }
 
-  for _, day := range s.Days {
+  rosterWeek := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+
+  for _, day := range rosterWeek.Days {
     for _, row := range day.Rows {
       if row.Amelia.AssignedStaff != nil && *row.Amelia.AssignedStaff == accID {
         row.Amelia.AssignedStaff = nil
@@ -458,7 +460,7 @@ func (s *Server) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
     }
   }
 
-  SaveState(s)
+  s.Save()
   if selfDelete {
     s.HandleGoogleLogout(w, r)
   } else {
