@@ -163,7 +163,11 @@ func (s *Server) CheckFlags() {
           }
           if staff != nil {
             if !staff.Availability[i].Early {
-              row.Early.Flag = PrefConflict
+              if !staff.Availability[i].Mid && !staff.Availability[i].Late {
+                row.Early.Flag = PrefRefuse
+              } else {
+                row.Early.Flag = PrefConflict
+              }
             }
           }
         }
@@ -182,7 +186,11 @@ func (s *Server) CheckFlags() {
               }
             }
             if !staff.Availability[i].Mid {
-              row.Mid.Flag = PrefConflict
+              if !staff.Availability[i].Early && !staff.Availability[i].Late {
+                row.Mid.Flag = PrefRefuse
+              } else {
+                row.Mid.Flag = PrefConflict
+              }
             }
           }
         }
@@ -201,7 +209,11 @@ func (s *Server) CheckFlags() {
           }
           if staff != nil {
             if !staff.Availability[i].Late {
-              row.Late.Flag = PrefConflict
+              if !staff.Availability[i].Early && !staff.Availability[i].Mid {
+                row.Late.Flag = PrefRefuse
+              } else {
+                row.Late.Flag = PrefConflict
+              }
             }
           }
         }

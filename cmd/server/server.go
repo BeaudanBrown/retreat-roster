@@ -30,6 +30,7 @@ const (
   None Highlight = iota
   Duplicate
   PrefConflict
+  PrefRefuse
   LeaveConflict
 )
 
@@ -40,7 +41,7 @@ func GetHighlightCol(defaultCol string, flag Highlight) string {
   if flag == PrefConflict {
     return "#FF9999"
   }
-  if flag == LeaveConflict {
+  if flag == LeaveConflict || flag == PrefRefuse {
     return "#CC3333"
   }
   return defaultCol
