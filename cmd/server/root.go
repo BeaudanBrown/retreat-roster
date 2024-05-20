@@ -66,22 +66,16 @@ type DayStruct struct {
   Date time.Time
   IsLive bool
   ActiveStaff StaffMember
-  HideByIdeal bool
-  HideByPrefs bool
-  HideByLeave bool
 }
 
-func MakeDayStruct(day RosterDay, s Server, activeStaff StaffMember) DayStruct {
-  date :=  s.StartDate.AddDate(0, 0, day.Offset)
+func MakeDayStruct(isLive bool, day RosterDay, s Server, activeStaff StaffMember) DayStruct {
+  date :=  activeStaff.Config.RosterStartDate.AddDate(0, 0, day.Offset)
   return DayStruct{
     day,
     s.Staff,
     date,
-    s.IsLive,
+    isLive,
     activeStaff,
-    s.HideByIdeal,
-    s.HideByPrefs,
-    s.HideByLeave,
   }
 }
 
@@ -256,17 +250,18 @@ func MemberIsAssigned(activeID uuid.UUID, assignedID *uuid.UUID) bool {
   return *assignedID == activeID
 }
 
-func (s *Server) HandleRoot(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
   thisStaff := s.GetSessionUser(w, r)
   if (thisStaff == nil) {
     return
   }
-  if !thisStaff.IsAdmin && !s.IsLive {
+  week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+  if !thisStaff.IsAdmin && !week.IsLive {
     w.Header().Set("HX-Redirect", "/profile")
     w.WriteHeader(http.StatusOK)
     return
   }
-  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff))
+  s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff, week))
 }
 
 func googleOauthConfig() *oauth2.Config {

@@ -77,36 +77,31 @@ type TimesheetData struct {
   StaffMember StaffMember
   DayNames []string
   StaffMap map[uuid.UUID]StaffMember
-  HideApproved  bool
   RosterLive  bool
-  ApprovalMode  bool
   CacheBust  string
 }
 
-func (s *Server) MakeTimesheetStruct(staffMember StaffMember) TimesheetData {
-  t, err := LoadWeek(s.TimesheetStartDate)
+func (s *Server) MakeTimesheetStruct(activeStaff StaffMember) TimesheetData {
+  t, err := LoadWeek(activeStaff.Config.TimesheetStartDate)
   if err != nil {
     log.Fatalf("Failed to load timesheet week: %v", err)
   }
   return TimesheetData{
-    RosterLive: s.IsLive,
     TimesheetWeekState: *t,
-    StaffMember: staffMember,
+    StaffMember: activeStaff,
     DayNames: []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"},
-    HideApproved: s.HideApproved,
     StaffMap: s.GetStaffMap(),
-    ApprovalMode: s.ApprovalMode,
     CacheBust: s.CacheBust,
   }
 }
 
-func getStaffTimesheetWeek(startDate time.Time, staffID uuid.UUID) *TimesheetWeek {
-  t, err := LoadWeek(startDate)
+func getStaffTimesheetWeek(staffMember StaffMember) *TimesheetWeek {
+  t, err := LoadWeek(staffMember.Config.TimesheetStartDate)
   if err != nil {
     log.Printf("Failed to load timesheet week: %v", err)
     return nil
   }
-  thisStaffWeek := t.getTimesheetWeek(staffID)
+  thisStaffWeek := t.getTimesheetWeek(staffMember.ID)
   return thisStaffWeek
 }
 
@@ -134,7 +129,7 @@ func (s *Server) HandleTimesheet(w http.ResponseWriter, r *http.Request) {
   if (thisStaff == nil) {
     return
   }
-  thisStaffWeek := getStaffTimesheetWeek(s.TimesheetStartDate, thisStaff.ID)
+  thisStaffWeek := getStaffTimesheetWeek(*thisStaff)
   if (thisStaffWeek == nil) {
     return
   }
@@ -191,7 +186,7 @@ func SaveTimesheetState(s *TimesheetWeekState) error {
 }
 
 func GetWeekFilename(startDate time.Time) string {
-    formattedDate := startDate.Format("2006-01-02") // Go uses this specific date as the layout pattern
+    formattedDate := startDate.Format("2006-01-02")
     return DATA_DIR + formattedDate + ".json"
 }
 
@@ -235,20 +230,24 @@ type ShiftTimesheetWindowBody struct {
 }
 
 func (s *Server) HandleShiftTimesheetWindow(w http.ResponseWriter, r *http.Request) {
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
   var reqBody ShiftTimesheetWindowBody
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
   switch reqBody.Action {
   case "+":
-    s.TimesheetStartDate = s.TimesheetStartDate.AddDate(0, 0, 7)
+    thisStaff.Config.TimesheetStartDate = thisStaff.Config.TimesheetStartDate.AddDate(0, 0, 7)
   case "-":
-    s.TimesheetStartDate = s.TimesheetStartDate.AddDate(0, 0, -7)
+    thisStaff.Config.TimesheetStartDate = thisStaff.Config.TimesheetStartDate.AddDate(0, 0, -7)
   default:
     today := time.Now()
     daysSinceTuesday := int(today.Weekday() - time.Tuesday)
     if daysSinceTuesday < 0 {
         daysSinceTuesday += 7
     }
-    s.TimesheetStartDate = today.AddDate(0, 0, -daysSinceTuesday)
+    thisStaff.Config.TimesheetStartDate = today.AddDate(0, 0, -daysSinceTuesday)
   }
   SaveState(s)
   s.RenderTimesheetTemplate(w, r, reqBody.AdminView)
@@ -425,22 +424,22 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
 }
 
 func (s *Server) HandleToggleApprovalMode(w http.ResponseWriter, r *http.Request) {
-  s.ApprovalMode = !s.ApprovalMode
   SaveState(s)
   thisStaff := s.GetSessionUser(w, r)
   if (thisStaff == nil) {
     return
   }
+  thisStaff.Config.ApprovalMode = !thisStaff.Config.ApprovalMode
   s.RenderTimesheetTemplate(w, r, thisStaff.IsAdmin)
 }
 
 func (s *Server) HandleToggleHideApproved(w http.ResponseWriter, r *http.Request) {
-  s.HideApproved = !s.HideApproved
   SaveState(s)
   thisStaff := s.GetSessionUser(w, r)
   if (thisStaff == nil) {
     return
   }
+  thisStaff.Config.HideApproved = !thisStaff.Config.HideApproved
   s.RenderTimesheetTemplate(w, r, thisStaff.IsAdmin)
 }
 

@@ -1,11 +1,11 @@
 {{ define "timesheet" }}
 {{ $staffMember := .StaffMember }}
+{{ $config := .StaffMember.Config }}
 {{ $staffTimesheets := .StaffTimesheets }}
-{{ $startDate := .StartDate }}
-{{ $approvalMode := .ApprovalMode }}
-{{ $adminView := and .ApprovalMode .StaffMember.IsAdmin }}
+{{ $approvalMode := $config.ApprovalMode }}
+{{ $adminView := and $approvalMode .StaffMember.IsAdmin }}
 {{ $staffMap := .StaffMap }}
-{{ $hideApproved := .HideApproved }}
+{{ $hideApproved := $config.HideApproved }}
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html>
   <head>
@@ -25,14 +25,14 @@
                 hx-get="/toggleApprovalMode"
                 hx-target="#timesheet"
                 hx-swap='outerHTML'>
-          <input type="checkbox" {{ if .ApprovalMode }}checked{{ end }}>
+          <input type="checkbox" {{ if $approvalMode }}checked{{ end }}>
           <label>Approval mode</label>
         </button>
         <button class="checkLabel"
                 hx-get="/toggleHideApproved"
                 hx-target="#timesheet"
                 hx-swap='outerHTML'>
-          <input type="checkbox" {{ if .HideApproved }}checked{{ end }}>
+          <input type="checkbox" {{ if $hideApproved }}checked{{ end }}>
           <label>Hide approved</label>
         </button>
       </div>
@@ -63,7 +63,7 @@
         </button>
       </div>
       <div>
-        <h3>Week {{$startDate.Format "02/01"}} - {{(addDays $startDate 7).Format "02/01"}}</h3>
+        <h3>Week {{$config.TimesheetStartDate.Format "02/01"}} - {{(addDays $config.TimesheetStartDate 7).Format "02/01"}}</h3>
       </div>
       <div class="week-form">
         <div class="timesheetDay day-header">
@@ -79,7 +79,7 @@
             {{ if not $adminView }}
               <button class="add-entry-btn"
                       hx-post='/addTimesheetEntry' hx-ext='json-enc'
-                      hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "dayIdx":{{$idx}}, "start-date":"{{$startDate}}"}'
+                      hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "dayIdx":{{$idx}}, "start-date":"{{$config.TimesheetStartDate}}"}'
                       hx-swap='outerHTML' hx-target='#timesheet'>+</button>
             {{ end }}
             <h3>{{$dayName}}</h3>
@@ -89,13 +89,13 @@
             {{ if not $adminView }}
               {{ if (eq $staffID $staffMember.ID) }}
                 {{ range $day.Entries }}
-                  {{ template "timesheetEntry" (MakeTimesheetEntryStruct . (index $staffMap $staffID) $startDate $approvalMode $staffMember.IsAdmin) }}
+                  {{ template "timesheetEntry" (MakeTimesheetEntryStruct . (index $staffMap $staffID) $config.TimesheetStartDate $approvalMode $staffMember.IsAdmin) }}
                 {{ end }}
               {{ end }}
             {{ else }}
               {{ range $day.Entries }}
                 {{ if not (and (eq .Status 2) $hideApproved)}}
-                  {{ template "timesheetEntry" (MakeTimesheetEntryStruct . (index $staffMap $staffID) $startDate $approvalMode $staffMember.IsAdmin) }}
+                  {{ template "timesheetEntry" (MakeTimesheetEntryStruct . (index $staffMap $staffID) $config.TimesheetStartDate $approvalMode $staffMember.IsAdmin) }}
                 {{ end }}
               {{ end }}
             {{ end }}

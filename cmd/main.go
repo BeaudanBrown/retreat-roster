@@ -23,7 +23,6 @@ func main() {
     http.ServeFile(w, r, "./www/app.css")
   })
   http.HandleFunc("/timesheets", s.VerifySession(s.HandleTimesheet))
-  http.HandleFunc("/root", s.VerifySession(s.HandleRoot))
   http.HandleFunc("/submitLeave", s.VerifySession(s.HandleSubmitLeave))
   http.HandleFunc("/profile", s.VerifySession(s.HandleProfileIndex))
   http.HandleFunc("/profileBody", s.VerifySession(s.HandleProfile))

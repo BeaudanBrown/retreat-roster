@@ -7,9 +7,10 @@
   {{ $isClosed := .IsClosed }}
   {{ $isLive := .IsLive }}
   {{ $ameliaOpen := .AmeliaOpen }}
-  {{ $hideByIdeal := .HideByIdeal }}
-  {{ $hideByLeave := .HideByLeave }}
-  {{ $hideByPrefs := .HideByPrefs }}
+  {{ $config := .ActiveStaff.Config }}
+  {{ $hideByIdeal := $config.HideByIdeal }}
+  {{ $hideByLeave := $config.HideByLeave }}
+  {{ $hideByPrefs := $config.HideByPrefs }}
   {{ $offset := .Offset }}
   {{ $colour := .Colour }}
   {{range $index, $row := .Rows}}

@@ -21,7 +21,18 @@ const DEV_MODE = false
 type Server struct {
   CacheBust string
   Templates *template.Template
-  ServerDisc
+  StaffState
+}
+
+type StaffState struct {
+  Staff *[]*StaffMember `json:"staff"`
+}
+
+type RosterWeek struct {
+  ID uuid.UUID
+  StartDate  time.Time   `json:"startDate"`
+  Days  []*RosterDay   `json:"days"`
+  IsLive         bool `json:"isLive"`
 }
 
 type Highlight int
@@ -317,14 +328,6 @@ func (s *Server) GetDayByID(dayID uuid.UUID) *RosterDay {
 
 func (s *Server) HandleLanding(w http.ResponseWriter, r *http.Request) {
   s.renderTemplate(w, "landing", s.CacheBust)
-}
-
-func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
-  thisStaff := s.GetSessionUser(w, r)
-  if (thisStaff == nil) {
-    return
-  }
-  s.renderTemplate(w, "index", s.MakeRootStruct(*s, *thisStaff))
 }
 
 type HeaderData struct {

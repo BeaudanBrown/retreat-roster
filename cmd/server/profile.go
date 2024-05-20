@@ -39,6 +39,16 @@ func MakeProfileStruct(rosterLive bool, staffMember StaffMember, adminRights boo
   }
 }
 
+type StaffConfig struct {
+  TimesheetStartDate  time.Time
+  RosterStartDate  time.Time
+  HideByIdeal         bool
+  HideByPrefs         bool
+  HideByLeave         bool
+  HideApproved  bool
+  ApprovalMode  bool
+}
+
 type StaffMember struct {
   ID   uuid.UUID
   IsAdmin   bool
@@ -57,6 +67,7 @@ type StaffMember struct {
   Availability []DayAvailability
   Token *uuid.UUID
   LeaveRequests	[]LeaveRequest
+  Config	StaffConfig
 }
 
 type CustomDate struct {
