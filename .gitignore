@@ -2,4 +2,8 @@ dist
 data
 state.json
 .env
+.envrc
 .prodenv
+.devenv/
+.direnv/
+.envrc
