@@ -242,14 +242,9 @@ func (s *Server) HandleShiftTimesheetWindow(w http.ResponseWriter, r *http.Reque
   case "-":
     thisStaff.Config.TimesheetStartDate = thisStaff.Config.TimesheetStartDate.AddDate(0, 0, -7)
   default:
-    today := time.Now()
-    daysSinceTuesday := int(today.Weekday() - time.Tuesday)
-    if daysSinceTuesday < 0 {
-        daysSinceTuesday += 7
-    }
-    thisStaff.Config.TimesheetStartDate = today.AddDate(0, 0, -daysSinceTuesday)
+    thisStaff.Config.TimesheetStartDate = GetLastTuesday()
   }
-  s.Save()
+  s.SaveStaffMember(*thisStaff)
   s.RenderTimesheetTemplate(w, r, reqBody.AdminView)
 }
 
@@ -429,7 +424,7 @@ func (s *Server) HandleToggleApprovalMode(w http.ResponseWriter, r *http.Request
     return
   }
   thisStaff.Config.ApprovalMode = !thisStaff.Config.ApprovalMode
-  s.Save()
+  s.SaveStaffMember(*thisStaff)
   s.RenderTimesheetTemplate(w, r, thisStaff.IsAdmin)
 }
 
@@ -439,7 +434,7 @@ func (s *Server) HandleToggleHideApproved(w http.ResponseWriter, r *http.Request
     return
   }
   thisStaff.Config.HideApproved = !thisStaff.Config.HideApproved
-  s.Save()
+  s.SaveStaffMember(*thisStaff)
   s.RenderTimesheetTemplate(w, r, thisStaff.IsAdmin)
 }
 

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type ProfileIndexBody struct {
@@ -102,9 +103,9 @@ func (cd *CustomDate) UnmarshalJSON(input []byte) error {
 type LeaveRequest struct {
   ID uuid.UUID
   CreationDate CustomDate
-  Reason string	`json:"reason"`
-  StartDate CustomDate	`json:"start-date"`
-  EndDate CustomDate	`json:"end-date"`
+  Reason string	`bson:"reason"`
+  StartDate CustomDate	`bson:"start-date"`
+  EndDate CustomDate	`bson:"end-date"`
 }
 
 type DayAvailability struct {
@@ -112,6 +113,25 @@ type DayAvailability struct {
   Early   bool
   Mid   bool
   Late   bool
+}
+
+func GetLastTuesday() (time.Time) {
+  today := time.Now()
+  daysSinceTuesday := int(today.Weekday() - time.Tuesday)
+  if daysSinceTuesday < 0 {
+      daysSinceTuesday += 7
+  }
+  return today.AddDate(0, 0, -daysSinceTuesday)
+}
+
+
+func GetNextTuesday() (time.Time) {
+  today := time.Now()
+  daysUntilTuesday := int(time.Tuesday - today.Weekday())
+  if daysUntilTuesday <= 0 {
+    daysUntilTuesday += 7
+  }
+  return today.AddDate(0, 0, daysUntilTuesday)
 }
 
 var emptyAvailability = []DayAvailability{
@@ -176,7 +196,7 @@ func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(http.StatusBadRequest)
         return
       }
-      staff := GetStaffByID(editStaffId, *s.Staff)
+      staff := s.GetStaffByID(editStaffId)
       if staff != nil {
         editStaff = staff
       } else {
@@ -193,7 +213,7 @@ func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
     CacheBust: s.CacheBust,
     StaffMember: *editStaff,
     AdminRights: adminRights,
-    RosterLive: LoadRosterWeek(editStaff.Config.RosterStartDate).IsLive,
+    RosterLive: s.LoadRosterWeek(editStaff.Config.RosterStartDate).IsLive,
   }
 
   err := s.Templates.ExecuteTemplate(w, "profileIndex", data)
@@ -211,7 +231,7 @@ func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
   data := ProfileData{
     AdminRights: staff.IsAdmin,
     StaffMember: *staff,
-    RosterLive: LoadRosterWeek(staff.Config.RosterStartDate).IsLive,
+    RosterLive: s.LoadRosterWeek(staff.Config.RosterStartDate).IsLive,
   }
   s.renderTemplate(w, "profile", data)
 }
@@ -229,14 +249,14 @@ func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
   }
   data := ProfileData{
     AdminRights: staff.IsAdmin,
-    RosterLive: LoadRosterWeek(staff.Config.RosterStartDate).IsLive,
+    RosterLive: s.LoadRosterWeek(staff.Config.RosterStartDate).IsLive,
   }
   if reqBody.StartDate.After(*reqBody.EndDate.Time) {
     data.ShowLeaveError = true
   } else {
     data.ShowLeaveSuccess = true
     staff.LeaveRequests = append(staff.LeaveRequests, reqBody)
-    s.Save()
+    s.SaveStaffMember(*staff)
   }
   data.StaffMember = *staff
   s.renderTemplate(w, "profile", data)
@@ -285,7 +305,7 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  staff := GetStaffByID(staffID, *s.Staff)
+  staff := s.GetStaffByID(staffID)
   if (staff == nil) {
     return
   }
@@ -355,10 +375,10 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
   data := ProfileData{
     AdminRights: activeStaff.IsAdmin,
     StaffMember: *staff,
-    RosterLive: LoadRosterWeek(staff.Config.RosterStartDate).IsLive,
+    RosterLive: s.LoadRosterWeek(staff.Config.RosterStartDate).IsLive,
     ShowUpdateSuccess: true,
   }
-  s.Save()
+  s.SaveStaffMember(*staff)
   s.renderTemplate(w, "profile", data)
 }
 
@@ -381,34 +401,20 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
     return
   }
 
-  found := false
-  adminDelete := false
-  for _, staff := range *s.Staff {
-    for i, leaveReq := range staff.LeaveRequests {
-      if leaveReq.ID == leaveID {
-        if thisStaff.IsAdmin && staff.ID != thisStaff.ID {
-          adminDelete = true
-        }
-        if thisStaff.IsAdmin || staff.ID == thisStaff.ID {
-          staff.LeaveRequests = append(staff.LeaveRequests[:i], staff.LeaveRequests[i+1:]...)
-          s.Save()
-          found = true
-        }
-        break
-      }
-    }
-    if found {
-      break
-    }
+  staffMember := s.GetStaffByLeaveReqID(leaveID)
+  if staffMember != nil {
+    s.DeleteLeaveReqByID(*staffMember, leaveID)
   }
+
+  adminDelete := thisStaff.ID != staffMember.ID
   if adminDelete {
-    week := LoadRosterWeek(thisStaff.Config.RosterStartDate)
-    s.renderTemplate(w, "root", s.MakeRootStruct(*s, *thisStaff, week))
+    week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+    s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
   } else {
     data := ProfileData{
       StaffMember: *thisStaff,
       AdminRights: thisStaff.IsAdmin,
-      RosterLive: LoadRosterWeek(thisStaff.Config.RosterStartDate).IsLive,
+      RosterLive: s.LoadRosterWeek(thisStaff.Config.RosterStartDate).IsLive,
     }
     s.renderTemplate(w, "profile", data)
   }
@@ -422,22 +428,21 @@ func (s *Server) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
   var reqBody DeleteAccountBody
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
   accID, err := uuid.Parse(reqBody.ID)
-  if err != nil {
+  thisStaff := s.GetSessionUser(w, r)
+  if err != nil || thisStaff == nil {
     log.Printf("Invalid accID: %v", err)
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  thisStaff := s.GetSessionUser(w, r)
-  selfDelete := thisStaff.ID == accID
-  for i, staff := range *s.Staff {
-    if staff.ID == accID {
-      newStaff := append((*s.Staff)[:i], (*s.Staff)[i+1:]...)
-      s.Staff = &newStaff
-      break
-    }
+  collection := s.DB.Collection("staff")
+  filter := bson.M{"_id": accID}
+  _, err = collection.DeleteOne(s.Context, filter)
+  if err != nil {
+      log.Fatalf("Failed to delete document: %v", err)
   }
+  selfDelete := thisStaff.ID == accID
 
-  rosterWeek := LoadRosterWeek(thisStaff.Config.RosterStartDate)
+  rosterWeek := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 
   for _, day := range rosterWeek.Days {
     for _, row := range day.Rows {
@@ -460,14 +465,10 @@ func (s *Server) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
     }
   }
 
-  s.Save()
+  s.SaveRosterWeek(*rosterWeek)
   if selfDelete {
     s.HandleGoogleLogout(w, r)
   } else {
-    thisStaff := s.GetSessionUser(w, r)
-    if (thisStaff == nil) {
-      return
-    }
     w.Header().Set("HX-Redirect", "/")
     w.WriteHeader(http.StatusOK)
   }

@@ -1,45 +1,42 @@
 package main
 
 import (
-  "database/sql"
-  _ "github.com/lib/pq"
-  "log"
-	"fmt"
-  "os"
-  "net/http"
+	"context"
+	"log"
+	"net/http"
 
-  "github.com/joho/godotenv"
-  "roster/cmd/server"
+	"roster/cmd/server"
+	"roster/cmd/migrate"
+
+	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func main() {
   if err := godotenv.Load(); err != nil {
     log.Printf("No .env file found")
   }
+  ctx := context.TODO()
 
-  connStr := fmt.Sprintf("user=%v password=%v dbname=%v host=%v port=%v sslmode=disable",
-    os.Getenv("DB_USER"),
-    os.Getenv("DB_PASS"),
-    os.Getenv("DB_NAME"),
-    os.Getenv("DB_HOST"),
-    os.Getenv("DB_PORT"),
-  )
-  db, err := sql.Open("postgres", connStr)
+  clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
+  client, err := mongo.Connect(ctx, clientOptions)
   if err != nil {
-    log.Fatalf("Error opening database: %q", err)
+    log.Fatalf("Error connecting to database: %v", err)
   }
-  defer db.Close()
-  err = db.Ping()
+  db := client.Database("mongodb")
+  defer client.Disconnect(ctx)
+
+  s, err := server.LoadServerState(db, ctx)
   if err != nil {
-    log.Fatal(err)
+    log.Fatalf("Error loading server state: %v", err)
   }
 
-  log.Println("Successfully connected to the database!")
-
-  s, err := server.LoadServerState()
+  err = migrate.MigrateToMongo(s)
   if err != nil {
-    log.Fatalf("Error loading state: %v", err)
+    log.Printf("Error migrating old data: %v", err)
   }
+
   http.HandleFunc("/", s.VerifySession(s.HandleIndex))
   http.HandleFunc("/landing", s.HandleLanding)
 
@@ -83,6 +80,7 @@ func main() {
 
   log.Println(http.ListenAndServe(":6969", nil))
 }
+
 
 // func CleanAndSortLeaveReqs(staff []*StaffMember) []LeaveRequest {
 //   reqList := []LeaveRequest{}

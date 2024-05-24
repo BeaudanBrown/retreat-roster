@@ -23,7 +23,10 @@
       devShells = forEachSystem
         (system:
           let
-            pkgs = nixpkgs.legacyPackages.${system};
+            pkgs = import nixpkgs {
+              inherit system;
+              config.allowUnfree = true;
+            };
           in
           {
             default = devenv.lib.mkShell {
@@ -34,35 +37,10 @@
 
                   languages.go.enable = true;
 
-                  services.postgres = {
+                  services.mongodb = {
                     enable = true;
-                    initialDatabases = [{
-                      name = "rosterdb";
-                    }];
-                    listen_addresses = "127.0.0.1";
-                    port = 16969;
-                    initialScript = ''
-CREATE TABLE staff (
-    id UUID PRIMARY KEY,
-    data JSONB NOT NULL
-);
-
-CREATE TABLE rosters (
-    id UUID PRIMARY KEY,
-    data JSONB NOT NULL
-);
-
-CREATE TABLE timesheets (
-    id UUID PRIMARY KEY,
-    data JSONB NOT NULL
-);
-
-CREATE INDEX idx_staff_data ON staff USING gin (data);
-CREATE INDEX idx_rosters_data ON rosters USING gin (data);
-CREATE INDEX idx_timesheets_data ON timesheets USING gin (data);
-CREATE USER rosterdb;
-GRANT ALL PRIVILEGES ON DATABASE rosterdb TO rosterdb;
-                    '';
+                    initDatabasePassword = "mongodb";
+                    initDatabaseUsername = "mongodb";
                   };
 
                 }

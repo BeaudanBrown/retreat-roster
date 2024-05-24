@@ -3,8 +3,7 @@ DIST_FOLDER=./dist
 
 .PHONY: build
 
-run-clean:
-	rm data/state.json
+run:
 	go run cmd/main.go
 
 build:
