@@ -1,22 +1,21 @@
 package server
 
 import (
-	"encoding/json"
 	"log"
 	"math"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const DATA_DIR = "./data/timesheets/"
-
 type TimesheetWeekState struct {
-  ID uuid.UUID
-  StartDate  time.Time   `json:"startDate"`
-  StaffTimesheets map[uuid.UUID]*TimesheetWeek
+  ID uuid.UUID `bson:"_id"`
+  StartDate  time.Time   `bson:"startDate"`
+  StaffTimesheets map[uuid.UUID]*TimesheetWeek `bson:"staffTimesheets"`
 }
 
 type TimesheetWeek struct {
@@ -82,27 +81,18 @@ type TimesheetData struct {
 }
 
 func (s *Server) MakeTimesheetStruct(activeStaff StaffMember) TimesheetData {
-  t, err := LoadWeek(activeStaff.Config.TimesheetStartDate)
-  if err != nil {
-    log.Fatalf("Failed to load timesheet week: %v", err)
+  timesheetWeek := s.LoadTimesheetWeek(activeStaff.Config.TimesheetStartDate)
+  if timesheetWeek == nil {
+    log.Printf("Failed to load timesheet week when making struct")
   }
+
   return TimesheetData{
-    TimesheetWeekState: *t,
+    TimesheetWeekState: *timesheetWeek,
     StaffMember: activeStaff,
     DayNames: []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"},
     StaffMap: s.GetStaffMap(),
     CacheBust: s.CacheBust,
   }
-}
-
-func getStaffTimesheetWeek(staffMember StaffMember) *TimesheetWeek {
-  t, err := LoadWeek(staffMember.Config.TimesheetStartDate)
-  if err != nil {
-    log.Printf("Failed to load timesheet week: %v", err)
-    return nil
-  }
-  thisStaffWeek := t.getTimesheetWeek(staffMember.ID)
-  return thisStaffWeek
 }
 
 func (t *TimesheetWeek) getDayByID(dayID uuid.UUID) *TimesheetDay {
@@ -114,23 +104,19 @@ func (t *TimesheetWeek) getDayByID(dayID uuid.UUID) *TimesheetDay {
   return nil
 }
 
-func (t *TimesheetWeekState) getTimesheetWeek(staffID uuid.UUID) *TimesheetWeek {
+func (s *Server) GetStaffTimesheetWeek(staffID uuid.UUID, t *TimesheetWeekState) *TimesheetWeek {
   if timesheet, exists := t.StaffTimesheets[staffID]; exists {
     return timesheet
   }
   newWeek := newWeek()
   t.StaffTimesheets[staffID] = &newWeek
-  SaveTimesheetState(t)
+  s.SaveTimesheetState(t)
   return &newWeek
 }
 
 func (s *Server) HandleTimesheet(w http.ResponseWriter, r *http.Request) {
   thisStaff := s.GetSessionUser(w, r)
   if (thisStaff == nil) {
-    return
-  }
-  thisStaffWeek := getStaffTimesheetWeek(*thisStaff)
-  if (thisStaffWeek == nil) {
     return
   }
   data := s.MakeTimesheetStruct(*thisStaff)
@@ -169,49 +155,57 @@ func newWeek() TimesheetWeek {
   return w
 }
 
-func SaveTimesheetState(s *TimesheetWeekState) error {
-  data, err := json.Marshal(s)
+func (s *Server) SaveTimesheetWeek (w TimesheetWeekState) error {
+  collection := s.DB.Collection("timesheets")
+  filter := bson.M{"_id": w.ID}
+  update := bson.M{"$set": w}
+  opts := options.Update().SetUpsert(true)
+  _, err := collection.UpdateOne(s.Context, filter, update, opts)
   if err != nil {
-    log.Println("Error jsonifying timesheet week")
-    log.Println(err)
-    return err
+      log.Println("Failed to save timesheet week")
+      return err
   }
-  log.Println("Saving timesheet week")
-  if err := os.WriteFile(GetWeekFilename(s.StartDate), data, 0666); err != nil {
-    log.Println("Error saving timesheet week")
-    log.Println(err)
-    return err
-  }
+  log.Println("Saved timesheet week")
   return nil
 }
 
-func GetWeekFilename(startDate time.Time) string {
-    formattedDate := startDate.Format("2006-01-02")
-    return DATA_DIR + formattedDate + ".json"
+func (s *Server) SaveTimesheetState(timesheetWeek *TimesheetWeekState) error {
+  collection := s.DB.Collection("timesheets")
+  filter := bson.M{"_id": timesheetWeek.ID}
+  update := bson.M{"$set": timesheetWeek}
+  opts := options.Update().SetUpsert(true)
+  _, err := collection.UpdateOne(s.Context, filter, update, opts)
+  if err != nil {
+      log.Println("Failed to save timesheet week")
+      return err
+  }
+  log.Println("Saved staff timesheet week")
+  return nil
 }
 
-func LoadWeek(startDate time.Time) (*TimesheetWeekState, error) {
-  var s *TimesheetWeekState
-  var err error
-  filename := GetWeekFilename(startDate)
-  if _, err = os.Stat(filename); err != nil {
-    log.Println("Creating new timesheet week")
-    s = newTimesheetWeekState(startDate)
-    SaveTimesheetState(s)
-  } else {
-    var data []byte
-    if data, err = os.ReadFile(filename); err != nil {
-      log.Println("Failed to read timesheet week")
-      return nil, err
-    }
-    if err = json.Unmarshal(data, &s); err != nil {
-      log.Println("Failed to parse timesheet week")
-      return nil, err
-    }
+func (s *Server) LoadTimesheetWeek(startDate time.Time) (*TimesheetWeekState) {
+  var weekState *TimesheetWeekState
+  filter := bson.M{"startDate": startDate}
+  collection := s.DB.Collection("timesheets")
+  err := collection.FindOne(s.Context, filter).Decode(&weekState)
+  if err == nil {
+    log.Printf("Found timesheet week")
+    return weekState
   }
 
-  log.Println("Loaded timesheet week")
-  return s, nil
+  if err != mongo.ErrNoDocuments {
+    log.Printf("Error loading timesheet week: %v", err)
+    return nil
+  }
+
+  log.Printf("Making new timesheet week")
+  weekState = newTimesheetWeekState(startDate)
+  if saveErr := s.SaveTimesheetWeek(*weekState); saveErr != nil {
+    log.Printf("Error saving timesheet week: %v", saveErr)
+    return nil
+  }
+
+  return weekState
 }
 
 func (s *Server) RenderTimesheetTemplate(w http.ResponseWriter, r *http.Request, adminView bool) {
@@ -257,6 +251,10 @@ type DeleteTimesheetEntryBody struct {
 
 func (s *Server) HandleDeleteTimesheetEntry(w http.ResponseWriter, r *http.Request) {
   log.Println("Delete timesheet entry")
+  thisStaff := s.GetSessionUser(w, r)
+  if (thisStaff == nil) {
+    return
+  }
   var reqBody DeleteTimesheetEntryBody
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
   entryID, err := uuid.Parse(reqBody.EntryID)
@@ -271,24 +269,19 @@ func (s *Server) HandleDeleteTimesheetEntry(w http.ResponseWriter, r *http.Reque
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  t, err := LoadWeek(*reqBody.StartDate.Time)
-  if err != nil {
-    log.Printf("Failed to load timesheet week: %v", err)
+  timesheetWeek := s.LoadTimesheetWeek(*reqBody.StartDate.Time)
+  if timesheetWeek == nil {
+    log.Printf("Failed to load timesheet week when deleting")
     return
   }
-  thisStaffWeek := t.getTimesheetWeek(staffID)
-
-  thisStaff := s.GetSessionUser(w, r)
-  if (thisStaff == nil) {
-    return
-  }
+  thisStaffWeek := s.GetStaffTimesheetWeek(staffID, timesheetWeek)
   found := false
   for _, day := range thisStaffWeek.Days {
     for i, entry := range day.Entries {
       if entry.ID == entryID {
         if thisStaff.IsAdmin || staffID == thisStaff.ID {
           day.Entries = append(day.Entries[:i], day.Entries[i+1:]...)
-          SaveTimesheetState(t)
+          s.SaveTimesheetWeek(*timesheetWeek)
           found = true
         }
         break
@@ -315,13 +308,13 @@ func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request)
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  t, err := LoadWeek(*reqBody.StartDate.Time)
-  if err != nil {
+  timesheetWeek := s.LoadTimesheetWeek(*reqBody.StartDate.Time)
+  if timesheetWeek == nil {
     log.Printf("Failed to load timesheet week: %v", err)
     return
   }
-  week := t.getTimesheetWeek(staffID)
-  day := week.Days[reqBody.DayIdx]
+  staffTimesheetWeek := s.GetStaffTimesheetWeek(staffID, timesheetWeek)
+  day := staffTimesheetWeek.Days[reqBody.DayIdx]
   if day == nil {
     log.Printf("Could not find day: %v", err)
     w.WriteHeader(http.StatusBadRequest)
@@ -330,7 +323,7 @@ func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request)
   day.Entries = append(day.Entries, &TimesheetEntry{
     ID:      uuid.New(),
   })
-  SaveTimesheetState(t)
+  s.SaveTimesheetState(timesheetWeek)
   s.RenderTimesheetTemplate(w, r, reqBody.AdminView)
 }
 
@@ -368,18 +361,18 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
     return
   }
 
-  t, err := LoadWeek(*reqBody.StartDate.Time)
-  if err != nil {
-    log.Printf("Failed to load timesheet week: %v", err)
+  timesheetWeek := s.LoadTimesheetWeek(*reqBody.StartDate.Time)
+  if timesheetWeek == nil {
+    log.Printf("Failed to load timesheet week when modifying")
     return
   }
 
   found := false
-  for _, week := range t.StaffTimesheets {
+  for _, week := range timesheetWeek.StaffTimesheets {
     for _, day := range week.Days {
       for _, entry := range day.Entries {
         if entry.ID == entryID {
-          dayDate := t.StartDate.AddDate(0, 0, day.Offset)
+          dayDate := timesheetWeek.StartDate.AddDate(0, 0, day.Offset)
           found = true
           entry.Status = reqBody.Status
           entry.ShiftType = stringToShiftType(reqBody.ShiftType)
@@ -408,7 +401,7 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
           } else {
             entry.ShiftLength = 0
           }
-          SaveTimesheetState(t)
+          s.SaveTimesheetState(timesheetWeek)
           break
         }
       }

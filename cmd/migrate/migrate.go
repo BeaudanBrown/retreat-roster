@@ -1,135 +1,77 @@
 package migrate
 
 import (
-  "encoding/json"
-  "log"
-  "os"
-  "path/filepath"
-  "roster/cmd/server"
+	"encoding/json"
+	"log"
+	"os"
+	"roster/cmd/server"
+	"time"
+
+	"github.com/google/uuid"
 )
 
-const STAFF_STATE_FILE = "./data/staff.json"
-const ROSTER_DIR = "./data/rosters/"
-const MIGRATE_DIR = "./data-old/"
+type OldData struct {
+  StartDate time.Time
+  TimesheetStartDate time.Time
+  Staff *[]*server.StaffMember `bson:"staff"`
+  Days  []*server.RosterDay   `bson:"days"`
+  IsLive bool
+  HideByIdeal bool
+  HideByPrefs bool
+  HideByLeave bool
+  ApprovalMode bool
+}
+
+const STATE_FILE = "./data/state.json"
 
 func MigrateToMongo(s *server.Server) (error) {
-  err := MigrateAllRosterWeeks(s)
-  if err != nil {
-    return err
+  var state OldData
+  if _, err := os.Stat(STATE_FILE); err != nil {
+    log.Println("No state to migrate")
+    return nil
   }
-  err = MigrateStaffState(s)
+  data, err := os.ReadFile(STATE_FILE)
   if err != nil {
+    log.Printf("Couldn't read state file: %v", err)
+    return nil
+  }
+  if err = json.Unmarshal(data, &state); err != nil {
+    log.Printf("Couldn't unmarshal state file: %v", err)
+    return nil
+  }
+  for _, staffMember := range *state.Staff {
+    staffMember.Config = server.StaffConfig{
+      TimesheetStartDate: server.GetLastTuesday(),
+      RosterStartDate: server.GetNextTuesday(),
+    }
+    err = s.SaveStaffMember(*staffMember)
+    if err != nil {
+      log.Printf("Error while migrating staff: %v", err)
+      return err
+    }
+  }
+  rosterWeek := server.RosterWeek{
+    ID: uuid.New(),
+    StartDate: state.StartDate,
+    Days: state.Days,
+    IsLive: state.IsLive,
+  }
+  err = s.SaveRosterWeek(rosterWeek)
+  if err != nil {
+    log.Printf("Error while migrating roster week: %v", err)
     return err
   }
   MoveOldState()
   return nil
 }
 
-func MigrateAllRosterWeeks(s *server.Server) (error) {
-  if _, err := os.Stat(ROSTER_DIR); err != nil {
-    log.Println("No roster weeks to migrate")
-    return nil
-  }
-  err := filepath.Walk(ROSTER_DIR, func(filename string, info os.FileInfo, err error) error {
-    if err != nil {
-      return err
-    }
-    if info.IsDir() {
-      return nil
-    }
-    rosterWeek := LoadRosterWeek(filename)
-    if rosterWeek == nil {
-      return nil
-    }
-    err = s.SaveRosterWeek(*rosterWeek)
-    return err
-  })
-  return err
-}
-
-func LoadRosterWeek(filename string) *server.RosterWeek {
-  var rosterWeek server.RosterWeek
-  if _, err := os.Stat(filename); err != nil {
-    log.Println("No file")
-    return nil
-  }
-  data, err := os.ReadFile(filename)
-  if err != nil {
-    log.Println("No read file")
-    return nil
-  }
-  if err := json.Unmarshal(data, &rosterWeek); err != nil {
-    log.Println("No json file")
-    return nil
-  }
-  log.Println("Loaded rosterWeek")
-  return &rosterWeek
-}
-
-func MigrateStaffState(s *server.Server) (error) {
-  staffState := LoadStaffState()
-  if staffState == nil {
-    return nil
-  }
-  for _, staffMember := range *staffState.Staff {
-    err := s.SaveStaffMember(*staffMember)
-    if err != nil {
-      return err
-    }
-  }
-  return nil
-}
-
-func LoadStaffState() *server.StaffState {
-  var staffState server.StaffState
-
-  if _, err := os.Stat(STAFF_STATE_FILE); err != nil {
-    log.Println("No staff to migrate")
-    return nil
-  }
-
-  // Read the file
-  data, err := os.ReadFile(STAFF_STATE_FILE)
-  if err != nil {
-    log.Println(err)
-    return nil
-  }
-
-  // Unmarshal the JSON data
-  if err := json.Unmarshal(data, &staffState); err != nil {
-    log.Println(err)
-    return nil
-  }
-
-  return &staffState
-}
-
-func MakeMigrateDir() {
-  err := os.Mkdir(MIGRATE_DIR, 0755)
-  if err != nil {
-    if os.IsExist(err) {
-      return
-    } else {
-      log.Fatalf("Failed to create directory: %v", err)
-    }
-  }
-}
-
 func MoveOldState() {
-  if _, err := os.Stat(STAFF_STATE_FILE); err == nil {
-    MakeMigrateDir()
-    err := os.Rename(STAFF_STATE_FILE, MIGRATE_DIR + "state.json")
+  if _, err := os.Stat(STATE_FILE); err == nil {
+    filename := "./data/state-" + time.Now().Format("01-02--15-04") + ".json"
+    err := os.Rename(STATE_FILE, filename)
     if err != nil {
       log.Fatalf("Failed to move old staffState: %v", err)
     }
     log.Println("Successfully migrated staff state")
-  }
-  if _, err := os.Stat(ROSTER_DIR); err == nil {
-    MakeMigrateDir()
-    err := os.Rename(ROSTER_DIR, MIGRATE_DIR + "rosters")
-    if err != nil {
-      log.Fatalf("Failed to move old rosters: %v", err)
-    }
-    log.Println("Successfully migrated rosters")
   }
 }

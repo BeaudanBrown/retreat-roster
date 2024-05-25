@@ -80,22 +80,3 @@ func main() {
 
   log.Println(http.ListenAndServe(":6969", nil))
 }
-
-
-// func CleanAndSortLeaveReqs(staff []*StaffMember) []LeaveRequest {
-//   reqList := []LeaveRequest{}
-//   today := time.Now()
-//   for _, s := range staff {
-//     changed := false
-//     for i, r := range s.LeaveRequests {
-//       if r.EndDate.Before(today) {
-//         changed = true
-//         s.LeaveRequests = append(s.LeaveRequests[:i], s.LeaveRequests[i+1:]...)
-//       }
-//     }
-//     if changed {
-//       SaveState(s)
-//     }
-//   }
-//   return reqList
-// }

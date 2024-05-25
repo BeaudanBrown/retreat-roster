@@ -8,32 +8,33 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const SESSION_KEY = "sessionToken"
-const STAFF_STATE_FILE = "./data/staff.json"
-const ROSTER_DIR = "./data/rosters/"
 const DEV_MODE = false
 
 type Server struct {
   CacheBust string
   Templates *template.Template
-  StaffState
+  DB *mongo.Database
+  Context context.Context
 }
 
 type StaffState struct {
-  Staff *[]*StaffMember `json:"staff"`
+  Staff *[]*StaffMember `bson:"staff"`
 }
 
 type RosterWeek struct {
-  ID uuid.UUID
-  StartDate  time.Time   `json:"startDate"`
-  Days  []*RosterDay   `json:"days"`
-  IsLive         bool `json:"isLive"`
+  ID uuid.UUID  `bson:"_id"`
+  StartDate  time.Time   `bson:"startDate"`
+  Days  []*RosterDay   `bson:"days"`
+  IsLive         bool `bson:"isLive"`
 }
 
 type Highlight int
@@ -111,12 +112,7 @@ func (s *Server) VerifySession(handler http.HandlerFunc) http.HandlerFunc {
 }
 
 func (s *Server) isValidSession(token uuid.UUID) bool {
-  for i := range *s.Staff {
-    if (*s.Staff)[i].Token != nil && *(*s.Staff)[i].Token == token {
-      return true
-    }
-  }
-  return false
+  return s.GetStaffByToken(token) != nil
 }
 
 func ReadAndUnmarshal(w http.ResponseWriter, r *http.Request, reqBody interface{}) error {
@@ -139,101 +135,88 @@ func ReadAndUnmarshal(w http.ResponseWriter, r *http.Request, reqBody interface{
   return nil
 }
 
-func GetRosterWeekFilename(startDate time.Time) string {
-    formattedDate := startDate.Format("2006-01-02") // Go uses this specific date as the layout pattern
-    return ROSTER_DIR + formattedDate + ".json"
-}
-
-func (w *RosterWeek) Save() error {
-  s, err := LoadServerState()
-  w.CheckFlags(s.StaffState)
+func (s *Server) SaveStaffMember (staffMember StaffMember) error {
+  collection := s.DB.Collection("staff")
+  filter := bson.M{"_id": staffMember.ID}
+  update := bson.M{"$set": staffMember}
+  opts := options.Update().SetUpsert(true)
+  _, err := collection.UpdateOne(s.Context, filter, update, opts)
   if err != nil {
-    log.Println("Failed to load server state")
-    return err
+      log.Println("Failed to save staffMember")
+      return err
   }
-  data, err := json.Marshal(w)
-  if err != nil {
-    log.Println("Failed to marshal rosterWeek")
-    return err
-  }
-  log.Println("Saving roster week")
-  filename := GetRosterWeekFilename(w.StartDate)
-  if err := os.WriteFile(filename, data, 0666); err != nil {
-    log.Println("Error saving roster week")
-    log.Println(err)
-    return err
-  }
+  log.Println("Saved staff member")
   return nil
 }
 
-func LoadRosterWeek(startDate time.Time) RosterWeek {
+func (s *Server) SaveRosterWeek (w RosterWeek) error {
+  // w.CheckFlags(s.StaffState)
+  d := w.StartDate
+  w.StartDate = time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.Now().Location())
+  collection := s.DB.Collection("rosters")
+  filter := bson.M{"_id": w.ID}
+  update := bson.M{"$set": w}
+  opts := options.Update().SetUpsert(true)
+  _, err := collection.UpdateOne(s.Context, filter, update, opts)
+  if err != nil {
+      log.Println("Failed to save rosterWeek")
+      return err
+  }
+  log.Println("Saved roster week")
+  return nil
+}
+
+func (s *Server) LoadRosterWeek(startDate time.Time) *RosterWeek {
   var rosterWeek RosterWeek
-  var err error
-  filename := GetRosterWeekFilename(startDate)
-  if _, err = os.Stat(filename); err != nil {
-    log.Println("No file")
-    rosterWeek = newRosterWeek(startDate)
-    rosterWeek.Save()
-  } else {
-    var data []byte
-    if data, err = os.ReadFile(filename); err != nil {
-      log.Println("No read file")
-      rosterWeek = newRosterWeek(startDate)
-      rosterWeek.Save()
-    } else if err = json.Unmarshal(data, &rosterWeek); err != nil {
-      log.Println("No json file")
-      rosterWeek = newRosterWeek(startDate)
-      rosterWeek.Save()
-      // TODO: check for save errors?
-    }
+  d := startDate
+  startDate = time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.Now().Location())
+  filter := bson.M{"startDate": startDate}
+  collection := s.DB.Collection("rosters")
+  err := collection.FindOne(s.Context, filter).Decode(&rosterWeek)
+  if err == nil {
+    return &rosterWeek
   }
 
-  log.Println("Loaded rosterWeek")
-  return rosterWeek
+  if err != mongo.ErrNoDocuments {
+    log.Printf("Error loading roster week: %v", err)
+    return nil
+  }
+
+  // No document found, create a new RosterWeek
+  log.Printf("Making new roster week")
+  rosterWeek = newRosterWeek(startDate)
+  if saveErr := s.SaveRosterWeek(rosterWeek); saveErr != nil {
+    log.Printf("Error saving roster week: %v", saveErr)
+    return nil
+  }
+
+  return &rosterWeek
 }
 
-func (s *StaffState) Save() error {
-  data, err := json.Marshal(s)
+func (s *Server) LoadStaffState() (StaffState) {
+  collection := s.DB.Collection("staff")
+  cursor, err := collection.Find(s.Context, bson.M{})
   if err != nil {
-    return err
+      log.Printf("Error executing query: %v", err)
   }
-  log.Println("Saving staff state")
-  if err := os.WriteFile(STAFF_STATE_FILE, data, 0666); err != nil {
-    return err
+  defer cursor.Close(s.Context)
+
+  newStaff := []*StaffMember{}
+
+  for cursor.Next(s.Context) {
+      var staffMember StaffMember
+      if err := cursor.Decode(&staffMember); err != nil {
+        fmt.Printf("Error loading staff state: %v", err)
+      }
+      newStaff = append(newStaff, &staffMember)
   }
-  return nil
-}
-
-func NewServerState() (*Server) {
-    staffState := NewStaffState()
-    staffState.Save()
-    return &Server{
-      CacheBust: fmt.Sprintf("%v", time.Now().UnixNano()),
-      StaffState: staffState,
-    }
-}
-
-func LoadStaffState() (StaffState) {
-  var staffState StaffState
-  var err error
-  if _, err = os.Stat(STAFF_STATE_FILE); err != nil {
-    log.Println(err)
-    staffState = NewStaffState()
-  } else {
-    var data []byte
-    if data, err = os.ReadFile(STAFF_STATE_FILE); err != nil {
-      log.Println(err)
-      staffState = NewStaffState()
-    }
-    if err = json.Unmarshal(data, &staffState); err != nil {
-      log.Println(err)
-      staffState = NewStaffState()
-    }
+  staffState := StaffState{
+    &newStaff,
   }
   return staffState
 }
 
-func LoadServerState() (*Server, error) {
+func LoadServerState(db *mongo.Database, context context.Context) (*Server, error) {
   var serverState Server
   var err error
   serverState = Server{
@@ -249,7 +232,8 @@ func LoadServerState() (*Server, error) {
         return t.AddDate(0, 0, days)
       },
     }),
-    StaffState: LoadStaffState(),
+    DB: db,
+    Context: context,
   }
   serverState.Templates, err = serverState.Templates.ParseGlob("./www/*.html")
   if err != nil {
@@ -314,23 +298,95 @@ func NewStaffState() StaffState {
   s := StaffState{
     &staff,
   }
-  s.Save()
   return s
 }
 
-func (s *Server) GetStaffByToken(token uuid.UUID) *StaffMember {
-  for i := range *s.Staff {
-    if (*s.Staff)[i].Token != nil && *(*s.Staff)[i].Token == token {
-      return (*s.Staff)[i]
+func (s *Server) GetStaffByGoogleID(googleID string) *StaffMember {
+  collection := s.DB.Collection("staff")
+  filter := bson.M{"googleid": googleID}
+  var staffMember StaffMember
+  err := collection.FindOne(s.Context, filter).Decode(&staffMember)
+  if err != nil {
+    if err == mongo.ErrNoDocuments {
+      log.Printf("No staff with google id found: %v", err)
+      return nil
     }
+    log.Printf("Error getting staff by google id: %v", err)
+    return nil
   }
-  return nil
+  return &staffMember
+}
+
+
+func (s *Server) DeleteLeaveReqByID(staffMember StaffMember, leaveReqID uuid.UUID) {
+  for i, leaveReq := range staffMember.LeaveRequests {
+    if leaveReq.ID != leaveReqID {
+      continue
+    }
+    staffMember.LeaveRequests = append(
+      staffMember.LeaveRequests[:1],
+      staffMember.LeaveRequests[i+1:]...)
+      err := s.SaveStaffMember(staffMember)
+      if err != nil {
+        log.Printf("Error deleting leave request: %v", err)
+      }
+      return
+  }
+}
+
+func (s *Server) GetStaffByLeaveReqID(leaveReqID uuid.UUID) *StaffMember {
+  collection := s.DB.Collection("staff")
+  var staffMember StaffMember
+  filter := bson.M{
+    "leaveRequests": bson.M{
+      "$elemMatch": bson.M{
+        "id": leaveReqID,
+      },
+    },
+  }
+  err := collection.FindOne(s.Context, filter).Decode(&staffMember)
+  if err != nil {
+      if err == mongo.ErrNoDocuments {
+          return nil
+      }
+      return nil
+  }
+  return &staffMember
+}
+
+func (s *Server) GetStaffByID(staffID uuid.UUID) *StaffMember {
+  collection := s.DB.Collection("staff")
+  filter := bson.M{"id": staffID}
+  var staffMember StaffMember
+  err := collection.FindOne(s.Context, filter).Decode(&staffMember)
+  if err != nil {
+      if err == mongo.ErrNoDocuments {
+          return nil
+      }
+      return nil
+  }
+  return &staffMember
+}
+
+
+func (s *Server) GetStaffByToken(token uuid.UUID) *StaffMember {
+  collection := s.DB.Collection("staff")
+  filter := bson.M{"token": token}
+  var staffMember StaffMember
+  err := collection.FindOne(s.Context, filter).Decode(&staffMember)
+  if err != nil {
+      if err == mongo.ErrNoDocuments {
+          return nil
+      }
+      return nil
+  }
+  return &staffMember
 }
 
 func (s *Server) GetSessionUser(w http.ResponseWriter, r *http.Request) *StaffMember {
   sessionToken, ok := r.Context().Value(SESSION_KEY).(uuid.UUID)
   if !ok {
-    log.Printf("Error retrieving token")
+    log.Printf("No session for using")
     return nil
   }
   staff := s.GetStaffByToken(sessionToken)
@@ -341,18 +397,8 @@ func (s *Server) GetSessionUser(w http.ResponseWriter, r *http.Request) *StaffMe
   return staff
 }
 
-func GetStaffByID(staffID uuid.UUID, allStaff []*StaffMember) *StaffMember {
-  for i := range allStaff {
-    if (allStaff)[i].ID == staffID {
-      return (allStaff)[i]
-    }
-  }
-  return nil
-}
-
 func (week *RosterWeek) GetSlotByID(slotID uuid.UUID) *Slot {
-  for i := range week.Days {
-    day := week.Days[i]
+  for _, day := range week.Days {
     for j := range day.Rows {
       row := day.Rows[j]
       if row.Amelia.ID == slotID {
@@ -373,9 +419,9 @@ func (week *RosterWeek) GetSlotByID(slotID uuid.UUID) *Slot {
 }
 
 func (week *RosterWeek) GetDayByID(dayID uuid.UUID) *RosterDay {
-  for i := range week.Days {
-    if week.Days[i].ID == dayID {
-      return week.Days[i]
+  for _, day := range week.Days {
+    if day.ID == dayID {
+      return day
     }
   }
   return nil
@@ -399,7 +445,8 @@ func MakeHeaderStruct(isAdmin bool, rosterLive bool) HeaderData {
 
 func (s *Server) GetStaffMap() map[uuid.UUID]StaffMember {
   staffMap := map[uuid.UUID]StaffMember{}
-  for _, staff := range *s.Staff {
+  staffState := s.LoadStaffState().Staff
+  for _, staff := range *staffState {
     staffMap[staff.ID] = *staff
   }
   return staffMap

@@ -103,9 +103,9 @@ func (cd *CustomDate) UnmarshalJSON(input []byte) error {
 type LeaveRequest struct {
   ID uuid.UUID
   CreationDate CustomDate
-  Reason string	`bson:"reason"`
-  StartDate CustomDate	`bson:"start-date"`
-  EndDate CustomDate	`bson:"end-date"`
+  Reason string	`json:"reason"`
+  StartDate CustomDate	`json:"start-date"`
+  EndDate CustomDate	`json:"end-date"`
 }
 
 type DayAvailability struct {
