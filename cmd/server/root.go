@@ -7,6 +7,9 @@ import (
 	"os"
 	"time"
 
+  "roster/cmd/db"
+  "roster/cmd/utils"
+
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -14,12 +17,12 @@ import (
 
 type RootStruct struct {
   *Server
-  ActiveStaff StaffMember
-  RosterWeek
-  StaffState
+  ActiveStaff db.StaffMember
+  db.RosterWeek
+  db.StaffState
 }
 
-func (s *Server) MakeRootStruct(activeStaff StaffMember, week RosterWeek) RootStruct {
+func (s *Server) MakeRootStruct(activeStaff db.StaffMember, week db.RosterWeek) RootStruct {
   return RootStruct{
     s,
     activeStaff,
@@ -28,49 +31,15 @@ func (s *Server) MakeRootStruct(activeStaff StaffMember, week RosterWeek) RootSt
   }
 }
 
-type RosterDay struct {
-  ID             uuid.UUID
-  DayName        string
-  Rows           []*Row
-  Colour         string
-  Offset         int
-  IsClosed       bool
-  AmeliaOpen     bool
-}
-
-type Row struct {
-  ID     uuid.UUID
-  Amelia  Slot
-  Early  Slot
-  Mid Slot
-  Late   Slot
-}
-
-type Slot struct {
-  ID            uuid.UUID
-  StartTime     string
-  AssignedStaff *uuid.UUID
-  StaffString *string
-  Flag	Highlight
-  Description	string
-}
-
-func (s *Slot) HasThisStaff(staffId uuid.UUID) bool {
-  if s.AssignedStaff != nil && *s.AssignedStaff == staffId {
-    return true
-  }
-  return false
-}
-
 type DayStruct struct {
-  RosterDay
-  Staff *[]*StaffMember
+  db.RosterDay
+  Staff *[]*db.StaffMember
   Date time.Time
   IsLive bool
-  ActiveStaff StaffMember
+  ActiveStaff db.StaffMember
 }
 
-func MakeDayStruct(isLive bool, day RosterDay, s *Server, activeStaff StaffMember) DayStruct {
+func MakeDayStruct(isLive bool, day db.RosterDay, s *Server, activeStaff db.StaffMember) DayStruct {
   date :=  activeStaff.Config.RosterStartDate.AddDate(0, 0, day.Offset)
   return DayStruct{
     day,
@@ -79,177 +48,6 @@ func MakeDayStruct(isLive bool, day RosterDay, s *Server, activeStaff StaffMembe
     isLive,
     activeStaff,
   }
-}
-
-func (s *Server) CheckFlags(staffState StaffState, week RosterWeek) (RosterWeek) {
-  allStaff := staffState.Staff
-  for _, staff := range *allStaff {
-    staff.CurrentShifts = 0
-    s.SaveStaffMember(*staff)
-  }
-  for i, day := range week.Days {
-    // Create a new map for each day to track occurrences of staff IDs within that day
-    staffIDOccurrences := make(map[uuid.UUID]int)
-
-    for _, row := range day.Rows {
-      if day.AmeliaOpen && row.Amelia.AssignedStaff != nil {
-        staffIDOccurrences[*row.Amelia.AssignedStaff]++
-        staff := s.GetStaffByID(*row.Amelia.AssignedStaff)
-        if staff != nil {
-          staff.CurrentShifts += 1
-          s.SaveStaffMember(*staff)
-        }
-      }
-      if row.Early.AssignedStaff != nil {
-        staffIDOccurrences[*row.Early.AssignedStaff]++
-        staff := s.GetStaffByID(*row.Early.AssignedStaff)
-        if staff != nil {
-          staff.CurrentShifts += 1
-          s.SaveStaffMember(*staff)
-        }
-      }
-      if row.Mid.AssignedStaff != nil {
-        staffIDOccurrences[*row.Mid.AssignedStaff]++
-        staff := s.GetStaffByID(*row.Mid.AssignedStaff)
-        if staff != nil {
-          staff.CurrentShifts += 1
-          s.SaveStaffMember(*staff)
-        }
-      }
-      if row.Late.AssignedStaff != nil {
-        staffIDOccurrences[*row.Late.AssignedStaff]++
-        staff := s.GetStaffByID(*row.Late.AssignedStaff)
-        if staff != nil {
-          staff.CurrentShifts += 1
-          s.SaveStaffMember(*staff)
-        }
-      }
-    }
-
-    for _, row := range day.Rows {
-      row.Amelia.Flag = None
-      row.Early.Flag = None
-      row.Mid.Flag = None
-      row.Late.Flag = None
-      date := week.StartDate.AddDate(0, 0, day.Offset)
-
-      if day.AmeliaOpen && row.Amelia.AssignedStaff != nil {
-        if staffIDOccurrences[*row.Amelia.AssignedStaff] > 1 {
-          row.Amelia.Flag = Duplicate
-        } else {
-          staff := s.GetStaffByID(*row.Amelia.AssignedStaff)
-          for _, req := range staff.LeaveRequests {
-            if !req.StartDate.After(date) && req.EndDate.After(date) {
-              row.Amelia.Flag = LeaveConflict
-              break
-            }
-          }
-          if staff != nil {
-            if !staff.Availability[i].Late {
-              row.Amelia.Flag = PrefConflict
-            }
-          }
-        }
-      }
-
-      if row.Early.AssignedStaff != nil {
-        if staffIDOccurrences[*row.Early.AssignedStaff] > 1 {
-          row.Early.Flag = Duplicate
-        } else {
-          staff := s.GetStaffByID(*row.Early.AssignedStaff)
-          for _, req := range staff.LeaveRequests {
-            if !req.StartDate.After(date) && req.EndDate.After(date) {
-              row.Early.Flag = LeaveConflict
-              break
-            }
-          }
-          if staff != nil {
-            if !staff.Availability[i].Early {
-              if !staff.Availability[i].Mid && !staff.Availability[i].Late {
-                row.Early.Flag = PrefRefuse
-              } else {
-                row.Early.Flag = PrefConflict
-              }
-            }
-          }
-        }
-      }
-
-      if row.Mid.AssignedStaff != nil {
-        if staffIDOccurrences[*row.Mid.AssignedStaff] > 1 {
-          row.Mid.Flag = Duplicate
-        } else {
-          staff := s.GetStaffByID(*row.Mid.AssignedStaff)
-          if staff != nil {
-            for _, req := range staff.LeaveRequests {
-              if !req.StartDate.After(date) && req.EndDate.After(date) {
-                row.Mid.Flag = LeaveConflict
-                break
-              }
-            }
-            if !staff.Availability[i].Mid {
-              if !staff.Availability[i].Early && !staff.Availability[i].Late {
-                row.Mid.Flag = PrefRefuse
-              } else {
-                row.Mid.Flag = PrefConflict
-              }
-            }
-          }
-        }
-      }
-
-      if row.Late.AssignedStaff != nil {
-        if staffIDOccurrences[*row.Late.AssignedStaff] > 1 {
-          row.Late.Flag = Duplicate
-        } else {
-          staff := s.GetStaffByID(*row.Late.AssignedStaff)
-          for _, req := range staff.LeaveRequests {
-            if !req.StartDate.After(date) && req.EndDate.After(date) {
-              row.Late.Flag = LeaveConflict
-              break
-            }
-          }
-          if staff != nil {
-            if !staff.Availability[i].Late {
-              if !staff.Availability[i].Early && !staff.Availability[i].Mid {
-                row.Late.Flag = PrefRefuse
-              } else {
-                row.Late.Flag = PrefConflict
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-  return week
-}
-
-func (staff *StaffMember) HasConflict(slot string, offset int) bool {
-  switch slot {
-  case "Early":
-    if !staff.Availability[offset].Early {
-      return true
-    }
-  case "Mid":
-    if !staff.Availability[offset].Mid {
-      return true
-    }
-  case "Late":
-    if !staff.Availability[offset].Late {
-      return true
-    }
-  }
-  return false
-}
-
-func (staff *StaffMember) IsAway(date time.Time) bool {
-  for _, req := range staff.LeaveRequests {
-    if !req.StartDate.After(date) && req.EndDate.After(date) {
-      return true
-    }
-  }
-  return false
 }
 
 func MemberIsAssigned(activeID uuid.UUID, assignedID *uuid.UUID) bool {
@@ -264,6 +62,7 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
   if (thisStaff == nil) {
     return
   }
+  log.Printf("roster Start Date: %v", thisStaff.Config.RosterStartDate)
   week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
   if !thisStaff.IsAdmin && !week.IsLive {
     http.Redirect(w, r, "/profile", http.StatusSeeOther)
@@ -352,25 +151,9 @@ func (s *Server) HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
     Path:     "/",
   })
 
-  staffMember := s.GetStaffByGoogleID(userInfo.ID)
-  if staffMember != nil {
-    staffMember.Token = &sessionIdentifier
-    s.SaveStaffMember(*staffMember)
-  } else {
-    isAdmin := len(*s.LoadStaffState().Staff) == 0
-    staffMember = &StaffMember{
-      ID:    uuid.New(),
-      GoogleID:    userInfo.ID,
-      FirstName:  "",
-      IsAdmin: isAdmin,
-      Token: &sessionIdentifier,
-      Availability: emptyAvailability,
-      Config: StaffConfig{
-        TimesheetStartDate: GetLastTuesday(),
-        RosterStartDate: GetNextTuesday(),
-      },
-    }
-    s.SaveStaffMember(*staffMember)
+  err := s.CreateOrUpdateStaffGoogleID(userInfo.ID, sessionIdentifier)
+  if err != nil {
+    log.Printf("Error logging in with google: %v", err)
   }
 
   http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -673,16 +456,10 @@ type AddTrialBody struct {
 func (s *Server) HandleAddTrial(w http.ResponseWriter, r *http.Request) {
   var reqBody AddTrialBody
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
-  newStaff := StaffMember{
-    ID:    uuid.New(),
-    GoogleID:    "Trial",
-    IsTrial:    true,
-    FirstName:  reqBody.Name,
-    Availability: emptyAvailability,
-  }
-  s.SaveStaffMember(newStaff)
+  s.CreateTrial(reqBody.Name)
   thisStaff := s.GetSessionUser(w, r)
   if (thisStaff == nil) {
+    // TODO: Handle error, also loading the roster week below
     return
   }
   week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
@@ -706,7 +483,7 @@ func (s *Server) HandleShiftWindow(w http.ResponseWriter, r *http.Request) {
   case "-":
     thisStaff.Config.RosterStartDate = thisStaff.Config.RosterStartDate.AddDate(0, 0, -7)
   default:
-    thisStaff.Config.RosterStartDate = GetNextTuesday()
+    thisStaff.Config.RosterStartDate = utils.GetNextTuesday()
   }
   s.SaveStaffMember(*thisStaff)
   week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
@@ -733,44 +510,31 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
     return
   }
 
-  week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
-  for i := range week.Days {
-    if week.Days[i].ID == dayID {
-      if reqBody.Action == "+" {
-        week.Days[i].Rows = append(week.Days[i].Rows, newRow())
-      } else {
-        if len(week.Days[i].Rows) > 4 {
-          week.Days[i].Rows = week.Days[i].Rows[:len(week.Days[i].Rows)-1]
-        }
-      }
-      s.SaveRosterWeek(*week)
-      s.renderTemplate(w, "rosterDay", MakeDayStruct(week.IsLive, *week.Days[i], s, *thisStaff))
-      break
-    }
-  }
+  newDay, isLive := s.ChangeDayRowCount(thisStaff.Config.RosterStartDate, dayID, reqBody.Action)
+  s.renderTemplate(w, "rosterDay", MakeDayStruct(isLive, *newDay, s, *thisStaff))
 }
 
 
-func duplicateRosterWeek(startDate time.Time, src RosterWeek) RosterWeek {
-  newWeek := RosterWeek{
+func duplicateRosterWeek(startDate time.Time, src db.RosterWeek) db.RosterWeek {
+  newWeek := db.RosterWeek{
     ID:        uuid.New(),
     StartDate: startDate,
     IsLive:    false,
-    Days:      make([]*RosterDay, len(src.Days)),
+    Days:      make([]*db.RosterDay, len(src.Days)),
   }
 
   for i, day := range src.Days {
-    newDay := &RosterDay{
+    newDay := &db.RosterDay{
       ID:          uuid.New(),
       DayName:     day.DayName,
       Colour:      day.Colour,
       Offset:      day.Offset,
       IsClosed:    day.IsClosed,
       AmeliaOpen:  day.AmeliaOpen,
-      Rows:        make([]*Row, len(day.Rows)),
+      Rows:        make([]*db.Row, len(day.Rows)),
     }
     for j, row := range day.Rows {
-      newRow := &Row{
+      newRow := &db.Row{
         ID:    uuid.New(),
         Amelia: duplicateSlot(row.Amelia),
         Early:  duplicateSlot(row.Early),
@@ -785,20 +549,20 @@ func duplicateRosterWeek(startDate time.Time, src RosterWeek) RosterWeek {
   return newWeek
 }
 
-func duplicateSlot(src Slot) Slot {
+func duplicateSlot(src db.Slot) db.Slot {
   var newAssignedStaff *uuid.UUID
   if src.AssignedStaff != nil {
-    newStaffID := *src.AssignedStaff // Copy the UUID value
+    newStaffID := *src.AssignedStaff
     newAssignedStaff = &newStaffID
   }
 
   var newStaffString *string
   if src.StaffString != nil {
-    newString := *src.StaffString // Copy the string value
+    newString := *src.StaffString
     newStaffString = &newString
   }
 
-  return Slot{
+  return db.Slot{
     ID:            uuid.New(),
     StartTime:     src.StartTime,
     AssignedStaff: newAssignedStaff,

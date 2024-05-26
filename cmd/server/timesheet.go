@@ -6,81 +6,22 @@ import (
 	"net/http"
 	"time"
 
+  "roster/cmd/db"
+  "roster/cmd/utils"
+
 	"github.com/google/uuid"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-type TimesheetWeekState struct {
-  ID uuid.UUID `bson:"_id"`
-  StartDate  time.Time   `bson:"startDate"`
-  StaffTimesheets map[uuid.UUID]*TimesheetWeek `bson:"staffTimesheets"`
-}
-
-type TimesheetWeek struct {
-  ID uuid.UUID
-  Days  []*TimesheetDay   `json:"days"`
-}
-
-type TimesheetDay struct {
-  ID uuid.UUID
-  DayName        string
-  Offset       int
-  Entries      []*TimesheetEntry
-}
-
-type ApprovalStatus int
-
-const (
-    Incomplete ApprovalStatus = iota
-    Complete
-    Approved
-)
-
-type ShiftType int
-
-const (
-    Bar ShiftType = iota
-    Managing
-    Admin
-)
-
-func stringToShiftType(typeStr string) ShiftType {
-  switch typeStr {
-  case "0":
-    return Bar
-  case "1":
-    return Managing
-  case "2":
-    return Admin
-  default:
-    return Bar
-  }
-}
-
-type TimesheetEntry struct {
-  ID uuid.UUID
-  ShiftStart  *time.Time   `json:"shiftStart"`
-  ShiftEnd  *time.Time   `json:"shiftEnd"`
-  BreakStart  *time.Time   `json:"breakStart"`
-  BreakEnd  *time.Time   `json:"breakEnd"`
-  BreakLength float64 `json:"breakLength"`
-  ShiftLength float64 `json:"shiftLength"`
-  Status        ApprovalStatus  `json:"status"`
-  ShiftType        ShiftType  `json:"shiftType"`
-}
 
 type TimesheetData struct {
-  TimesheetWeekState
-  StaffMember StaffMember
+  db.TimesheetWeekState
+  StaffMember db.StaffMember
   DayNames []string
-  StaffMap map[uuid.UUID]StaffMember
+  StaffMap map[uuid.UUID]db.StaffMember
   RosterLive  bool
   CacheBust  string
 }
 
-func (s *Server) MakeTimesheetStruct(activeStaff StaffMember) TimesheetData {
+func (s *Server) MakeTimesheetStruct(activeStaff db.StaffMember) TimesheetData {
   timesheetWeek := s.LoadTimesheetWeek(activeStaff.Config.TimesheetStartDate)
   if timesheetWeek == nil {
     log.Printf("Failed to load timesheet week when making struct")
@@ -95,25 +36,6 @@ func (s *Server) MakeTimesheetStruct(activeStaff StaffMember) TimesheetData {
   }
 }
 
-func (t *TimesheetWeek) getDayByID(dayID uuid.UUID) *TimesheetDay {
-  for _, day := range t.Days {
-    if day.ID == dayID {
-      return day
-    }
-  }
-  return nil
-}
-
-func (s *Server) GetStaffTimesheetWeek(staffID uuid.UUID, t *TimesheetWeekState) *TimesheetWeek {
-  if timesheet, exists := t.StaffTimesheets[staffID]; exists {
-    return timesheet
-  }
-  newWeek := newWeek()
-  t.StaffTimesheets[staffID] = &newWeek
-  s.SaveTimesheetState(t)
-  return &newWeek
-}
-
 func (s *Server) HandleTimesheet(w http.ResponseWriter, r *http.Request) {
   thisStaff := s.GetSessionUser(w, r)
   if (thisStaff == nil) {
@@ -121,91 +43,6 @@ func (s *Server) HandleTimesheet(w http.ResponseWriter, r *http.Request) {
   }
   data := s.MakeTimesheetStruct(*thisStaff)
   s.renderTemplate(w, "timesheet", data)
-}
-
-func newTimesheetWeekState(startDate time.Time) *TimesheetWeekState {
-  s := &TimesheetWeekState{
-    ID:            uuid.New(),
-    StartDate: startDate,
-    StaffTimesheets: map[uuid.UUID]*TimesheetWeek{},
-  }
-  return s
-}
-
-func newWeek() TimesheetWeek {
-  dayNames := []string{"Tues", "Wed", "Thurs", "Fri", "Sat", "Sun", "Mon"}
-
-  var Days []*TimesheetDay
-
-  // Loop over dayNames to fill Days slice
-  for i, dayName := range dayNames {
-    Days = append(Days, &TimesheetDay{
-      ID:      uuid.New(),
-      DayName: dayName,
-      Offset:  i,
-      Entries:  []*TimesheetEntry{},
-    })
-  }
-
-  w := TimesheetWeek{
-    ID:            uuid.New(),
-    Days:  Days,
-    // StaffName: staffName,
-  }
-  return w
-}
-
-func (s *Server) SaveTimesheetWeek (w TimesheetWeekState) error {
-  collection := s.DB.Collection("timesheets")
-  filter := bson.M{"_id": w.ID}
-  update := bson.M{"$set": w}
-  opts := options.Update().SetUpsert(true)
-  _, err := collection.UpdateOne(s.Context, filter, update, opts)
-  if err != nil {
-      log.Println("Failed to save timesheet week")
-      return err
-  }
-  log.Println("Saved timesheet week")
-  return nil
-}
-
-func (s *Server) SaveTimesheetState(timesheetWeek *TimesheetWeekState) error {
-  collection := s.DB.Collection("timesheets")
-  filter := bson.M{"_id": timesheetWeek.ID}
-  update := bson.M{"$set": timesheetWeek}
-  opts := options.Update().SetUpsert(true)
-  _, err := collection.UpdateOne(s.Context, filter, update, opts)
-  if err != nil {
-      log.Println("Failed to save timesheet week")
-      return err
-  }
-  log.Println("Saved staff timesheet week")
-  return nil
-}
-
-func (s *Server) LoadTimesheetWeek(startDate time.Time) (*TimesheetWeekState) {
-  var weekState *TimesheetWeekState
-  filter := bson.M{"startDate": startDate}
-  collection := s.DB.Collection("timesheets")
-  err := collection.FindOne(s.Context, filter).Decode(&weekState)
-  if err == nil {
-    log.Printf("Found timesheet week")
-    return weekState
-  }
-
-  if err != mongo.ErrNoDocuments {
-    log.Printf("Error loading timesheet week: %v", err)
-    return nil
-  }
-
-  log.Printf("Making new timesheet week")
-  weekState = newTimesheetWeekState(startDate)
-  if saveErr := s.SaveTimesheetWeek(*weekState); saveErr != nil {
-    log.Printf("Error saving timesheet week: %v", saveErr)
-    return nil
-  }
-
-  return weekState
 }
 
 func (s *Server) RenderTimesheetTemplate(w http.ResponseWriter, r *http.Request, adminView bool) {
@@ -236,7 +73,7 @@ func (s *Server) HandleShiftTimesheetWindow(w http.ResponseWriter, r *http.Reque
   case "-":
     thisStaff.Config.TimesheetStartDate = thisStaff.Config.TimesheetStartDate.AddDate(0, 0, -7)
   default:
-    thisStaff.Config.TimesheetStartDate = GetLastTuesday()
+    thisStaff.Config.TimesheetStartDate = utils.GetLastTuesday()
   }
   s.SaveStaffMember(*thisStaff)
   s.RenderTimesheetTemplate(w, r, reqBody.AdminView)
@@ -245,7 +82,7 @@ func (s *Server) HandleShiftTimesheetWindow(w http.ResponseWriter, r *http.Reque
 type DeleteTimesheetEntryBody struct {
   StaffID string `json:"staffID"`
   EntryID string `json:"entryID"`
-  StartDate CustomDate	`json:"start-date"`
+  StartDate db.CustomDate	`json:"start-date"`
   AdminView bool `json:"adminView"`
 }
 
@@ -295,7 +132,7 @@ func (s *Server) HandleDeleteTimesheetEntry(w http.ResponseWriter, r *http.Reque
 type AddTimesheetEntryBody struct {
   StaffID string `json:"staffID"`
   DayIdx int `json:"dayIdx"`
-  StartDate CustomDate	`json:"start-date"`
+  StartDate db.CustomDate	`json:"start-date"`
   AdminView bool `json:"adminView"`
 }
 
@@ -320,7 +157,7 @@ func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request)
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  day.Entries = append(day.Entries, &TimesheetEntry{
+  day.Entries = append(day.Entries, &db.TimesheetEntry{
     ID:      uuid.New(),
   })
   s.SaveTimesheetState(timesheetWeek)
@@ -330,17 +167,17 @@ func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request)
 type ModifyTimesheetEntryBody struct {
     StaffID       string     `json:"staffID"`
     EntryID         string     `json:"entryID"`
-    StartDate     CustomDate `json:"start-date"`
-    ShiftStart CustomDate     `json:"shiftStart"`
-    ShiftEnd  CustomDate     `json:"shiftEnd"`
-    BreakStart CustomDate     `json:"breakStart"`
-    BreakEnd  CustomDate     `json:"breakEnd"`
-    Status         ApprovalStatus       `json:"status"`
+    StartDate     db.CustomDate `json:"start-date"`
+    ShiftStart db.CustomDate     `json:"shiftStart"`
+    ShiftEnd  db.CustomDate     `json:"shiftEnd"`
+    BreakStart db.CustomDate     `json:"breakStart"`
+    BreakEnd  db.CustomDate     `json:"breakEnd"`
+    Status         db.ApprovalStatus       `json:"status"`
     ShiftType        string  `json:"shiftType"`
     AdminView         bool       `json:"adminView"`
 }
 
-func getAdjustedTime(t CustomDate, dayDate time.Time) (*time.Time) {
+func getAdjustedTime(t db.CustomDate, dayDate time.Time) (*time.Time) {
   year, month, day := dayDate.Date()
   if t.Time != nil {
     hour, min, _ := t.Clock()
@@ -375,7 +212,7 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
           dayDate := timesheetWeek.StartDate.AddDate(0, 0, day.Offset)
           found = true
           entry.Status = reqBody.Status
-          entry.ShiftType = stringToShiftType(reqBody.ShiftType)
+          entry.ShiftType = db.StringToShiftType(reqBody.ShiftType)
           entry.BreakStart = getAdjustedTime(reqBody.BreakStart, dayDate)
           entry.BreakEnd = getAdjustedTime(reqBody.BreakEnd, dayDate)
 
@@ -432,14 +269,14 @@ func (s *Server) HandleToggleHideApproved(w http.ResponseWriter, r *http.Request
 }
 
 type TimesheetEntryData struct {
-  TimesheetEntry
+  db.TimesheetEntry
   StartDate  time.Time
-  StaffMember StaffMember
+  StaffMember db.StaffMember
   ApprovalMode bool
   IsAdmin  bool
 }
 
-func MakeTimesheetEntryStruct(entry TimesheetEntry, staffMember StaffMember, startDate time.Time, approvalMode bool, isAdmin bool) TimesheetEntryData {
+func MakeTimesheetEntryStruct(entry db.TimesheetEntry, staffMember db.StaffMember, startDate time.Time, approvalMode bool, isAdmin bool) TimesheetEntryData {
   return TimesheetEntryData{
     TimesheetEntry: entry,
     StartDate: startDate,

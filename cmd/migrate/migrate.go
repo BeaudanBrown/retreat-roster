@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"roster/cmd/db"
 	"roster/cmd/server"
+	"roster/cmd/utils"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,8 +15,8 @@ import (
 type OldData struct {
   StartDate time.Time `json:"startDate"`
   TimesheetStartDate time.Time `json:"timesheetStartDate"`
-  Staff *[]*server.StaffMember `json:"staff"`
-  Days  []*server.RosterDay   `json:"days"`
+  Staff *[]*db.StaffMember `json:"staff"`
+  Days  []*db.RosterDay   `json:"days"`
   IsLive bool `json:"isLive"`
   HideByIdeal bool `json:"hideByIdeal"`
   HideByPrefs bool `json:"hideByPrefs"`
@@ -40,9 +42,9 @@ func MigrateToMongo(s *server.Server) (error) {
     return nil
   }
   for _, staffMember := range *state.Staff {
-    staffMember.Config = server.StaffConfig{
-      TimesheetStartDate: server.GetLastTuesday(),
-      RosterStartDate: server.GetNextTuesday(),
+    staffMember.Config = db.StaffConfig{
+      TimesheetStartDate: utils.GetLastTuesday(),
+      RosterStartDate: utils.GetNextTuesday(),
     }
     err = s.SaveStaffMember(*staffMember)
     if err != nil {
@@ -52,7 +54,7 @@ func MigrateToMongo(s *server.Server) (error) {
   }
   year, month, day := state.StartDate.Date()
   startDate := time.Date(year, month, day, 0, 0, 0, 0, time.Now().Location())
-  rosterWeek := server.RosterWeek{
+  rosterWeek := db.RosterWeek{
     ID: uuid.New(),
     StartDate: startDate,
     Days: state.Days,

@@ -4,8 +4,9 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
+
+  "roster/cmd/db"
 
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
@@ -19,11 +20,11 @@ type ProfileIndexData struct {
   CacheBust string
   RosterLive bool
   AdminRights bool
-  StaffMember
+  db.StaffMember
 }
 
 type ProfileData struct {
-  StaffMember
+  db.StaffMember
   AdminRights bool
   RosterLive bool
   ShowUpdateSuccess bool
@@ -32,157 +33,12 @@ type ProfileData struct {
   ShowLeaveError bool
 }
 
-func MakeProfileStruct(rosterLive bool, staffMember StaffMember, adminRights bool) ProfileData {
+func MakeProfileStruct(rosterLive bool, staffMember db.StaffMember, adminRights bool) ProfileData {
   return ProfileData{
     StaffMember: staffMember,
     AdminRights: adminRights,
     RosterLive: rosterLive,
   }
-}
-
-type StaffConfig struct {
-  TimesheetStartDate  time.Time
-  RosterStartDate  time.Time
-  HideByIdeal         bool
-  HideByPrefs         bool
-  HideByLeave         bool
-  HideApproved  bool
-  ApprovalMode  bool
-}
-
-type StaffMember struct {
-  ID   uuid.UUID
-  IsAdmin   bool
-  IsTrial   bool
-  IsHidden   bool
-  GoogleID   string
-  NickName string
-  FirstName string
-  LastName string
-  Email string
-  Phone string
-  ContactName string
-  ContactPhone string
-  IdealShifts int
-  CurrentShifts int
-  Availability []DayAvailability
-  Token *uuid.UUID
-  LeaveRequests	[]LeaveRequest
-  Config	StaffConfig
-}
-
-type CustomDate struct {
-  *time.Time
-}
-
-func (cd *CustomDate) UnmarshalJSON(input []byte) error {
-  strInput := strings.Trim(string(input), `"`)
-  // Try parsing the date in the expected formats
-  formats := []string{
-    "2006-01-02",
-    "2006-01-02T15:04:05Z",
-    "2006-01-02T15:04:05.999999999Z07:00",
-    "2006-01-02 15:04:05.999999999 -0700 MST",
-    "15:04",
-    "03:04 PM",
-  }
-  var parseErr error
-  for _, format := range formats {
-    var newTime time.Time
-    newTime, parseErr = time.Parse(format, strInput)
-    if parseErr == nil {
-      cd.Time = &newTime
-      return nil
-    }
-  }
-  log.Printf("Invalid time: %v", parseErr)
-  cd.Time = nil
-  return nil
-}
-
-type LeaveRequest struct {
-  ID uuid.UUID
-  CreationDate CustomDate
-  Reason string	`json:"reason"`
-  StartDate CustomDate	`json:"start-date"`
-  EndDate CustomDate	`json:"end-date"`
-}
-
-type DayAvailability struct {
-  Name   string
-  Early   bool
-  Mid   bool
-  Late   bool
-}
-
-func GetLastTuesday() time.Time {
-  nextTuesday := GetNextTuesday()
-  lastTuesday := nextTuesday.AddDate(0, 0, -7)
-  log.Printf("Last tuesday: %v", lastTuesday)
-  return time.Date(
-    lastTuesday.Year(),
-    lastTuesday.Month(),
-    lastTuesday.Day(),
-    0, 0, 0, 0,
-    lastTuesday.Location())
-}
-
-func GetNextTuesday() time.Time {
-  today := time.Now()
-  daysUntilTuesday := int((7 + (time.Tuesday - today.Weekday())) % 7)
-  nextTuesday := today.AddDate(0, 0, daysUntilTuesday)
-  log.Printf("Next tuesday: %v", nextTuesday)
-  return time.Date(
-    nextTuesday.Year(),
-    nextTuesday.Month(),
-    nextTuesday.Day(),
-    0, 0, 0, 0,
-    nextTuesday.Location())
-}
-
-var emptyAvailability = []DayAvailability{
-  {
-    Name: "Tues",
-    Early: true,
-    Mid:   true,
-    Late:  true,
-  },
-  {
-    Name: "Wed",
-    Early: true,
-    Mid:   true,
-    Late:  true,
-  },
-  {
-    Name: "Thurs",
-    Early: true,
-    Mid:   true,
-    Late:  true,
-  },
-  {
-    Name: "Fri",
-    Early: true,
-    Mid:   true,
-    Late:  true,
-  },
-  {
-    Name: "Sat",
-    Early: true,
-    Mid:   true,
-    Late:  true,
-  },
-  {
-    Name: "Sun",
-    Early: true,
-    Mid:   true,
-    Late:  true,
-  },
-  {
-    Name: "Mon",
-    Early: true,
-    Mid:   true,
-    Late:  true,
-  },
 }
 
 func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
@@ -244,11 +100,11 @@ func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
   log.Println("Submit leave request")
-  var reqBody LeaveRequest
+  var reqBody db.LeaveRequest
   if err := ReadAndUnmarshal(w, r, &reqBody); err != nil { return }
   reqBody.ID = uuid.New()
   now := time.Now()
-  reqBody.CreationDate = CustomDate{&now}
+  reqBody.CreationDate = db.CustomDate{Time: &now}
   staff := s.GetSessionUser(w, r)
   if (staff == nil) {
     return
@@ -334,7 +190,7 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
   // This can fail but not from me
   staff.IdealShifts, _ = strconv.Atoi(reqBody.IdealShifts)
 
-  staff.Availability = []DayAvailability{
+  staff.Availability = []db.DayAvailability{
     {
       Name: "Tues",
       Early: reqBody.TuesEarly == "on",
