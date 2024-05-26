@@ -81,10 +81,11 @@ func MakeDayStruct(isLive bool, day RosterDay, s *Server, activeStaff StaffMembe
   }
 }
 
-func (s *Server) CheckFlags(staffState StaffState, week *RosterWeek) {
+func (s *Server) CheckFlags(staffState StaffState, week RosterWeek) (RosterWeek) {
   allStaff := staffState.Staff
   for _, staff := range *allStaff {
     staff.CurrentShifts = 0
+    s.SaveStaffMember(*staff)
   }
   for i, day := range week.Days {
     // Create a new map for each day to track occurrences of staff IDs within that day
@@ -221,7 +222,7 @@ func (s *Server) CheckFlags(staffState StaffState, week *RosterWeek) {
       }
     }
   }
-  s.SaveRosterWeek(*week)
+  return week
 }
 
 func (staff *StaffMember) HasConflict(slot string, offset int) bool {

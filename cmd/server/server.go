@@ -37,6 +37,67 @@ type RosterWeek struct {
   IsLive         bool `bson:"isLive"`
 }
 
+func (s StaffMember) MarshalBSON() ([]byte, error) {
+    type Alias StaffMember
+    aux := &struct {
+        *Alias `bson:",inline"`
+    }{
+        Alias: (*Alias)(&s),
+    }
+    return bson.Marshal(aux)
+}
+
+func (s *StaffMember) UnmarshalBSON(data []byte) error {
+    type Alias StaffMember
+    aux := &struct {
+        *Alias `bson:",inline"`
+    }{
+        Alias: (*Alias)(s),
+    }
+
+    if err := bson.Unmarshal(data, aux); err != nil {
+        return err
+    }
+
+    s.Config.RosterStartDate = s.Config.RosterStartDate.In(time.Now().Location())
+    s.Config.TimesheetStartDate = s.Config.TimesheetStartDate.In(time.Now().Location())
+
+    return nil
+}
+func (rw RosterWeek) MarshalBSON() ([]byte, error) {
+    type Alias RosterWeek
+    return bson.Marshal(&struct {
+        StartDate string `bson:"startDate"`
+        *Alias `bson:",inline"`
+    }{
+        StartDate: rw.StartDate.Format("2006-01-02"),
+        Alias:     (*Alias)(&rw),
+    })
+}
+
+// UnmarshalBSON customizes the BSON unmarshaling for RosterWeek
+func (rw *RosterWeek) UnmarshalBSON(data []byte) error {
+    type Alias RosterWeek
+    aux := &struct {
+        StartDate string `bson:"startDate"`
+        *Alias `bson:",inline"`
+    }{
+        Alias: (*Alias)(rw),
+    }
+
+    if err := bson.Unmarshal(data, aux); err != nil {
+        return err
+    }
+
+    parsedDate, err := time.Parse("2006-01-02", aux.StartDate)
+    parsedDate = parsedDate.In(time.Now().Location())
+    log.Printf("Unmarshalled date: %v", parsedDate)
+    if err != nil {
+        return err
+    }
+    return nil
+}
+
 type Highlight int
 
 const (
@@ -150,9 +211,11 @@ func (s *Server) SaveStaffMember (staffMember StaffMember) error {
 }
 
 func (s *Server) SaveRosterWeek (w RosterWeek) error {
-  // w.CheckFlags(s.StaffState)
-  d := w.StartDate
+  staffState := s.LoadStaffState()
+  w = s.CheckFlags(staffState, w)
+  d := w.StartDate.In(time.Now().Location())
   w.StartDate = time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.Now().Location())
+  log.Printf("Start Date: %v", w.StartDate)
   collection := s.DB.Collection("rosters")
   filter := bson.M{"_id": w.ID}
   update := bson.M{"$set": w}
@@ -168,9 +231,10 @@ func (s *Server) SaveRosterWeek (w RosterWeek) error {
 
 func (s *Server) LoadRosterWeek(startDate time.Time) *RosterWeek {
   var rosterWeek RosterWeek
-  d := startDate
+  d := startDate.In(time.Now().Location())
   startDate = time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.Now().Location())
-  filter := bson.M{"startDate": startDate}
+  log.Printf("Loading week starting: %v", startDate)
+  filter := bson.M{"startDate": startDate.Format("2006-01-02")}
   collection := s.DB.Collection("rosters")
   err := collection.FindOne(s.Context, filter).Decode(&rosterWeek)
   if err == nil {

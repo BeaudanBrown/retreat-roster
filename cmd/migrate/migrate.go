@@ -11,15 +11,15 @@ import (
 )
 
 type OldData struct {
-  StartDate time.Time
-  TimesheetStartDate time.Time
-  Staff *[]*server.StaffMember `bson:"staff"`
-  Days  []*server.RosterDay   `bson:"days"`
-  IsLive bool
-  HideByIdeal bool
-  HideByPrefs bool
-  HideByLeave bool
-  ApprovalMode bool
+  StartDate time.Time `json:"startDate"`
+  TimesheetStartDate time.Time `json:"timesheetStartDate"`
+  Staff *[]*server.StaffMember `json:"staff"`
+  Days  []*server.RosterDay   `json:"days"`
+  IsLive bool `json:"isLive"`
+  HideByIdeal bool `json:"hideByIdeal"`
+  HideByPrefs bool `json:"hideByPrefs"`
+  HideByLeave bool `json:"hideByLeave"`
+  ApprovalMode bool `json:"approvalMode"`
 }
 
 const STATE_FILE = "./data/state.json"

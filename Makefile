@@ -6,6 +6,10 @@ DIST_FOLDER=./dist
 run:
 	go run cmd/main.go
 
+cleandb:
+	rm -rf .devenv/state/mongodb
+	mv data/state* data/state.json
+
 build:
 	@echo "Building static binary..."
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o $(DIST_FOLDER)/$(BINARY_NAME) ./cmd/main.go

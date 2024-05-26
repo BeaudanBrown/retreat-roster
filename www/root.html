@@ -37,9 +37,9 @@
       });
     }
     </script>
-  <body class="rootBody">
+  <body id="roster" class="rootBody">
     {{ template "header" (MakeHeaderStruct .ActiveStaff.IsAdmin .IsLive) }}
-    <div id="roster" class="roster-container">
+    <div class="roster-container">
       {{ if not .ActiveStaff.IsAdmin }}
         <div id="roster-jpg">
         {{ range .Days }}
