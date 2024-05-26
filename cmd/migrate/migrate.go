@@ -50,9 +50,11 @@ func MigrateToMongo(s *server.Server) (error) {
       return err
     }
   }
+  year, month, day := state.StartDate.Date()
+  startDate := time.Date(year, month, day, 0, 0, 0, 0, time.Now().Location())
   rosterWeek := server.RosterWeek{
     ID: uuid.New(),
-    StartDate: state.StartDate,
+    StartDate: startDate,
     Days: state.Days,
     IsLive: state.IsLive,
   }
