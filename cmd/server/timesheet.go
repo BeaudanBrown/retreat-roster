@@ -13,7 +13,7 @@ import (
 )
 
 type TimesheetData struct {
-  db.TimesheetWeekState
+  Entries []db.TimesheetEntry
   StaffMember db.StaffMember
   DayNames []string
   StaffMap map[uuid.UUID]db.StaffMember
@@ -22,13 +22,14 @@ type TimesheetData struct {
 }
 
 func (s *Server) MakeTimesheetStruct(activeStaff db.StaffMember) TimesheetData {
-  timesheetWeek := s.LoadTimesheetWeek(activeStaff.Config.TimesheetStartDate)
-  if timesheetWeek == nil {
+  entries := s.GetTimesheetWeek(activeStaff.Config.TimesheetStartDate)
+  if entries == nil {
     log.Printf("Failed to load timesheet week when making struct")
   }
+  log.Printf("Got entries: %v", entries)
 
   return TimesheetData{
-    TimesheetWeekState: *timesheetWeek,
+    Entries: *entries,
     StaffMember: activeStaff,
     DayNames: []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"},
     StaffMap: s.GetStaffMap(),
@@ -82,7 +83,6 @@ func (s *Server) HandleShiftTimesheetWindow(w http.ResponseWriter, r *http.Reque
 type DeleteTimesheetEntryBody struct {
   StaffID string `json:"staffID"`
   EntryID string `json:"entryID"`
-  StartDate db.CustomDate	`json:"start-date"`
   AdminView bool `json:"adminView"`
 }
 
@@ -100,31 +100,11 @@ func (s *Server) HandleDeleteTimesheetEntry(w http.ResponseWriter, r *http.Reque
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  staffID, err := uuid.Parse(reqBody.StaffID)
+  err = s.DeleteTimesheetEntry(entryID)
   if err != nil {
-    log.Printf("Invalid staffID: %v", err)
+    log.Printf("Error deleting timesheet entry: %v", err)
     w.WriteHeader(http.StatusBadRequest)
     return
-  }
-  timesheetWeek := s.LoadTimesheetWeek(*reqBody.StartDate.Time)
-  if timesheetWeek == nil {
-    log.Printf("Failed to load timesheet week when deleting")
-    return
-  }
-  thisStaffWeek := s.GetStaffTimesheetWeek(staffID, timesheetWeek)
-  found := false
-  for _, day := range thisStaffWeek.Days {
-    for i, entry := range day.Entries {
-      if entry.ID == entryID {
-        if thisStaff.IsAdmin || staffID == thisStaff.ID {
-          day.Entries = append(day.Entries[:i], day.Entries[i+1:]...)
-          s.SaveTimesheetWeek(*timesheetWeek)
-          found = true
-        }
-        break
-      }
-    }
-    if found { break }
   }
   s.RenderTimesheetTemplate(w, r, reqBody.AdminView)
 }
@@ -132,7 +112,7 @@ func (s *Server) HandleDeleteTimesheetEntry(w http.ResponseWriter, r *http.Reque
 type AddTimesheetEntryBody struct {
   StaffID string `json:"staffID"`
   DayIdx int `json:"dayIdx"`
-  StartDate db.CustomDate	`json:"start-date"`
+  StartDate db.CustomDate	`json:"startDate"`
   AdminView bool `json:"adminView"`
 }
 
@@ -145,29 +125,18 @@ func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request)
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  timesheetWeek := s.LoadTimesheetWeek(*reqBody.StartDate.Time)
-  if timesheetWeek == nil {
-    log.Printf("Failed to load timesheet week: %v", err)
-    return
-  }
-  staffTimesheetWeek := s.GetStaffTimesheetWeek(staffID, timesheetWeek)
-  day := staffTimesheetWeek.Days[reqBody.DayIdx]
-  if day == nil {
-    log.Printf("Could not find day: %v", err)
+  err = s.CreateTimesheetEntry(*reqBody.StartDate.Time, staffID)
+  if err != nil {
+    log.Printf("Couldn't create new timesheet entry: %v", err)
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-  day.Entries = append(day.Entries, &db.TimesheetEntry{
-    ID:      uuid.New(),
-  })
-  s.SaveTimesheetState(timesheetWeek)
   s.RenderTimesheetTemplate(w, r, reqBody.AdminView)
 }
 
 type ModifyTimesheetEntryBody struct {
     StaffID       string     `json:"staffID"`
     EntryID         string     `json:"entryID"`
-    StartDate     db.CustomDate `json:"start-date"`
     ShiftStart db.CustomDate     `json:"shiftStart"`
     ShiftEnd  db.CustomDate     `json:"shiftEnd"`
     BreakStart db.CustomDate     `json:"breakStart"`
@@ -181,7 +150,7 @@ func getAdjustedTime(t db.CustomDate, dayDate time.Time) (*time.Time) {
   year, month, day := dayDate.Date()
   if t.Time != nil {
     hour, min, _ := t.Clock()
-    newBreakStart := time.Date(year, month, day, hour, min, 0, 0, dayDate.Location())
+    newBreakStart := time.Date(year, month, day, hour, min, 0, 0, time.Now().Location())
     return &newBreakStart
   } else {
     return nil
@@ -197,54 +166,41 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
     w.WriteHeader(http.StatusBadRequest)
     return
   }
-
-  timesheetWeek := s.LoadTimesheetWeek(*reqBody.StartDate.Time)
-  if timesheetWeek == nil {
-    log.Printf("Failed to load timesheet week when modifying")
+  entry := s.GetTimesheetEntryByID(entryID)
+  if entry == nil {
+    log.Println("Couldn't find entry to modify")
+    w.WriteHeader(http.StatusBadRequest)
     return
   }
+  entry.Status = reqBody.Status
+  entry.ShiftType = db.StringToShiftType(reqBody.ShiftType)
+  entry.BreakStart = getAdjustedTime(reqBody.BreakStart, entry.StartDate)
+  entry.BreakEnd = getAdjustedTime(reqBody.BreakEnd, entry.StartDate)
 
-  found := false
-  for _, week := range timesheetWeek.StaffTimesheets {
-    for _, day := range week.Days {
-      for _, entry := range day.Entries {
-        if entry.ID == entryID {
-          dayDate := timesheetWeek.StartDate.AddDate(0, 0, day.Offset)
-          found = true
-          entry.Status = reqBody.Status
-          entry.ShiftType = db.StringToShiftType(reqBody.ShiftType)
-          entry.BreakStart = getAdjustedTime(reqBody.BreakStart, dayDate)
-          entry.BreakEnd = getAdjustedTime(reqBody.BreakEnd, dayDate)
-
-          if entry.BreakStart != nil && entry.BreakEnd != nil {
-            if entry.BreakStart.After(*entry.BreakEnd) {
-              newBreakEnd := entry.BreakEnd.AddDate(0, 0, 1)
-              entry.BreakEnd = &newBreakEnd
-            }
-            entry.BreakLength = math.Round(entry.BreakEnd.Sub(*entry.BreakStart).Hours() * 100) / 100
-          } else {
-            entry.BreakLength = 0
-          }
-
-          entry.ShiftStart = getAdjustedTime(reqBody.ShiftStart, dayDate)
-          entry.ShiftEnd = getAdjustedTime(reqBody.ShiftEnd, dayDate)
-
-          if entry.ShiftStart != nil && entry.ShiftEnd != nil {
-            if entry.ShiftStart.After(*entry.ShiftEnd) {
-              newShiftEnd := entry.ShiftEnd.AddDate(0, 0, 1)
-              entry.ShiftEnd = &newShiftEnd
-            }
-            entry.ShiftLength = math.Round((entry.ShiftEnd.Sub(*entry.ShiftStart).Hours() - entry.BreakLength) * 100) / 100
-          } else {
-            entry.ShiftLength = 0
-          }
-          s.SaveTimesheetState(timesheetWeek)
-          break
-        }
-      }
-      if found { break }
+  if entry.BreakStart != nil && entry.BreakEnd != nil {
+    if entry.BreakStart.After(*entry.BreakEnd) {
+      newBreakEnd := entry.BreakEnd.AddDate(0, 0, 1)
+      entry.BreakEnd = &newBreakEnd
     }
+    entry.BreakLength = math.Round(entry.BreakEnd.Sub(*entry.BreakStart).Hours() * 100) / 100
+  } else {
+    entry.BreakLength = 0
   }
+
+  entry.ShiftStart = getAdjustedTime(reqBody.ShiftStart, entry.StartDate)
+  entry.ShiftEnd = getAdjustedTime(reqBody.ShiftEnd, entry.StartDate)
+
+  if entry.ShiftStart != nil && entry.ShiftEnd != nil {
+    if entry.ShiftStart.After(*entry.ShiftEnd) {
+      newShiftEnd := entry.ShiftEnd.AddDate(0, 0, 1)
+      entry.ShiftEnd = &newShiftEnd
+    }
+    entry.ShiftLength = math.Round((entry.ShiftEnd.Sub(*entry.ShiftStart).Hours() - entry.BreakLength) * 100) / 100
+  } else {
+    entry.ShiftLength = 0
+  }
+  s.SaveTimesheetEntry(*entry)
+
   s.RenderTimesheetTemplate(w, r, reqBody.AdminView)
 }
 
@@ -276,10 +232,9 @@ type TimesheetEntryData struct {
   IsAdmin  bool
 }
 
-func MakeTimesheetEntryStruct(entry db.TimesheetEntry, staffMember db.StaffMember, startDate time.Time, approvalMode bool, isAdmin bool) TimesheetEntryData {
+func MakeTimesheetEntryStruct(entry db.TimesheetEntry, staffMember db.StaffMember, approvalMode bool, isAdmin bool) TimesheetEntryData {
   return TimesheetEntryData{
     TimesheetEntry: entry,
-    StartDate: startDate,
     StaffMember: staffMember,
     ApprovalMode: approvalMode,
     IsAdmin: isAdmin,

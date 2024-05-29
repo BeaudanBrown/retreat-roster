@@ -7,7 +7,7 @@
     <div class="timesheetDay" id='entry-{{.ID}}'>
   <form hx-ext="json-enc" hx-swap="outerHTML" hx-target="#timesheet"
         hx-post="/modifyTimesheetEntry"
-        hx-vals='js:{"entryID":"{{ .ID }}", "staffID":"{{.StaffMember.ID}}", "start-date":"{{.StartDate}}", "status": {{.Status}} + 1}'>
+        hx-vals='js:{"entryID":"{{ .ID }}", "staffID":"{{.StaffMember.ID}}", "status": {{.Status}} + 1}'>
       <div class="timesheetEl">
         <label>{{if .StaffMember.NickName}}{{.StaffMember.NickName}}{{else}}{{.StaffMember.FirstName}}{{end}}</label>
       </div>
@@ -59,7 +59,7 @@
                 class="actionBtn"
                 hx-ext="json-enc"
                 hx-post="/deleteTimesheetEntry"
-                hx-vals='js:{"entryID":"{{ .ID }}", "staffID":"{{.StaffMember.ID}}", "start-date":"{{.StartDate}}"}'
+                hx-vals='js:{"entryID":"{{ .ID }}", "staffID":"{{.StaffMember.ID}}"}'
                 hx-swap="outerHTML"
                 hx-confirm="Are you sure you want to delete this entry?"
                 hx-target="#timesheet">
@@ -112,8 +112,7 @@
                             "shiftEnd":"{{.ShiftEnd}}",
                             "breakStart":"{{.BreakStart}}",
                             "breakEnd":"{{.BreakEnd}}",
-                            "status": {{.Status}} - 1,
-                            "start-date":"{{.StartDate}}"}'
+                            "status": {{.Status}} - 1}'
                   hx-swap="outerHTML"
                   hx-target="#timesheet">
             Edit

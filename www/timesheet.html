@@ -1,7 +1,7 @@
 {{ define "timesheet" }}
 {{ $staffMember := .StaffMember }}
 {{ $config := .StaffMember.Config }}
-{{ $staffTimesheets := .StaffTimesheets }}
+{{ $entries := .Entries }}
 {{ $approvalMode := $config.ApprovalMode }}
 {{ $adminView := and $approvalMode .StaffMember.IsAdmin }}
 {{ $staffMap := .StaffMap }}
@@ -75,27 +75,25 @@
           <div class="timesheetEl">Action</div>
         </div>
         {{ range $idx, $dayName := .DayNames }}
+          {{ $thisDate := addDays $config.TimesheetStartDate $idx }}
           <div class="day-name">
             {{ if not $adminView }}
               <button class="add-entry-btn"
                       hx-post='/addTimesheetEntry' hx-ext='json-enc'
-                      hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "dayIdx":{{$idx}}, "start-date":"{{$config.TimesheetStartDate}}"}'
+                      hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "dayIdx":{{$idx}}, "startDate":"{{$config.TimesheetStartDate}}"}'
                       hx-swap='outerHTML' hx-target='#timesheet'>+</button>
             {{ end }}
             <h3>{{$dayName}}</h3>
           </div>
-          {{ range $staffID, $week := $staffTimesheets }}
-            {{ $day := index $week.Days $idx }}
-            {{ if not $adminView }}
-              {{ if (eq $staffID $staffMember.ID) }}
-                {{ range $day.Entries }}
-                  {{ template "timesheetEntry" (MakeTimesheetEntryStruct . (index $staffMap $staffID) $config.TimesheetStartDate $approvalMode $staffMember.IsAdmin) }}
+          {{ range $entry := $entries }}
+            {{ if (eq $entry.StartDate $thisDate) }}
+              {{ if not $adminView }}
+                {{ if (eq .StaffID $staffMember.ID) }}
+                  {{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry (index $staffMap .StaffID) $approvalMode $staffMember.IsAdmin) }}
                 {{ end }}
-              {{ end }}
-            {{ else }}
-              {{ range $day.Entries }}
+              {{ else }}
                 {{ if not (and (eq .Status 2) $hideApproved)}}
-                  {{ template "timesheetEntry" (MakeTimesheetEntryStruct . (index $staffMap $staffID) $config.TimesheetStartDate $approvalMode $staffMember.IsAdmin) }}
+                  {{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry (index $staffMap .StaffID) $approvalMode $staffMember.IsAdmin) }}
                 {{ end }}
               {{ end }}
             {{ end }}

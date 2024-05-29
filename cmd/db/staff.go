@@ -195,7 +195,8 @@ func (d *Database) LoadStaffState() (StaffState) {
   collection := d.DB.Collection("staff")
   cursor, err := collection.Find(d.Context, bson.M{})
   if err != nil {
-      log.Printf("Error executing query: %v", err)
+    log.Printf("Error executing query: %v", err)
+    return StaffState{ }
   }
   defer cursor.Close(d.Context)
 
