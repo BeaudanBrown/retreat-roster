@@ -10,11 +10,13 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+//TODO: Flatten rosterweeks into days or maybe even just rows
+
 type RosterWeek struct {
-	ID        uuid.UUID   `bson:"id"`
-	StartDate time.Time   `bson:"startDate"`
-	Days      []RosterDay `bson:"days"`
-	IsLive    bool        `bson:"isLive"`
+	ID        uuid.UUID    `bson:"id"`
+	StartDate time.Time    `bson:"startDate"`
+	Days      []*RosterDay `bson:"days"`
+	IsLive    bool         `bson:"isLive"`
 }
 
 type RosterDay struct {
@@ -126,7 +128,7 @@ func (d *Database) LoadRosterWeek(startDate time.Time) *RosterWeek {
 
 func newRosterWeek(startDate time.Time) RosterWeek {
 	dayNames := []string{"Tues", "Wed", "Thurs", "Fri", "Sat", "Sun", "Mon"}
-	var Days []RosterDay
+	var Days []*RosterDay
 
 	for i, dayName := range dayNames {
 		var colour string
@@ -135,7 +137,7 @@ func newRosterWeek(startDate time.Time) RosterWeek {
 		} else {
 			colour = "#ffffff"
 		}
-		Days = append(Days, RosterDay{
+		Days = append(Days, &RosterDay{
 			ID:      uuid.New(),
 			DayName: dayName,
 			Rows: []*Row{
@@ -214,7 +216,7 @@ func (d *Database) CheckFlags(allStaff []*StaffMember, week RosterWeek) RosterWe
 	shiftCounts := make(map[uuid.UUID][]int)
 
 	for i := range week.Days {
-		shiftCounts = countShifts(shiftCounts, week.Days[i], i)
+		shiftCounts = countShifts(shiftCounts, *week.Days[i], i)
 	}
 	for staffID, counts := range shiftCounts {
 		total := getCurentShifts(counts)
@@ -229,12 +231,13 @@ func (d *Database) CheckFlags(allStaff []*StaffMember, week RosterWeek) RosterWe
 	}
 
 	for i := range week.Days {
-		week.Days[i] = assignFlags(week.Days[i], week.StartDate.AddDate(0, 0, i), shiftCounts, staffMap, i)
+		newDay := assignFlags(week.Days[i], week.StartDate.AddDate(0, 0, i), shiftCounts, staffMap, i)
+		week.Days[i] = &newDay
 	}
 	return week
 }
 
-func assignFlags(day RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int, staffMap map[uuid.UUID]*StaffMember, i int) RosterDay {
+func assignFlags(day *RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int, staffMap map[uuid.UUID]*StaffMember, i int) RosterDay {
 	processSlot := func(slot *Slot, dayIndex int) {
 		if slot.AssignedStaff != nil {
 			if shiftCounts[*slot.AssignedStaff][dayIndex] > 1 {
@@ -275,7 +278,7 @@ func assignFlags(day RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int,
 		processSlot(&row.Late, i)
 	}
 
-	return day
+	return *day
 }
 
 func (week *RosterWeek) GetSlotByID(slotID uuid.UUID) *Slot {
@@ -302,7 +305,7 @@ func (week *RosterWeek) GetSlotByID(slotID uuid.UUID) *Slot {
 func (week *RosterWeek) GetDayByID(dayID uuid.UUID) *RosterDay {
 	for _, day := range week.Days {
 		if day.ID == dayID {
-			return &day
+			return day
 		}
 	}
 	return nil
@@ -350,7 +353,7 @@ func (d *Database) ChangeDayRowCount(
 				}
 			}
 			d.SaveRosterWeek(*week)
-			return &day, week.IsLive
+			return day, week.IsLive
 		}
 	}
 	return nil, false

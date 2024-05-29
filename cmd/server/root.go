@@ -529,7 +529,7 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
 }
 
 func duplicateRosterWeek(src db.RosterWeek, newWeek db.RosterWeek) db.RosterWeek {
-	newDays := []db.RosterDay{}
+	newDays := []*db.RosterDay{}
 	for _, day := range src.Days {
 		newDay := db.RosterDay{
 			ID:         uuid.New(),
@@ -550,7 +550,7 @@ func duplicateRosterWeek(src db.RosterWeek, newWeek db.RosterWeek) db.RosterWeek
 			}
 			newDay.Rows = append(newDay.Rows, newRow)
 		}
-		newDays = append(newDays, newDay)
+		newDays = append(newDays, &newDay)
 	}
 	newWeek.Days = newDays
 
