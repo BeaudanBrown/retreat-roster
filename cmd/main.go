@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"roster/cmd/migrate"
 	"roster/cmd/server"
@@ -19,7 +21,12 @@ func main() {
 	}
 	ctx := context.TODO()
 
-	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
+	db_host := os.Getenv("DB_HOST")
+	db_user := os.Getenv("DB_USER")
+	db_pass := os.Getenv("DB_PASS")
+	db_port := os.Getenv("DB_PORT")
+	uri := fmt.Sprintf("mongodb://%s:%s@%s:%s", db_user, db_pass, db_host, db_port)
+	clientOptions := options.Client().ApplyURI(uri)
 	client, err := mongo.Connect(ctx, clientOptions)
 	if err != nil {
 		log.Fatalf("Error connecting to database: %v", err)

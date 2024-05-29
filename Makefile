@@ -14,9 +14,13 @@ build:
 	@echo "Building static binary..."
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o $(DIST_FOLDER)/$(BINARY_NAME) ./cmd/main.go
 
-docker:
+docker-build:
 	@echo "Building dockerfile..."
-	docker build -t retreat-roster .
+	docker-compose build
+
+docker-run:
+	@echo "Building dockerfile..."
+	docker-compose up
 
 docker-push:
 	@echo "Pushing docker image..."
