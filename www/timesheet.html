@@ -80,7 +80,7 @@
 					{{ if not $adminView }}
 					<button class="add-entry-btn"
 						hx-post='/addTimesheetEntry' hx-ext='json-enc'
-						hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "dayIdx":{{$idx}}, "startDate":"{{$config.TimesheetStartDate}}"}'
+						hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "startDate":"{{$thisDate}}"}'
 						hx-swap='outerHTML' hx-target='#timesheet'>+</button>
 					{{ end }}
 					<h3>{{$dayName}}</h3>
