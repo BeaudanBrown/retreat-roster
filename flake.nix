@@ -43,9 +43,8 @@
                     initDatabaseUsername = "mongodb";
                   };
 
-                  pre-commit.hooks.formatter = {
+                  pre-commit.hooks.gofmt = {
                     enable = true;
-                    entry = ''find . -name "*.go" -exec gofmt -w {} \;'';
                   };
 
                 }
