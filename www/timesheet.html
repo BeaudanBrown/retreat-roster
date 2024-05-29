@@ -8,99 +8,99 @@
 {{ $hideApproved := $config.HideApproved }}
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html>
-  <head>
-    <base href="/">
-    <title>Retreat Roster</title>
-    <link rel="stylesheet" href="app.css?v={{ .CacheBust }}">
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
-  </head>
-  <body id="timesheet" class="rootBody">
-    {{ template "header" (MakeHeaderStruct $staffMember.IsAdmin .RosterLive) }}
-    {{ if $staffMember.IsAdmin }}
-      </br>
-      <div class="buttons" id="filters">
-        <button class="checkLabel"
-                hx-get="/toggleApprovalMode"
-                hx-target="#timesheet"
-                hx-swap='outerHTML'>
-          <input type="checkbox" {{ if $approvalMode }}checked{{ end }}>
-          <label>Approval mode</label>
-        </button>
-        <button class="checkLabel"
-                hx-get="/toggleHideApproved"
-                hx-target="#timesheet"
-                hx-swap='outerHTML'>
-          <input type="checkbox" {{ if $hideApproved }}checked{{ end }}>
-          <label>Hide approved</label>
-        </button>
-      </div>
-      </br>
-    {{ end }}
-    <div class="timesheet">
-      <div>
-        <button hx-post='/shiftTimesheetWindow'
-                hx-ext='json-enc'
-                hx-vals='js:{"action":"-"}'
-                hx-swap='outerHTML'
-                hx-target='#timesheet'>
-          -
-        </button>
-        <button hx-post='/shiftTimesheetWindow'
-                hx-ext='json-enc'
-                hx-vals='js:{"action":"0"}'
-                hx-swap='outerHTML'
-                hx-target='#timesheet'>
-          This Week
-        </button>
-        <button hx-post='/shiftTimesheetWindow'
-                hx-ext='json-enc'
-                hx-vals='js:{"action":"+"}'
-                hx-swap='outerHTML'
-                hx-target='#timesheet'>
-          +
-        </button>
-      </div>
-      <div>
-        <h3>Week {{$config.TimesheetStartDate.Format "02/01"}} - {{(addDays $config.TimesheetStartDate 7).Format "02/01"}}</h3>
-      </div>
-      <div class="week-form">
-        <div class="timesheetDay day-header">
-          <div class="timesheetEl">Staff</div>
-          <div class="timesheetEl">Type</div>
-          <div class="timesheetEl">Shift</div>
-          <div class="timesheetEl">Break</div>
-          <div class="timesheetEl">Total</div>
-          <div class="timesheetEl">Action</div>
-        </div>
-        {{ range $idx, $dayName := .DayNames }}
-          {{ $thisDate := addDays $config.TimesheetStartDate $idx }}
-          <div class="day-name">
-            {{ if not $adminView }}
-              <button class="add-entry-btn"
-                      hx-post='/addTimesheetEntry' hx-ext='json-enc'
-                      hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "dayIdx":{{$idx}}, "startDate":"{{$config.TimesheetStartDate}}"}'
-                      hx-swap='outerHTML' hx-target='#timesheet'>+</button>
-            {{ end }}
-            <h3>{{$dayName}}</h3>
-          </div>
-          {{ range $entry := $entries }}
-            {{ if (eq $entry.StartDate $thisDate) }}
-              {{ if not $adminView }}
-                {{ if (eq .StaffID $staffMember.ID) }}
-                  {{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry (index $staffMap .StaffID) $approvalMode $staffMember.IsAdmin) }}
-                {{ end }}
-              {{ else }}
-                {{ if not (and (eq .Status 2) $hideApproved)}}
-                  {{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry (index $staffMap .StaffID) $approvalMode $staffMember.IsAdmin) }}
-                {{ end }}
-              {{ end }}
-            {{ end }}
-          {{ end }}
-        {{ end }}
-      </div>
-    </div>
-  </body>
+	<head>
+		<base href="/">
+		<title>Retreat Roster</title>
+		<link rel="stylesheet" href="app.css?v={{ .CacheBust }}">
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+		<script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
+	</head>
+	<body id="timesheet" class="rootBody">
+		{{ template "header" (MakeHeaderStruct $staffMember.IsAdmin .RosterLive) }}
+		{{ if $staffMember.IsAdmin }}
+		</br>
+		<div class="buttons" id="filters">
+			<button class="checkLabel"
+				hx-get="/toggleApprovalMode"
+				hx-target="#timesheet"
+				hx-swap='outerHTML'>
+				<input type="checkbox" {{ if $approvalMode }}checked{{ end }}>
+				<label>Approval mode</label>
+			</button>
+			<button class="checkLabel"
+				hx-get="/toggleHideApproved"
+				hx-target="#timesheet"
+				hx-swap='outerHTML'>
+				<input type="checkbox" {{ if $hideApproved }}checked{{ end }}>
+				<label>Hide approved</label>
+			</button>
+		</div>
+		</br>
+		{{ end }}
+		<div class="timesheet">
+			<div>
+				<button hx-post='/shiftTimesheetWindow'
+					hx-ext='json-enc'
+					hx-vals='js:{"action":"-"}'
+					hx-swap='outerHTML'
+					hx-target='#timesheet'>
+					-
+				</button>
+				<button hx-post='/shiftTimesheetWindow'
+					hx-ext='json-enc'
+					hx-vals='js:{"action":"0"}'
+					hx-swap='outerHTML'
+					hx-target='#timesheet'>
+					This Week
+				</button>
+				<button hx-post='/shiftTimesheetWindow'
+					hx-ext='json-enc'
+					hx-vals='js:{"action":"+"}'
+					hx-swap='outerHTML'
+					hx-target='#timesheet'>
+					+
+				</button>
+			</div>
+			<div>
+				<h3>Week {{$config.TimesheetStartDate.Format "02/01"}} - {{(addDays $config.TimesheetStartDate 7).Format "02/01"}}</h3>
+			</div>
+			<div class="week-form">
+				<div class="timesheetDay day-header">
+					<div class="timesheetEl">Staff</div>
+					<div class="timesheetEl">Type</div>
+					<div class="timesheetEl">Shift</div>
+					<div class="timesheetEl">Break</div>
+					<div class="timesheetEl">Total</div>
+					<div class="timesheetEl">Action</div>
+				</div>
+				{{ range $idx, $dayName := .DayNames }}
+				{{ $thisDate := addDays $config.TimesheetStartDate $idx }}
+				<div class="day-name">
+					{{ if not $adminView }}
+					<button class="add-entry-btn"
+						hx-post='/addTimesheetEntry' hx-ext='json-enc'
+						hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "dayIdx":{{$idx}}, "startDate":"{{$config.TimesheetStartDate}}"}'
+						hx-swap='outerHTML' hx-target='#timesheet'>+</button>
+					{{ end }}
+					<h3>{{$dayName}}</h3>
+				</div>
+				{{ range $entry := $entries }}
+				{{ if (eq $entry.StartDate $thisDate) }}
+				{{ if not $adminView }}
+				{{ if (eq .StaffID $staffMember.ID) }}
+				{{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry (index $staffMap .StaffID) $approvalMode $staffMember.IsAdmin) }}
+				{{ end }}
+				{{ else }}
+				{{ if not (and (eq .Status 2) $hideApproved)}}
+				{{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry (index $staffMap .StaffID) $approvalMode $staffMember.IsAdmin) }}
+				{{ end }}
+				{{ end }}
+				{{ end }}
+				{{ end }}
+				{{ end }}
+			</div>
+		</div>
+	</body>
 </html>
 {{ end }}
