@@ -29,7 +29,7 @@ type StaffMember struct {
 	IdealShifts   int
 	CurrentShifts int
 	Availability  []DayAvailability
-	Token         *uuid.UUID
+	Tokens        []uuid.UUID
 	LeaveRequests []LeaveRequest
 	Config        StaffConfig
 }
@@ -247,7 +247,7 @@ func (d *Database) GetStaffByID(staffID uuid.UUID) *StaffMember {
 
 func (d *Database) GetStaffByToken(token uuid.UUID) *StaffMember {
 	collection := d.DB.Collection("staff")
-	filter := bson.M{"token": token}
+	filter := bson.M{"tokens": bson.M{"$elemMatch": bson.M{"$eq": token}}}
 	var staffMember StaffMember
 	err := collection.FindOne(d.Context, filter).Decode(&staffMember)
 	if err != nil {
@@ -286,10 +286,21 @@ func (staff *StaffMember) IsAway(date time.Time) bool {
 	return false
 }
 
+func AddToken(slice []uuid.UUID, value uuid.UUID) []uuid.UUID {
+	for _, v := range slice {
+		if v == value {
+			// Value already exists, return the original slice
+			return slice
+		}
+	}
+	// Value does not exist, append it to the slice
+	return append(slice, value)
+}
+
 func (d *Database) CreateOrUpdateStaffGoogleID(googleId string, token uuid.UUID) error {
 	staffMember := d.GetStaffByGoogleID(googleId)
 	if staffMember != nil {
-		staffMember.Token = &token
+		staffMember.Tokens = AddToken(staffMember.Tokens, token)
 		err := d.SaveStaffMember(*staffMember)
 		if err != nil {
 			return err
@@ -301,7 +312,7 @@ func (d *Database) CreateOrUpdateStaffGoogleID(googleId string, token uuid.UUID)
 			GoogleID:     googleId,
 			FirstName:    "",
 			IsAdmin:      isAdmin,
-			Token:        &token,
+			Tokens:       []uuid.UUID{token},
 			Availability: emptyAvailability,
 			Config: StaffConfig{
 				TimesheetStartDate: utils.GetLastTuesday(),

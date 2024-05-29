@@ -104,7 +104,7 @@ func (s *Server) HandleGoogleLogout(w http.ResponseWriter, r *http.Request) {
 
 	staff := s.GetSessionUser(w, r)
 	if staff != nil {
-		staff.Token = nil
+		staff.Tokens = []uuid.UUID{}
 	}
 	w.Header().Set("HX-Redirect", "/landing")
 	w.WriteHeader(http.StatusOK)
