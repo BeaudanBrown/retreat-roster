@@ -528,15 +528,9 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
 	s.renderTemplate(w, "rosterDay", MakeDayStruct(isLive, *newDay, s, *thisStaff))
 }
 
-func duplicateRosterWeek(startDate time.Time, src db.RosterWeek) db.RosterWeek {
-	newWeek := db.RosterWeek{
-		ID:        uuid.New(),
-		StartDate: startDate,
-		IsLive:    false,
-		Days:      make([]*db.RosterDay, len(src.Days)),
-	}
-
-	for i, day := range src.Days {
+func duplicateRosterWeek(src db.RosterWeek, newWeek db.RosterWeek) db.RosterWeek {
+	newDays := []*db.RosterDay{}
+	for _, day := range src.Days {
 		newDay := &db.RosterDay{
 			ID:         uuid.New(),
 			DayName:    day.DayName,
@@ -544,9 +538,9 @@ func duplicateRosterWeek(startDate time.Time, src db.RosterWeek) db.RosterWeek {
 			Offset:     day.Offset,
 			IsClosed:   day.IsClosed,
 			AmeliaOpen: day.AmeliaOpen,
-			Rows:       make([]*db.Row, len(day.Rows)),
+			Rows:       []*db.Row{},
 		}
-		for j, row := range day.Rows {
+		for _, row := range day.Rows {
 			newRow := &db.Row{
 				ID:     uuid.New(),
 				Amelia: duplicateSlot(row.Amelia),
@@ -554,10 +548,11 @@ func duplicateRosterWeek(startDate time.Time, src db.RosterWeek) db.RosterWeek {
 				Mid:    duplicateSlot(row.Mid),
 				Late:   duplicateSlot(row.Late),
 			}
-			newDay.Rows[j] = newRow
+			newDay.Rows = append(newDay.Rows, newRow)
 		}
-		newWeek.Days[i] = newDay
+		newDays = append(newDays, newDay)
 	}
+	newWeek.Days = newDays
 
 	return newWeek
 }
@@ -593,7 +588,20 @@ func (s *Server) HandleImportRosterWeek(w http.ResponseWriter, r *http.Request) 
 	log.Println("Importing")
 	lastWeekDate := thisStaff.Config.RosterStartDate.AddDate(0, 0, -7)
 	lastWeek := s.LoadRosterWeek(lastWeekDate)
-	thisWeek := duplicateRosterWeek(thisStaff.Config.RosterStartDate, *lastWeek)
-	s.SaveRosterWeek(thisWeek)
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, thisWeek))
+	if lastWeek == nil {
+		log.Println("No last week to duplicate")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	thisWeek := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if thisWeek == nil {
+		thisWeek = &db.RosterWeek{
+			ID:        uuid.New(),
+			StartDate: thisStaff.Config.RosterStartDate,
+		}
+	}
+	newWeek := duplicateRosterWeek(*lastWeek, *thisWeek)
+	thisWeek = &newWeek
+	s.SaveRosterWeek(*thisWeek)
+	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *thisWeek))
 }
