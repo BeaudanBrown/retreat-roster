@@ -16,7 +16,7 @@ type OldData struct {
 	StartDate          time.Time          `json:"startDate"`
 	TimesheetStartDate time.Time          `json:"timesheetStartDate"`
 	Staff              *[]*db.StaffMember `json:"staff"`
-	Days               []*db.RosterDay    `json:"days"`
+	Days               []db.RosterDay     `json:"days"`
 	IsLive             bool               `json:"isLive"`
 	HideByIdeal        bool               `json:"hideByIdeal"`
 	HideByPrefs        bool               `json:"hideByPrefs"`

@@ -63,18 +63,6 @@ type CustomDate struct {
 	*time.Time
 }
 
-type StaffState struct {
-	Staff *[]*StaffMember `bson:"staff"`
-}
-
-func NewStaffState() StaffState {
-	staff := []*StaffMember{}
-	s := StaffState{
-		Staff: &staff,
-	}
-	return s
-}
-
 func (cd *CustomDate) UnmarshalJSON(input []byte) error {
 	strInput := strings.Trim(string(input), `"`)
 	// Try parsing the date in the expected formats
@@ -177,9 +165,28 @@ func (s *StaffMember) UnmarshalBSON(data []byte) error {
 	return nil
 }
 
+func (d *Database) SaveStaffMembers(staffMembers []*StaffMember) error {
+	collection := d.DB.Collection("staff")
+	bulkWriteModels := make([]mongo.WriteModel, len(staffMembers))
+	for i, staffMember := range staffMembers {
+		filter := bson.M{"id": staffMember.ID}
+		update := bson.M{"$set": staffMember}
+		bulkWriteModels[i] = mongo.NewUpdateOneModel().SetFilter(filter).SetUpdate(update).SetUpsert(true)
+	}
+
+	opts := options.BulkWrite().SetOrdered(false)
+	_, err := collection.BulkWrite(d.Context, bulkWriteModels, opts)
+	if err != nil {
+		log.Printf("Failed to save staff members: %v\n", err)
+		return err
+	}
+	log.Println("Saved staff members")
+	return nil
+}
+
 func (d *Database) SaveStaffMember(staffMember StaffMember) error {
 	collection := d.DB.Collection("staff")
-	filter := bson.M{"_id": staffMember.ID}
+	filter := bson.M{"id": staffMember.ID}
 	update := bson.M{"$set": staffMember}
 	opts := options.Update().SetUpsert(true)
 	_, err := collection.UpdateOne(d.Context, filter, update, opts)
@@ -191,12 +198,12 @@ func (d *Database) SaveStaffMember(staffMember StaffMember) error {
 	return nil
 }
 
-func (d *Database) LoadStaffState() StaffState {
+func (d *Database) LoadAllStaff() []*StaffMember {
 	collection := d.DB.Collection("staff")
 	cursor, err := collection.Find(d.Context, bson.M{})
 	if err != nil {
 		log.Printf("Error executing query: %v", err)
-		return StaffState{}
+		return []*StaffMember{}
 	}
 	defer cursor.Close(d.Context)
 
@@ -209,10 +216,7 @@ func (d *Database) LoadStaffState() StaffState {
 		}
 		newStaff = append(newStaff, &staffMember)
 	}
-	staffState := StaffState{
-		&newStaff,
-	}
-	return staffState
+	return newStaff
 }
 
 func (d *Database) GetStaffByGoogleID(googleID string) *StaffMember {
@@ -306,7 +310,7 @@ func (d *Database) CreateOrUpdateStaffGoogleID(googleId string, token uuid.UUID)
 			return err
 		}
 	} else {
-		isAdmin := len(*d.LoadStaffState().Staff) == 0
+		isAdmin := len(d.LoadAllStaff()) == 0
 		staffMember = &StaffMember{
 			ID:           uuid.New(),
 			GoogleID:     googleId,
@@ -329,8 +333,8 @@ func (d *Database) CreateOrUpdateStaffGoogleID(googleId string, token uuid.UUID)
 
 func (d *Database) GetStaffMap() map[uuid.UUID]StaffMember {
 	staffMap := map[uuid.UUID]StaffMember{}
-	staffState := d.LoadStaffState().Staff
-	for _, staff := range *staffState {
+	staffState := d.LoadAllStaff()
+	for _, staff := range staffState {
 		staffMap[staff.ID] = *staff
 	}
 	return staffMap
@@ -379,6 +383,7 @@ func (d *Database) CreateTrial(trialName string) {
 		IsTrial:      true,
 		FirstName:    trialName,
 		Availability: emptyAvailability,
+		IdealShifts:  7,
 	}
 	err := d.SaveStaffMember(newStaff)
 	if err != nil {

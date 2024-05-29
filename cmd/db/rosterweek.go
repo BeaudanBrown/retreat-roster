@@ -11,10 +11,10 @@ import (
 )
 
 type RosterWeek struct {
-	ID        uuid.UUID    `bson:"_id"`
-	StartDate time.Time    `bson:"startDate"`
-	Days      []*RosterDay `bson:"days"`
-	IsLive    bool         `bson:"isLive"`
+	ID        uuid.UUID   `bson:"id"`
+	StartDate time.Time   `bson:"startDate"`
+	Days      []RosterDay `bson:"days"`
+	IsLive    bool        `bson:"isLive"`
 }
 
 type RosterDay struct {
@@ -52,6 +52,8 @@ const (
 	PrefConflict
 	PrefRefuse
 	LeaveConflict
+	IdealMet
+	IdealExceeded
 )
 
 func (rw RosterWeek) MarshalBSON() ([]byte, error) {
@@ -81,10 +83,10 @@ func (rw *RosterWeek) UnmarshalBSON(data []byte) error {
 }
 
 func (d *Database) SaveRosterWeek(w RosterWeek) error {
-	staffState := d.LoadStaffState()
-	w = d.CheckFlags(staffState, w)
+	allStaff := d.LoadAllStaff()
+	w = d.CheckFlags(allStaff, w)
 	collection := d.DB.Collection("rosters")
-	filter := bson.M{"_id": w.ID}
+	filter := bson.M{"id": w.ID}
 	update := bson.M{"$set": w}
 	opts := options.Update().SetUpsert(true)
 	_, err := collection.UpdateOne(d.Context, filter, update, opts)
@@ -124,7 +126,7 @@ func (d *Database) LoadRosterWeek(startDate time.Time) *RosterWeek {
 
 func newRosterWeek(startDate time.Time) RosterWeek {
 	dayNames := []string{"Tues", "Wed", "Thurs", "Fri", "Sat", "Sun", "Mon"}
-	var Days []*RosterDay
+	var Days []RosterDay
 
 	for i, dayName := range dayNames {
 		var colour string
@@ -133,7 +135,7 @@ func newRosterWeek(startDate time.Time) RosterWeek {
 		} else {
 			colour = "#ffffff"
 		}
-		Days = append(Days, &RosterDay{
+		Days = append(Days, RosterDay{
 			ID:      uuid.New(),
 			DayName: dayName,
 			Rows: []*Row{
@@ -173,150 +175,107 @@ func newSlot() Slot {
 	}
 }
 
-func (d *Database) CheckFlags(staffState StaffState, week RosterWeek) RosterWeek {
-	allStaff := staffState.Staff
-	for _, staff := range *allStaff {
-		staff.CurrentShifts = 0
-		d.SaveStaffMember(*staff)
+func countShifts(shiftCounts map[uuid.UUID][]int, day RosterDay, dayIndex int) map[uuid.UUID][]int {
+	recordShifts := func(slot *Slot) {
+		if slot.AssignedStaff != nil {
+			if _, exists := shiftCounts[*slot.AssignedStaff]; !exists {
+				shiftCounts[*slot.AssignedStaff] = make([]int, 7)
+			}
+			shiftCounts[*slot.AssignedStaff][dayIndex]++
+		}
 	}
-	for i, day := range week.Days {
-		// Create a new map for each day to track occurrences of staff IDs within that day
-		// TODO: Improve this by batching staff queries and updates
-		// TODO: Move staff current shifts check somewhere more sensible
-		staffIDOccurrences := make(map[uuid.UUID]int)
 
-		for _, row := range day.Rows {
-			if day.AmeliaOpen && row.Amelia.AssignedStaff != nil {
-				staffIDOccurrences[*row.Amelia.AssignedStaff]++
-				staff := d.GetStaffByID(*row.Amelia.AssignedStaff)
-				if staff != nil {
-					staff.CurrentShifts += 1
-					d.SaveStaffMember(*staff)
-				}
-			}
-			if row.Early.AssignedStaff != nil {
-				staffIDOccurrences[*row.Early.AssignedStaff]++
-				staff := d.GetStaffByID(*row.Early.AssignedStaff)
-				if staff != nil {
-					staff.CurrentShifts += 1
-					d.SaveStaffMember(*staff)
-				}
-			}
-			if row.Mid.AssignedStaff != nil {
-				staffIDOccurrences[*row.Mid.AssignedStaff]++
-				staff := d.GetStaffByID(*row.Mid.AssignedStaff)
-				if staff != nil {
-					staff.CurrentShifts += 1
-					d.SaveStaffMember(*staff)
-				}
-			}
-			if row.Late.AssignedStaff != nil {
-				staffIDOccurrences[*row.Late.AssignedStaff]++
-				staff := d.GetStaffByID(*row.Late.AssignedStaff)
-				if staff != nil {
-					staff.CurrentShifts += 1
-					d.SaveStaffMember(*staff)
-				}
-			}
+	for _, row := range day.Rows {
+		if day.AmeliaOpen {
+			recordShifts(&row.Amelia)
 		}
+		recordShifts(&row.Early)
+		recordShifts(&row.Mid)
+		recordShifts(&row.Late)
+	}
 
-		for _, row := range day.Rows {
-			row.Amelia.Flag = None
-			row.Early.Flag = None
-			row.Mid.Flag = None
-			row.Late.Flag = None
-			date := week.StartDate.AddDate(0, 0, day.Offset)
+	return shiftCounts
+}
 
-			if day.AmeliaOpen && row.Amelia.AssignedStaff != nil {
-				if staffIDOccurrences[*row.Amelia.AssignedStaff] > 1 {
-					row.Amelia.Flag = Duplicate
-				} else {
-					staff := d.GetStaffByID(*row.Amelia.AssignedStaff)
-					for _, req := range staff.LeaveRequests {
-						if !req.StartDate.After(date) && req.EndDate.After(date) {
-							row.Amelia.Flag = LeaveConflict
-							break
-						}
-					}
-					if staff != nil {
-						if !staff.Availability[i].Late {
-							row.Amelia.Flag = PrefConflict
-						}
-					}
-				}
-			}
+func getCurentShifts(counts []int) int {
+	total := 0
+	for _, value := range counts {
+		total += value
+	}
+	return total
+}
 
-			if row.Early.AssignedStaff != nil {
-				if staffIDOccurrences[*row.Early.AssignedStaff] > 1 {
-					row.Early.Flag = Duplicate
-				} else {
-					staff := d.GetStaffByID(*row.Early.AssignedStaff)
-					for _, req := range staff.LeaveRequests {
-						if !req.StartDate.After(date) && req.EndDate.After(date) {
-							row.Early.Flag = LeaveConflict
-							break
-						}
-					}
-					if staff != nil {
-						if !staff.Availability[i].Early {
-							if !staff.Availability[i].Mid && !staff.Availability[i].Late {
-								row.Early.Flag = PrefRefuse
-							} else {
-								row.Early.Flag = PrefConflict
-							}
-						}
-					}
-				}
-			}
+func (d *Database) CheckFlags(allStaff []*StaffMember, week RosterWeek) RosterWeek {
+	staffMap := make(map[uuid.UUID]*StaffMember, len(allStaff))
+	for _, staff := range allStaff {
+		staff.CurrentShifts = 0
+		staffMap[staff.ID] = staff
+	}
+	shiftCounts := make(map[uuid.UUID][]int)
 
-			if row.Mid.AssignedStaff != nil {
-				if staffIDOccurrences[*row.Mid.AssignedStaff] > 1 {
-					row.Mid.Flag = Duplicate
-				} else {
-					staff := d.GetStaffByID(*row.Mid.AssignedStaff)
-					if staff != nil {
-						for _, req := range staff.LeaveRequests {
-							if !req.StartDate.After(date) && req.EndDate.After(date) {
-								row.Mid.Flag = LeaveConflict
-								break
-							}
-						}
-						if !staff.Availability[i].Mid {
-							if !staff.Availability[i].Early && !staff.Availability[i].Late {
-								row.Mid.Flag = PrefRefuse
-							} else {
-								row.Mid.Flag = PrefConflict
-							}
-						}
-					}
-				}
-			}
-
-			if row.Late.AssignedStaff != nil {
-				if staffIDOccurrences[*row.Late.AssignedStaff] > 1 {
-					row.Late.Flag = Duplicate
-				} else {
-					staff := d.GetStaffByID(*row.Late.AssignedStaff)
-					for _, req := range staff.LeaveRequests {
-						if !req.StartDate.After(date) && req.EndDate.After(date) {
-							row.Late.Flag = LeaveConflict
-							break
-						}
-					}
-					if staff != nil {
-						if !staff.Availability[i].Late {
-							if !staff.Availability[i].Early && !staff.Availability[i].Mid {
-								row.Late.Flag = PrefRefuse
-							} else {
-								row.Late.Flag = PrefConflict
-							}
-						}
-					}
-				}
-			}
+	for i := range week.Days {
+		shiftCounts = countShifts(shiftCounts, week.Days[i], i)
+	}
+	for staffID, counts := range shiftCounts {
+		total := getCurentShifts(counts)
+		if staff, ok := staffMap[staffID]; ok {
+			staff.CurrentShifts = total
 		}
+	}
+	err := d.SaveStaffMembers(allStaff)
+	if err != nil {
+		// TODO: Handle this?
+		log.Println("Error updating staff in checkflags")
+	}
+
+	for i := range week.Days {
+		week.Days[i] = assignFlags(week.Days[i], week.StartDate.AddDate(0, 0, i), shiftCounts, staffMap, i)
 	}
 	return week
+}
+
+func assignFlags(day RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int, staffMap map[uuid.UUID]*StaffMember, i int) RosterDay {
+	processSlot := func(slot *Slot, dayIndex int) {
+		if slot.AssignedStaff != nil {
+			if shiftCounts[*slot.AssignedStaff][dayIndex] > 1 {
+				slot.Flag = Duplicate
+			} else if staff, ok := staffMap[*slot.AssignedStaff]; ok {
+				for _, req := range staff.LeaveRequests {
+					if !req.StartDate.After(date) && req.EndDate.After(date) {
+						slot.Flag = LeaveConflict
+						return
+					}
+				}
+				availability := staff.Availability[dayIndex]
+				if !availability.Late {
+					slot.Flag = PrefConflict
+					if !availability.Early && !availability.Mid {
+						slot.Flag = PrefRefuse
+					}
+				} else if staff.CurrentShifts == staff.IdealShifts {
+					slot.Flag = IdealMet
+				} else if staff.CurrentShifts > staff.IdealShifts {
+					slot.Flag = IdealExceeded
+				}
+			}
+		}
+	}
+
+	for _, row := range day.Rows {
+		row.Amelia.Flag = None
+		row.Early.Flag = None
+		row.Mid.Flag = None
+		row.Late.Flag = None
+
+		if day.AmeliaOpen {
+			processSlot(&row.Amelia, i)
+		}
+		processSlot(&row.Early, i)
+		processSlot(&row.Mid, i)
+		processSlot(&row.Late, i)
+	}
+
+	return day
 }
 
 func (week *RosterWeek) GetSlotByID(slotID uuid.UUID) *Slot {
@@ -343,7 +302,7 @@ func (week *RosterWeek) GetSlotByID(slotID uuid.UUID) *Slot {
 func (week *RosterWeek) GetDayByID(dayID uuid.UUID) *RosterDay {
 	for _, day := range week.Days {
 		if day.ID == dayID {
-			return day
+			return &day
 		}
 	}
 	return nil
@@ -366,6 +325,12 @@ func GetHighlightCol(defaultCol string, flag Highlight) string {
 	if flag == LeaveConflict || flag == PrefRefuse {
 		return "#CC3333"
 	}
+	if flag == IdealMet {
+		return "#B2E1B0"
+	}
+	if flag == IdealExceeded {
+		return "#D7A9A9"
+	}
 	return defaultCol
 }
 
@@ -385,7 +350,7 @@ func (d *Database) ChangeDayRowCount(
 				}
 			}
 			d.SaveRosterWeek(*week)
-			return day, week.IsLive
+			return &day, week.IsLive
 		}
 	}
 	return nil, false

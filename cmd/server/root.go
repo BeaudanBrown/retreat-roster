@@ -19,7 +19,7 @@ type RootStruct struct {
 	*Server
 	ActiveStaff db.StaffMember
 	db.RosterWeek
-	db.StaffState
+	Staff []*db.StaffMember
 }
 
 func (s *Server) MakeRootStruct(activeStaff db.StaffMember, week db.RosterWeek) RootStruct {
@@ -27,13 +27,13 @@ func (s *Server) MakeRootStruct(activeStaff db.StaffMember, week db.RosterWeek) 
 		s,
 		activeStaff,
 		week,
-		s.LoadStaffState(),
+		s.LoadAllStaff(),
 	}
 }
 
 type DayStruct struct {
 	db.RosterDay
-	Staff       *[]*db.StaffMember
+	Staff       []*db.StaffMember
 	Date        time.Time
 	IsLive      bool
 	ActiveStaff db.StaffMember
@@ -43,7 +43,7 @@ func MakeDayStruct(isLive bool, day db.RosterDay, s *Server, activeStaff db.Staf
 	date := activeStaff.Config.RosterStartDate.AddDate(0, 0, day.Offset)
 	return DayStruct{
 		day,
-		s.LoadStaffState().Staff,
+		s.LoadAllStaff(),
 		date,
 		isLive,
 		activeStaff,
@@ -529,9 +529,9 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
 }
 
 func duplicateRosterWeek(src db.RosterWeek, newWeek db.RosterWeek) db.RosterWeek {
-	newDays := []*db.RosterDay{}
+	newDays := []db.RosterDay{}
 	for _, day := range src.Days {
-		newDay := &db.RosterDay{
+		newDay := db.RosterDay{
 			ID:         uuid.New(),
 			DayName:    day.DayName,
 			Colour:     day.Colour,

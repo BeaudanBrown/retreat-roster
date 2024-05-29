@@ -305,7 +305,7 @@ func (s *Server) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	collection := s.DB.Collection("staff")
-	filter := bson.M{"_id": accID}
+	filter := bson.M{"id": accID}
 	_, err = collection.DeleteOne(s.Context, filter)
 	if err != nil {
 		log.Fatalf("Failed to delete document: %v", err)
