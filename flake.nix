@@ -43,9 +43,8 @@
                     initDatabaseUsername = "mongodb";
                   };
 
-                  pre-commit.hooks.gofmt = {
-                    enable = true;
-                  };
+                  pre-commit.hooks.gofmt.enable = true;
+                  pre-commit.hooks.html-tidy.enable = true;
 
                 }
               ];
