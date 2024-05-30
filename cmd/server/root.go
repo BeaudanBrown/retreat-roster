@@ -1,10 +1,16 @@
 package server
 
 import (
+	"archive/zip"
+	"bytes"
+	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"sort"
+	"strconv"
 	"time"
 
 	"roster/cmd/db"
@@ -578,6 +584,161 @@ func duplicateSlot(src db.Slot) db.Slot {
 		Flag:          src.Flag,
 		Description:   src.Description,
 	}
+}
+
+func minTime(t1, t2 time.Time) time.Time {
+	if t1.Before(t2) {
+		return t1
+	}
+	return t2
+}
+
+func maxTime(t1, t2 time.Time) time.Time {
+	if t1.After(t2) {
+		return t1
+	}
+	return t2
+}
+
+func (s *Server) GetWorkFromEntry(windowStart time.Time, windowEnd time.Time, entry db.TimesheetEntry) float64 {
+	if entry.ShiftStart == nil || entry.ShiftEnd == nil {
+		return 0.0
+	}
+	shiftStart := maxTime(windowStart, *entry.ShiftStart)
+	shiftEnd := minTime(windowEnd, *entry.ShiftEnd)
+	if shiftStart.After(shiftEnd) {
+		return 0.0
+	}
+	overlappedShiftDuration := shiftEnd.Sub(shiftStart).Hours()
+	if entry.BreakStart != nil && entry.ShiftEnd != nil {
+		breakWindowStart := maxTime(shiftStart, *entry.BreakStart)
+		breakWindowEnd := minTime(shiftEnd, *entry.BreakEnd)
+		if breakWindowStart.After(breakWindowEnd) {
+			breakWindowStart = breakWindowEnd
+		}
+		overlappedBreakDuration := breakWindowEnd.Sub(breakWindowStart).Hours()
+		return overlappedShiftDuration - overlappedBreakDuration
+	}
+	return overlappedShiftDuration
+}
+
+type ShiftHours struct {
+	Staff   float64
+	Manager float64
+	Salary  float64
+}
+
+func (s *Server) HandleExportWageReport(w http.ResponseWriter, r *http.Request) {
+	thisStaff := s.GetSessionUser(w, r)
+	if thisStaff == nil {
+		log.Println("Couldn't find session user")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	entries := s.GetTimesheetWeek(thisStaff.Config.TimesheetStartDate)
+	if entries == nil {
+		log.Println("No timesheet entries to export")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	var zipBuffer bytes.Buffer
+	zipWriter := zip.NewWriter(&zipBuffer)
+
+	for i := 0; i <= 6; i++ {
+		report := map[time.Time]ShiftHours{}
+		thisDate := thisStaff.Config.TimesheetStartDate.AddDate(0, 0, i)
+		for i := 8; i <= 27; i++ {
+			windowStart := thisDate.Add(time.Duration(i) * time.Hour)
+			windowEnd := thisDate.Add(time.Duration(i+1) * time.Hour)
+			for _, entry := range *entries {
+				if entry.Status != db.Approved {
+					continue
+				}
+				window := report[windowStart]
+				if entry.ShiftType == db.Bar {
+					window.Staff += s.GetWorkFromEntry(windowStart, windowEnd, entry)
+				} else if entry.ShiftType == db.DayManager || entry.ShiftType == db.NightManager {
+					window.Manager += s.GetWorkFromEntry(windowStart, windowEnd, entry)
+				} else {
+					window.Salary += s.GetWorkFromEntry(windowStart, windowEnd, entry)
+				}
+				report[windowStart] = window
+			}
+		}
+
+		fileWriter, err := zipWriter.Create(thisDate.Format("02-01-06") + ".csv")
+		if err != nil {
+			http.Error(w, "Failed to create file in ZIP", http.StatusInternalServerError)
+			return
+		}
+		csvContent, err := createCSVContent(report)
+		if err != nil {
+			http.Error(w, "Failed to create CSV content", http.StatusInternalServerError)
+			return
+		}
+		if _, err := fileWriter.Write(csvContent); err != nil {
+			http.Error(w, "Failed to write CSV content to ZIP", http.StatusInternalServerError)
+			return
+		}
+	}
+	if err := zipWriter.Close(); err != nil {
+		http.Error(w, "Failed to close ZIP writer", http.StatusInternalServerError)
+		return
+	}
+
+	// Set the appropriate headers
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", "attachment;filename=data.zip")
+	w.Header().Set("Content-Length", strconv.Itoa(len(zipBuffer.Bytes())))
+
+	// Write the zip file to the response
+	if _, err := w.Write(zipBuffer.Bytes()); err != nil {
+		http.Error(w, "Failed to write ZIP file to response", http.StatusInternalServerError)
+		return
+	}
+}
+
+func createCSVContent(data map[time.Time]ShiftHours) ([]byte, error) {
+	var buffer bytes.Buffer
+	writer := csv.NewWriter(&buffer)
+
+	// Convert map keys to a slice
+	var times []time.Time
+	for t := range data {
+		times = append(times, t)
+	}
+
+	// Sort the slice by date
+	sort.Slice(times, func(i, j int) bool {
+		return times[i].Before(times[j])
+	})
+
+	// Write CSV header
+	header := []string{"Time", "Staff Hours", "Manager Hours", "Salary Hours"}
+	if err := writer.Write(header); err != nil {
+		return nil, err
+	}
+
+	// Write sorted data to CSV
+	for _, t := range times {
+		record := []string{
+			t.Format("1504"),
+			fmt.Sprintf("%.2f", data[t].Staff),
+			fmt.Sprintf("%.2f", data[t].Manager),
+			fmt.Sprintf("%.2f", data[t].Salary),
+		}
+		if err := writer.Write(record); err != nil {
+			return nil, err
+		}
+	}
+
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return nil, err
+	}
+
+	return buffer.Bytes(), nil
 }
 
 func (s *Server) HandleImportRosterWeek(w http.ResponseWriter, r *http.Request) {

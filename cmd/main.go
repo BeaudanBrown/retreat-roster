@@ -84,6 +84,7 @@ func main() {
 	http.HandleFunc("/toggleHideApproved", s.VerifyAdmin(s.HandleToggleHideApproved))
 	http.HandleFunc("/toggleApprovalMode", s.VerifyAdmin(s.HandleToggleApprovalMode))
 	http.HandleFunc("/importRosterWeek", s.VerifyAdmin(s.HandleImportRosterWeek))
+	http.HandleFunc("/exportWageReport", s.VerifyAdmin(s.HandleExportWageReport))
 
 	log.Println(http.ListenAndServe(":6969", nil))
 }

@@ -80,17 +80,35 @@ type ShiftType int
 
 const (
 	Bar ShiftType = iota
-	Managing
+	DayManager
+	NightManager
 	Admin
 )
+
+func ShiftTypeToString(shiftType ShiftType) string {
+	switch shiftType {
+	case Bar:
+		return "Bar"
+	case DayManager:
+		return "Day Manager"
+	case NightManager:
+		return "Night Manager"
+	case Admin:
+		return "Admin"
+	default:
+		return "Bar"
+	}
+}
 
 func StringToShiftType(typeStr string) ShiftType {
 	switch typeStr {
 	case "0":
 		return Bar
 	case "1":
-		return Managing
+		return DayManager
 	case "2":
+		return NightManager
+	case "3":
 		return Admin
 	default:
 		return Bar
