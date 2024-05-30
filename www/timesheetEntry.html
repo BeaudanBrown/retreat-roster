@@ -15,9 +15,10 @@
 			<select name="shiftType"
 				hx-post="/modifyTimesheetEntry"
 				hx-vals='js:{"status": {{.Status}}}'>
-				<option value=0 {{ if eq .ShiftType 0 }}selected{{ end }}>Bar</option>
-				<option value=1 {{ if eq .ShiftType 1 }}selected{{ end }}>Manager</option>
-				<option value=2 {{ if eq .ShiftType 2 }}selected{{ end }}>Admin</option>
+        <option value=0 {{ if eq .ShiftType 0 }}selected{{ end }}>{{ ShiftTypeToString 0 }}</option>
+				<option value=1 {{ if eq .ShiftType 1 }}selected{{ end }}>{{ ShiftTypeToString 1 }}</option>
+				<option value=2 {{ if eq .ShiftType 2 }}selected{{ end }}>{{ ShiftTypeToString 2 }}</option>
+				<option value=3 {{ if eq .ShiftType 3 }}selected{{ end }}>{{ ShiftTypeToString 3 }}</option>
 			</select>
 		</div>
 		<div class="timesheetEl doubleCol">
