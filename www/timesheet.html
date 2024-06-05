@@ -2,10 +2,10 @@
 {{ $staffMember := .StaffMember }}
 {{ $config := .StaffMember.Config }}
 {{ $entries := .Entries }}
-{{ $approvalMode := $config.ApprovalMode }}
-{{ $adminView := and $approvalMode .StaffMember.IsAdmin }}
+{{ $isAdmin := .StaffMember.IsAdmin }}
+{{ $showAll := and $config.ShowAll .StaffMember.IsAdmin }}
+{{ $hideApproved := and $config.HideApproved .StaffMember.IsAdmin }}
 {{ $staffMap := .StaffMap }}
-{{ $hideApproved := $config.HideApproved }}
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html>
 	<head>
@@ -22,11 +22,11 @@
 		</br>
 		<div class="buttons" id="filters">
 			<button class="checkLabel"
-				hx-get="/toggleApprovalMode"
+				hx-get="/toggleShowAll"
 				hx-target="#timesheet"
 				hx-swap='outerHTML'>
-				<input type="checkbox" {{ if $approvalMode }}checked{{ end }}>
-				<label>Approval mode</label>
+				<input type="checkbox" {{ if $showAll }}checked{{ end }}>
+				<label>Show all staff</label>
 			</button>
 			<button class="checkLabel"
 				hx-get="/toggleHideApproved"
@@ -75,29 +75,29 @@
 					<div class="timesheetEl">Action</div>
 				</div>
 				{{ range $idx, $dayName := .DayNames }}
-				{{ $thisDate := addDays $config.TimesheetStartDate $idx }}
-				<div class="day-name">
-					{{ if not $adminView }}
-					<button class="add-entry-btn"
-						hx-post='/addTimesheetEntry' hx-ext='json-enc'
-						hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "startDate":"{{$thisDate}}"}'
-						hx-swap='outerHTML' hx-target='#timesheet'>+</button>
+					{{ $thisDate := addDays $config.TimesheetStartDate $idx }}
+					<div class="day-name">
+						<button class="add-entry-btn"
+							hx-post='/addTimesheetEntry' hx-ext='json-enc'
+							hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "startDate":"{{$thisDate}}"}'
+							hx-swap='outerHTML' hx-target='#timesheet'>+</button>
+						<h3>{{$dayName}}</h3>
+					</div>
+					{{ range $entry := $entries }}
+						{{ if (eq $entry.StartDate $thisDate) }}
+							{{ if $showAll }}
+								{{ if not (and .Approved $hideApproved)}}
+									{{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry .StaffID $staffMap $showAll $staffMember.IsAdmin) }}
+								{{ end }}
+							{{ else }}
+								{{ if (eq .StaffID $staffMember.ID) }}
+									{{ if (or (not .Approved) (not $hideApproved)) }}
+										{{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry .StaffID $staffMap $showAll $staffMember.IsAdmin) }}
+									{{ end }}
+								{{ end }}
+							{{ end }}
+						{{ end }}
 					{{ end }}
-					<h3>{{$dayName}}</h3>
-				</div>
-				{{ range $entry := $entries }}
-				{{ if (eq $entry.StartDate $thisDate) }}
-				{{ if not $adminView }}
-				{{ if (eq .StaffID $staffMember.ID) }}
-				{{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry (index $staffMap .StaffID) $approvalMode $staffMember.IsAdmin) }}
-				{{ end }}
-				{{ else }}
-				{{ if not (and (eq .Status 2) $hideApproved)}}
-				{{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry (index $staffMap .StaffID) $approvalMode $staffMember.IsAdmin) }}
-				{{ end }}
-				{{ end }}
-				{{ end }}
-				{{ end }}
 				{{ end }}
 			</div>
 		</div>

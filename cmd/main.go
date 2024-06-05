@@ -82,7 +82,7 @@ func main() {
 	http.HandleFunc("/deleteTimesheetEntry", s.VerifySession(s.HandleDeleteTimesheetEntry))
 	http.HandleFunc("/modifyTimesheetEntry", s.VerifySession(s.HandleModifyTimesheetEntry))
 	http.HandleFunc("/toggleHideApproved", s.VerifyAdmin(s.HandleToggleHideApproved))
-	http.HandleFunc("/toggleApprovalMode", s.VerifyAdmin(s.HandleToggleApprovalMode))
+	http.HandleFunc("/toggleShowAll", s.VerifyAdmin(s.HandleToggleShowAll))
 	http.HandleFunc("/importRosterWeek", s.VerifyAdmin(s.HandleImportRosterWeek))
 	http.HandleFunc("/exportWageReport", s.VerifyAdmin(s.HandleExportWageReport))
 

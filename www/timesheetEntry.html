@@ -1,32 +1,46 @@
 {{ define "timesheetEntry" }}
-{{ $adminView := and .ApprovalMode .IsAdmin }}
-{{ $canEdit := or (and $adminView (eq .Status 1)) (and (not $adminView) (eq .Status 0)) }}
-{{ $canView := or (and $adminView (eq .Status 2)) (and (not $adminView) (or (eq .Status 1) (eq .Status 2))) }}
+{{ $isAdmin := and .IsAdmin }}
+{{ $showAll := and .ShowAll .IsAdmin }}
+{{ $thisStaff := (index .StaffMap .ThisStaffID) }}
+{{ $isThisStaff := eq .ThisStaffID .StaffID }}
+{{ $canEdit := and (not .Approved) (or $showAll $isThisStaff) }}
+{{ $canView := and .Approved (or $showAll $isThisStaff) }}
 
 {{ if $canEdit }}
 <div class="timesheetDay" id='entry-{{.ID}}'>
 	<form hx-ext="json-enc" hx-swap="outerHTML" hx-target="#timesheet"
 		hx-post="/modifyTimesheetEntry"
-		hx-vals='js:{"entryID":"{{ .ID }}", "staffID":"{{.StaffMember.ID}}", "status": {{.Status}} + 1}'>
+		hx-vals='js:{"entryID":"{{ .ID }}", "approved": true}'>
 		<div class="timesheetEl">
-			<label>{{if .StaffMember.NickName}}{{.StaffMember.NickName}}{{else}}{{.StaffMember.FirstName}}{{end}}</label>
+			{{ if not $isAdmin }}
+			<label>{{(or $thisStaff.NickName $thisStaff.FirstName)}}</label>
+			<input type="hidden" name="staffID" value="{{$thisStaff.ID}}" />
+			{{ else }}
+			<select name="staffID"
+				hx-post="/modifyTimesheetEntry"
+				hx-vals='js:{"approved": {{.Approved}}}'>
+				{{ range $staffID, $member := .StaffMap }}
+				<option value={{$staffID}} {{ if eq $staffID $thisStaff.ID }}selected{{ end }}>{{(or $member.NickName $member.FirstName)}}</option>
+				{{ end }}
+			</select>
+			{{ end }}
 		</div>
 		<div class="timesheetEl">
 			<select name="shiftType"
 				hx-post="/modifyTimesheetEntry"
-				hx-vals='js:{"status": {{.Status}}}'>
-        <option value=0 {{ if eq .ShiftType 0 }}selected{{ end }}>{{ ShiftTypeToString 0 }}</option>
+				hx-vals='js:{"approved": {{.Approved}}}'>
+				<option value=0 {{ if eq .ShiftType 0 }}selected{{ end }}>{{ ShiftTypeToString 0 }}</option>
+				{{ if .IsAdmin }}
 				<option value=1 {{ if eq .ShiftType 1 }}selected{{ end }}>{{ ShiftTypeToString 1 }}</option>
 				<option value=2 {{ if eq .ShiftType 2 }}selected{{ end }}>{{ ShiftTypeToString 2 }}</option>
 				<option value=3 {{ if eq .ShiftType 3 }}selected{{ end }}>{{ ShiftTypeToString 3 }}</option>
+				{{ end }}
 			</select>
 		</div>
 		<div class="timesheetEl doubleCol">
 			<label>Start</label>
 			<input type="time" name="shiftStart" id="shiftStart-{{.ID}}"
 				hx-post="/modifyTimesheetEntry"
-				hx-vals='js:{"status": {{.Status}}}'
-				value="{{if .ShiftStart}}{{.ShiftStart.Format "15:04"}}{{end}}"
 				required>
 			<label>End</label>
 			<input type="time" name="shiftEnd" id="shiftEnd-{{.ID}}"
@@ -39,13 +53,13 @@
 			<label>Start</label>
 			<input type="time" name="breakStart" id="breakStart-{{.ID}}"
 				hx-post="/modifyTimesheetEntry"
-				hx-vals='js:{"status": {{.Status}}}'
+				hx-vals='js:{"approved": {{.Approved}}}'
 				value="{{if .BreakStart}}{{.BreakStart.Format "15:04"}}{{end}}"
 				{{ if .BreakEnd }}required{{ end }}>
 			<label>End</label>
 			<input type="time" name="breakEnd" id="breakEnd-{{.ID}}"
 				hx-post="/modifyTimesheetEntry"
-				hx-vals='js:{"status": {{.Status}}}'
+				hx-vals='js:{"approved": {{.Approved}}}'
 				value="{{if .BreakEnd}}{{.BreakEnd.Format "15:04"}}{{end}}"
 				{{ if .BreakStart}}required{{ end }}>
 		</div>
@@ -60,21 +74,23 @@
 				class="actionBtn"
 				hx-ext="json-enc"
 				hx-post="/deleteTimesheetEntry"
-				hx-vals='js:{"entryID":"{{ .ID }}", "staffID":"{{.StaffMember.ID}}"}'
+				hx-vals='js:{"entryID":"{{ .ID }}", "staffID":"{{$thisStaff.ID}}"}'
 				hx-swap="outerHTML"
 				hx-confirm="Are you sure you want to delete this entry?"
 				hx-target="#timesheet">
 				Delete
 			</button>
+			{{ if $isAdmin }}
 			<button class="actionBtn" type="submit">
-				{{ if $adminView }}Approve{{else}}Save{{end}}
+				Approve
 			</button>
+			{{end}}
 		</div>
 	</form>
 </div>
 {{ else if $canView }}
 <div class="timesheetDay" id='entry-{{.ID}}'>
-	<label class="timesheetEl">{{if .StaffMember.NickName}}{{.StaffMember.NickName}}{{else}}{{.StaffMember.FirstName}}{{end}}</label>
+	<label class="timesheetEl">{{if $thisStaff.NickName}}{{$thisStaff.NickName}}{{else}}{{$thisStaff.FirstName}}{{end}}</label>
 	<div class="timesheetEl">
 		<select disabled>
 			<option value=0 {{ if eq .ShiftType 0 }}selected{{ end }}>Bar</option>
@@ -100,7 +116,7 @@
 		<label>Shift</label>
 		<label class="timesheetEl">{{.ShiftLength}}</label>
 	</div>
-	{{ if not (and (not $adminView) (eq .Status 2)) }}
+	{{ if (and $isAdmin .Approved) }}
 	<div class="actions">
 		<button type="button"
 			class="actionBtn"
@@ -108,12 +124,12 @@
 			hx-post="/modifyTimesheetEntry"
 			hx-vals='js:{
 			"entryID":"{{ .ID }}",
-			"staffID":"{{.StaffMember.ID}}",
+			"staffID":"{{$thisStaff.ID}}",
 			"shiftStart":"{{.ShiftStart}}",
 			"shiftEnd":"{{.ShiftEnd}}",
 			"breakStart":"{{.BreakStart}}",
 			"breakEnd":"{{.BreakEnd}}",
-			"status": {{.Status}} - 1}'
+			"approved": false}'
 			hx-swap="outerHTML"
 			hx-target="#timesheet">
 			Edit

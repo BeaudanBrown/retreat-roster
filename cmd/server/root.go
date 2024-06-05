@@ -652,7 +652,7 @@ func (s *Server) HandleExportWageReport(w http.ResponseWriter, r *http.Request) 
 			windowStart := thisDate.Add(time.Duration(i) * time.Hour)
 			windowEnd := thisDate.Add(time.Duration(i+1) * time.Hour)
 			for _, entry := range *entries {
-				if entry.Status != db.Approved {
+				if !entry.Approved {
 					continue
 				}
 				window := report[windowStart]

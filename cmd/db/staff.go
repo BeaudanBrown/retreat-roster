@@ -41,7 +41,7 @@ type StaffConfig struct {
 	HideByPrefs        bool
 	HideByLeave        bool
 	HideApproved       bool
-	ApprovalMode       bool
+	ShowAll            bool
 }
 
 type DayAvailability struct {
