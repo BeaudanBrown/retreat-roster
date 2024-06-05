@@ -829,7 +829,7 @@ func (s *Server) HandleExportWageReport(w http.ResponseWriter, r *http.Request) 
 			}
 		}
 
-		fileWriter, err := zipWriter.Create(thisDate.Format("02-01-06") + ".csv")
+		fileWriter, err := zipWriter.Create(thisDate.Format("2006-01-02") + ".csv")
 		if err != nil {
 			http.Error(w, "Failed to create file in ZIP", http.StatusInternalServerError)
 			return
@@ -850,8 +850,10 @@ func (s *Server) HandleExportWageReport(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Set the appropriate headers
+	formattedDate := thisStaff.Config.TimesheetStartDate.Format("2006-01-02")
+	reportFilename := "report-" + formattedDate + ".zip"
 	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Disposition", "attachment;filename=data.zip")
+	w.Header().Set("Content-Disposition", "attachment;filename="+reportFilename)
 	w.Header().Set("Content-Length", strconv.Itoa(len(zipBuffer.Bytes())))
 
 	// Write the zip file to the response

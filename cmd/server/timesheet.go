@@ -190,10 +190,14 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
 	entry.StaffID = staffID
 	entry.Approved = reqBody.Approved
 	entry.ShiftType = db.StringToShiftType(reqBody.ShiftType)
-	bs := getAdjustedTime(reqBody.BreakStart, entry.StartDate)
-	entry.BreakStart = &bs
-	be := getAdjustedTime(reqBody.BreakEnd, entry.StartDate)
-	entry.BreakEnd = &be
+	if reqBody.BreakStart.Time != nil {
+		bs := getAdjustedTime(reqBody.BreakStart, entry.StartDate)
+		entry.BreakStart = &bs
+	}
+	if reqBody.BreakEnd.Time != nil {
+		be := getAdjustedTime(reqBody.BreakEnd, entry.StartDate)
+		entry.BreakEnd = &be
+	}
 
 	if entry.BreakStart != nil && entry.BreakEnd != nil {
 		if entry.BreakStart.After(*entry.BreakEnd) {
