@@ -263,22 +263,27 @@ func (d *Database) GetStaffByToken(token uuid.UUID) *StaffMember {
 	return &staffMember
 }
 
-func (staff *StaffMember) HasConflict(slot string, offset int) bool {
+func (staff *StaffMember) GetConflict(slot string, offset int) Highlight {
+	if !staff.Availability[offset].Early &&
+		!staff.Availability[offset].Mid &&
+		!staff.Availability[offset].Late {
+		return PrefRefuse
+	}
 	switch slot {
 	case "Early":
 		if !staff.Availability[offset].Early {
-			return true
+			return PrefConflict
 		}
 	case "Mid":
 		if !staff.Availability[offset].Mid {
-			return true
+			return PrefConflict
 		}
 	case "Late":
 		if !staff.Availability[offset].Late {
-			return true
+			return PrefConflict
 		}
 	}
-	return false
+	return None
 }
 
 func (staff *StaffMember) IsAway(date time.Time) bool {

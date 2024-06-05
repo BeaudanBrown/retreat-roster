@@ -37,6 +37,18 @@ type Row struct {
 	Late   Slot
 }
 
+func (row Row) getSlot(slotStr string) *Slot {
+	switch slotStr {
+	case "Early":
+		return &row.Early
+	case "Mid":
+		return &row.Mid
+	case "Late":
+		return &row.Late
+	}
+	return nil
+}
+
 type Slot struct {
 	ID            uuid.UUID
 	StartTime     string
@@ -238,44 +250,39 @@ func (d *Database) CheckFlags(allStaff []*StaffMember, week RosterWeek) RosterWe
 }
 
 func assignFlags(day *RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int, staffMap map[uuid.UUID]*StaffMember, i int) RosterDay {
-	processSlot := func(slot *Slot, dayIndex int) {
-		if slot.AssignedStaff != nil {
-			if shiftCounts[*slot.AssignedStaff][dayIndex] > 1 {
-				slot.Flag = Duplicate
-			} else if staff, ok := staffMap[*slot.AssignedStaff]; ok {
-				for _, req := range staff.LeaveRequests {
-					if !req.StartDate.After(date) && req.EndDate.After(date) {
-						slot.Flag = LeaveConflict
-						return
-					}
-				}
-				availability := staff.Availability[dayIndex]
-				if !availability.Late {
-					slot.Flag = PrefConflict
-					if !availability.Early && !availability.Mid {
-						slot.Flag = PrefRefuse
-					}
-				} else if staff.CurrentShifts == staff.IdealShifts {
-					slot.Flag = IdealMet
-				} else if staff.CurrentShifts > staff.IdealShifts {
-					slot.Flag = IdealExceeded
+	processSlot := func(row Row, slotStr string, dayIndex int) Highlight {
+		slot := row.getSlot(slotStr)
+		if slot.AssignedStaff == nil {
+			return None
+		}
+		if shiftCounts[*slot.AssignedStaff][dayIndex] > 1 {
+			return Duplicate
+		}
+		if staff, ok := staffMap[*slot.AssignedStaff]; ok {
+			for _, req := range staff.LeaveRequests {
+				if !req.StartDate.After(date) && req.EndDate.After(date) {
+					return LeaveConflict
 				}
 			}
+			conflict := staff.GetConflict(slotStr, dayIndex)
+			if conflict != None {
+				return conflict
+			}
+			if staff.CurrentShifts == staff.IdealShifts {
+				return IdealMet
+			}
+			if staff.CurrentShifts > staff.IdealShifts {
+				return IdealExceeded
+			}
 		}
+		return None
 	}
 
 	for _, row := range day.Rows {
-		row.Amelia.Flag = None
-		row.Early.Flag = None
-		row.Mid.Flag = None
-		row.Late.Flag = None
-
-		if day.AmeliaOpen {
-			processSlot(&row.Amelia, i)
-		}
-		processSlot(&row.Early, i)
-		processSlot(&row.Mid, i)
-		processSlot(&row.Late, i)
+		row.Amelia.Flag = processSlot(*row, "Amelia", i)
+		row.Early.Flag = processSlot(*row, "Early", i)
+		row.Mid.Flag = processSlot(*row, "Mid", i)
+		row.Late.Flag = processSlot(*row, "Late", i)
 	}
 
 	return *day
