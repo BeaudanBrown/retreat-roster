@@ -39,6 +39,8 @@ type Row struct {
 
 func (row Row) getSlot(slotStr string) *Slot {
 	switch slotStr {
+	case "Amelia":
+		return &row.Amelia
 	case "Early":
 		return &row.Early
 	case "Mid":
@@ -249,7 +251,8 @@ func (d *Database) CheckFlags(allStaff []*StaffMember, week RosterWeek) RosterWe
 	return week
 }
 
-func assignFlags(day *RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int, staffMap map[uuid.UUID]*StaffMember, i int) RosterDay {
+func assignFlags(day *RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int, staffMap map[uuid.UUID]*StaffMember, dayIdx int) RosterDay {
+	log.Printf("%v on date %v", day.DayName, date)
 	processSlot := func(row Row, slotStr string, dayIndex int) Highlight {
 		slot := row.getSlot(slotStr)
 		if slot.AssignedStaff == nil {
@@ -269,7 +272,9 @@ func assignFlags(day *RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int
 				return conflict
 			}
 			if staff.CurrentShifts == staff.IdealShifts {
-				return IdealMet
+				//TODO: move this to a better place for viewing
+				// return IdealMet
+				return None
 			}
 			if staff.CurrentShifts > staff.IdealShifts {
 				return IdealExceeded
@@ -279,10 +284,14 @@ func assignFlags(day *RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int
 	}
 
 	for _, row := range day.Rows {
-		row.Amelia.Flag = processSlot(*row, "Amelia", i)
-		row.Early.Flag = processSlot(*row, "Early", i)
-		row.Mid.Flag = processSlot(*row, "Mid", i)
-		row.Late.Flag = processSlot(*row, "Late", i)
+		if day.AmeliaOpen {
+			row.Amelia.Flag = processSlot(*row, "Amelia", dayIdx)
+		} else {
+			row.Amelia.Flag = None
+		}
+		row.Early.Flag = processSlot(*row, "Early", dayIdx)
+		row.Mid.Flag = processSlot(*row, "Mid", dayIdx)
+		row.Late.Flag = processSlot(*row, "Late", dayIdx)
 	}
 
 	return *day

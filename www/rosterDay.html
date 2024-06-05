@@ -159,26 +159,19 @@
 				<select class="rosterInput" id="s-{{ $row.Mid.ID }}" name="staffID">
 					<option value=""></option>
 					{{ range $staff }}
-					{{ if not .IsHidden }}
-					{{ if or
-					(or (.IsTrial) ($row.Mid.HasThisStaff .ID))
-					(and
-					(and
-					(or (not $hideByIdeal) (lt .CurrentShifts .IdealShifts))
-					(or (not $hideByLeave) (not (.IsAway $date)))
-					)
-					(or (not $hideByPrefs) (not (.HasConflict "Mid" $offset)))
-					)
-					}}
-					<option class="drop-opt" value="{{.ID}}" {{if $row.Mid.HasThisStaff .ID}}selected{{end}}>
-						{{if .NickName}}
-						{{.NickName}}
-						{{else}}
-						{{.FirstName}}
-						{{end}}
-					</option>
-					{{ end }}
-					{{ end }}
+						{{ if not .IsHidden }}
+							{{ if or
+								(or (.IsTrial) ($row.Mid.HasThisStaff .ID))
+								(and
+									(and (or (not $hideByIdeal) (lt .CurrentShifts .IdealShifts))
+										(or (not $hideByLeave) (not (.IsAway $date))))
+									(or (not $hideByPrefs) (not (.HasConflict "Mid" $offset))))
+							}}
+							<option class="drop-opt" value="{{.ID}}" {{if $row.Mid.HasThisStaff .ID}}selected{{end}}>
+								{{if .NickName}} {{.NickName}} {{else}} {{.FirstName}} {{end}}
+							</option>
+							{{ end }}
+						{{ end }}
 					{{ end }}
 				</select>
 			</form>
