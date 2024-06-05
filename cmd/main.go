@@ -85,6 +85,7 @@ func main() {
 	http.HandleFunc("/toggleShowAll", s.VerifyAdmin(s.HandleToggleShowAll))
 	http.HandleFunc("/importRosterWeek", s.VerifyAdmin(s.HandleImportRosterWeek))
 	http.HandleFunc("/exportWageReport", s.VerifyAdmin(s.HandleExportWageReport))
+	http.HandleFunc("/exportEvanReport", s.VerifyAdmin(s.HandleExportEvanReport))
 
 	log.Println(http.ListenAndServe(":6969", nil))
 }

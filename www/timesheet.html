@@ -20,6 +20,12 @@
 		{{ template "header" (MakeHeaderStruct $staffMember.IsAdmin .RosterLive) }}
 		{{ if $staffMember.IsAdmin }}
 		</br>
+		<form action="/exportWageReport" method="get">
+				<button type="submit">Export wage report</button>
+		</form>
+		<form action="/exportEvanReport" method="get">
+				<button type="submit">Export evan report</button>
+		</form>
 		<div class="buttons" id="filters">
 			<button class="checkLabel"
 				hx-get="/toggleShowAll"

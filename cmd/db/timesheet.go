@@ -12,16 +12,16 @@ import (
 
 type TimesheetEntry struct {
 	ID          uuid.UUID
-	StaffID     uuid.UUID      `bson:"days"`
-	StartDate   time.Time      `bson:"startDate"`
-	ShiftStart  *time.Time     `json:"shiftStart"`
-	ShiftEnd    *time.Time     `json:"shiftEnd"`
-	BreakStart  *time.Time     `json:"breakStart"`
-	BreakEnd    *time.Time     `json:"breakEnd"`
-	BreakLength float64        `json:"breakLength"`
-	ShiftLength float64        `json:"shiftLength"`
-	Status      ApprovalStatus `json:"status"`
-	ShiftType   ShiftType      `json:"shiftType"`
+	StaffID     uuid.UUID  `bson:"days"`
+	StartDate   time.Time  `bson:"startDate"`
+	ShiftStart  time.Time  `json:"shiftStart"`
+	ShiftEnd    time.Time  `json:"shiftEnd"`
+	BreakStart  *time.Time `json:"breakStart"`
+	BreakEnd    *time.Time `json:"breakEnd"`
+	BreakLength float64    `json:"breakLength"`
+	ShiftLength float64    `json:"shiftLength"`
+	Approved    bool       `json:"approved"`
+	ShiftType   ShiftType  `json:"shiftType"`
 }
 
 func (s TimesheetEntry) MarshalBSON() ([]byte, error) {
@@ -49,14 +49,8 @@ func (s *TimesheetEntry) UnmarshalBSON(data []byte) error {
 	}
 
 	s.StartDate = s.StartDate.In(time.Now().Location())
-	if s.ShiftStart != nil {
-		shiftStartWithLoc := s.ShiftStart.In(time.Now().Location())
-		s.ShiftStart = &shiftStartWithLoc
-	}
-	if s.ShiftEnd != nil {
-		shiftEndWithLoc := s.ShiftEnd.In(time.Now().Location())
-		s.ShiftEnd = &shiftEndWithLoc
-	}
+	s.ShiftStart = s.ShiftStart.In(time.Now().Location())
+	s.ShiftEnd = s.ShiftEnd.In(time.Now().Location())
 	if s.BreakStart != nil {
 		breakStartWithLoc := s.BreakStart.In(time.Now().Location())
 		s.BreakStart = &breakStartWithLoc
@@ -183,14 +177,29 @@ func (d *Database) DeleteTimesheetEntry(entryID uuid.UUID) error {
 	return nil
 }
 
+func LastWholeHour() time.Time {
+	t := time.Now()
+	return t.Truncate(time.Hour)
+}
+
+func NextWholeHour() time.Time {
+	t := time.Now()
+	return t.Truncate(time.Hour).Add(time.Hour)
+}
+
 func (d *Database) CreateTimesheetEntry(startDate time.Time, staffID uuid.UUID) error {
 	collection := d.DB.Collection("timesheets")
 	year, month, day := startDate.Date()
 	dateOnly := time.Date(year, month, day, 0, 0, 0, 0, time.Now().Location())
+	start := LastWholeHour()
+	end := NextWholeHour()
 	newEntry := TimesheetEntry{
-		ID:        uuid.New(),
-		StaffID:   staffID,
-		StartDate: dateOnly,
+		ID:          uuid.New(),
+		StaffID:     staffID,
+		StartDate:   dateOnly,
+		ShiftStart:  start,
+		ShiftEnd:    end,
+		ShiftLength: end.Sub(start).Hours(),
 	}
 	_, err := collection.InsertOne(d.Context, newEntry)
 	if err != nil {

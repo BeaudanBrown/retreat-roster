@@ -41,12 +41,14 @@
 			<label>Start</label>
 			<input type="time" name="shiftStart" id="shiftStart-{{.ID}}"
 				hx-post="/modifyTimesheetEntry"
+				hx-vals='js:{"approved": {{.Approved}}}'
+				value="{{.ShiftStart.Format "15:04"}}"
 				required>
 			<label>End</label>
 			<input type="time" name="shiftEnd" id="shiftEnd-{{.ID}}"
 				hx-post="/modifyTimesheetEntry"
-				hx-vals='js:{"status": {{.Status}}}'
-				value="{{if .ShiftEnd}}{{.ShiftEnd.Format "15:04"}}{{end}}"
+				hx-vals='js:{"approved": {{.Approved}}}'
+				value="{{.ShiftEnd.Format "15:04"}}"
 				required>
 		</div>
 		<div class="timesheetEl doubleCol">

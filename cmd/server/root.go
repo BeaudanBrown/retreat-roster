@@ -601,16 +601,13 @@ func maxTime(t1, t2 time.Time) time.Time {
 }
 
 func (s *Server) GetWorkFromEntry(windowStart time.Time, windowEnd time.Time, entry db.TimesheetEntry) float64 {
-	if entry.ShiftStart == nil || entry.ShiftEnd == nil {
-		return 0.0
-	}
-	shiftStart := maxTime(windowStart, *entry.ShiftStart)
-	shiftEnd := minTime(windowEnd, *entry.ShiftEnd)
+	shiftStart := maxTime(windowStart, entry.ShiftStart)
+	shiftEnd := minTime(windowEnd, entry.ShiftEnd)
 	if shiftStart.After(shiftEnd) {
 		return 0.0
 	}
 	overlappedShiftDuration := shiftEnd.Sub(shiftStart).Hours()
-	if entry.BreakStart != nil && entry.ShiftEnd != nil {
+	if entry.BreakStart != nil {
 		breakWindowStart := maxTime(shiftStart, *entry.BreakStart)
 		breakWindowEnd := minTime(shiftEnd, *entry.BreakEnd)
 		if breakWindowStart.After(breakWindowEnd) {
@@ -626,6 +623,170 @@ type ShiftHours struct {
 	Staff   float64
 	Manager float64
 	Salary  float64
+}
+
+type DayIdx int
+
+const (
+	Tuesday DayIdx = iota
+	Wednesday
+	Thursday
+	Friday
+	Saturday
+	Sunday
+	Monday
+)
+
+type PayLevel int
+
+const (
+	Level2 PayLevel = iota
+	Level3
+	Level4
+	Level5
+)
+
+type StaffPayData struct {
+	Level2Hrs [7]DayBreakdown
+	Level3Hrs [7]DayBreakdown
+	Level4Hrs [7]DayBreakdown
+	Level5Hrs [7]DayBreakdown
+}
+
+type DayBreakdown struct {
+	OrdinaryHrs float64
+	EveningHrs  float64
+	After12Hrs  float64
+}
+
+func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) {
+	thisStaff := s.GetSessionUser(w, r)
+	if thisStaff == nil {
+		log.Println("Couldn't find session user")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	entries := s.GetTimesheetWeek(thisStaff.Config.TimesheetStartDate)
+	if entries == nil {
+		log.Println("No timesheet entries to export")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	staffData := map[uuid.UUID]*StaffPayData{}
+
+	for day := Tuesday; day <= 6; day++ {
+		thisDate := thisStaff.Config.TimesheetStartDate.AddDate(0, 0, int(day))
+		ordinaryWindowStart := thisDate
+		ordinaryWindowEnd := thisDate.Add(time.Duration(19) * time.Hour)
+		eveningWindowStart := ordinaryWindowEnd
+		eveningWindowEnd := thisDate.Add(time.Duration(24) * time.Hour)
+		after12WindowStart := eveningWindowEnd
+		after12WindowEnd := thisDate.Add(time.Duration(30) * time.Hour)
+		for _, entry := range *entries {
+			if !entry.Approved {
+				continue
+			}
+			payData, exists := staffData[entry.StaffID]
+			if !exists {
+				payData = &StaffPayData{}
+				staffData[entry.StaffID] = payData
+			}
+			if entry.ShiftType == db.Bar {
+				payData.Level2Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
+				payData.Level2Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
+				payData.Level2Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
+			} else if entry.ShiftType == db.DayManager {
+				if day != Friday && day != Saturday && day != Sunday {
+					payData.Level3Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
+					payData.Level3Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
+					payData.Level3Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
+				} else if day == Friday || day == Sunday {
+					payData.Level4Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
+					payData.Level4Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
+					payData.Level4Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
+				} else {
+					// day == Saturday
+					payData.Level5Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
+					payData.Level5Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
+					payData.Level5Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
+				}
+			} else if entry.ShiftType == db.NightManager {
+				payData.Level5Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
+				payData.Level5Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
+				payData.Level5Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
+			}
+		}
+	}
+
+	allStaff := s.GetStaffMap()
+	var fileBuffer bytes.Buffer
+	writer := csv.NewWriter(&fileBuffer)
+
+	header := []string{
+		"Employee",
+		"Tues Ord", "Tues 7-12", "Tues 12+",
+		"Wed Ord", "Wed 7-12", "Wed 12+",
+		"Thurs Ord", "Thurs 7-12", "Thurs 12+",
+		"Fri Ord", "Fri 7-12", "Fri 12+",
+		"Sat Ord", "Sat 7-12", "Sat 12+",
+		"Sun Ord", "Sun 7-12", "Sun 12+",
+		"Mon Ord", "Mon 7-12", "Mon 12+",
+	}
+	if err := writer.Write(header); err != nil {
+		log.Printf("Error writing evan report header: %v", err)
+	}
+	for staffID, payData := range staffData {
+		staffMember, ok := allStaff[staffID]
+		if !ok {
+			log.Printf("Missing staffID")
+			continue
+		}
+		name := staffMember.FirstName
+		record := []string{
+			name,
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Tuesday].OrdinaryHrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Tuesday].EveningHrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Tuesday].After12Hrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Wednesday].OrdinaryHrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Wednesday].EveningHrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Wednesday].After12Hrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Thursday].OrdinaryHrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Thursday].EveningHrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Thursday].After12Hrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Friday].OrdinaryHrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Friday].EveningHrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Friday].After12Hrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Saturday].OrdinaryHrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Saturday].EveningHrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Saturday].After12Hrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Sunday].OrdinaryHrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Sunday].EveningHrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Sunday].After12Hrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Monday].OrdinaryHrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Monday].EveningHrs),
+			fmt.Sprintf("%.2f", payData.Level2Hrs[Monday].After12Hrs),
+		}
+		if err := writer.Write(record); err != nil {
+			continue
+		}
+	}
+
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		log.Printf("Error creating evan report: %v", err)
+	}
+
+	// Set the appropriate headers
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment;filename=data.csv")
+	w.Header().Set("Content-Length", strconv.Itoa(len(fileBuffer.Bytes())))
+
+	// Write the zip file to the response
+	if _, err := w.Write(fileBuffer.Bytes()); err != nil {
+		http.Error(w, "Failed to write file to response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (s *Server) HandleExportWageReport(w http.ResponseWriter, r *http.Request) {
@@ -661,6 +822,7 @@ func (s *Server) HandleExportWageReport(w http.ResponseWriter, r *http.Request) 
 				} else if entry.ShiftType == db.DayManager || entry.ShiftType == db.NightManager {
 					window.Manager += s.GetWorkFromEntry(windowStart, windowEnd, entry)
 				} else {
+					// TODO: handle salary and admin properly
 					window.Salary += s.GetWorkFromEntry(windowStart, windowEnd, entry)
 				}
 				report[windowStart] = window
