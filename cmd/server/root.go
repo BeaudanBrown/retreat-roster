@@ -677,7 +677,7 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 
 	for day := Tuesday; day <= 6; day++ {
 		thisDate := thisStaff.Config.TimesheetStartDate.AddDate(0, 0, int(day))
-		ordinaryWindowStart := thisDate
+		ordinaryWindowStart := thisDate.Add(time.Duration(7) * time.Hour)
 		ordinaryWindowEnd := thisDate.Add(time.Duration(19) * time.Hour)
 		eveningWindowStart := ordinaryWindowEnd
 		eveningWindowEnd := thisDate.Add(time.Duration(24) * time.Hour)

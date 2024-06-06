@@ -64,12 +64,13 @@ type Highlight int
 
 const (
 	None Highlight = iota
-	Duplicate
-	PrefConflict
-	PrefRefuse
-	LeaveConflict
 	IdealMet
 	IdealExceeded
+	PrefConflict
+	LateToEarly
+	PrefRefuse
+	Duplicate
+	LeaveConflict
 )
 
 func (rw RosterWeek) MarshalBSON() ([]byte, error) {
@@ -248,7 +249,39 @@ func (d *Database) CheckFlags(allStaff []*StaffMember, week RosterWeek) RosterWe
 		newDay := assignFlags(week.Days[i], week.StartDate.AddDate(0, 0, i), shiftCounts, staffMap, i)
 		week.Days[i] = &newDay
 	}
+
+	for i := 0; i < len(week.Days)-1; i++ {
+		currentDay := week.Days[i]
+		nextDay := week.Days[i+1]
+		if currentDay.IsClosed || nextDay.IsClosed {
+			continue
+		}
+		checkLateToEarly(currentDay, nextDay)
+	}
 	return week
+}
+
+func checkLateToEarly(day *RosterDay, nextDay *RosterDay) {
+	for _, row := range day.Rows {
+		if row.Late.Flag > LateToEarly {
+			// Don't overwrite more important flags
+			continue
+		}
+		staff := row.Late.AssignedStaff
+		if staff == nil {
+			continue
+		}
+		for _, row2 := range nextDay.Rows {
+			if row2.Early.Flag > LateToEarly {
+				// Don't overwrite more important flags
+				continue
+			}
+			if row2.Early.HasThisStaff(*staff) {
+				row2.Early.Flag = LateToEarly
+				row.Late.Flag = LateToEarly
+			}
+		}
+	}
 }
 
 func assignFlags(day *RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int, staffMap map[uuid.UUID]*StaffMember, dayIdx int) RosterDay {
@@ -340,6 +373,9 @@ func GetHighlightCol(defaultCol string, flag Highlight) string {
 	}
 	if flag == PrefConflict {
 		return "#FF9999"
+	}
+	if flag == LateToEarly {
+		return "#117593"
 	}
 	if flag == LeaveConflict || flag == PrefRefuse {
 		return "#CC3333"

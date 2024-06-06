@@ -2,6 +2,7 @@ package db
 
 import (
 	"log"
+	"sort"
 	"strings"
 	"time"
 
@@ -216,6 +217,17 @@ func (d *Database) LoadAllStaff() []*StaffMember {
 		}
 		newStaff = append(newStaff, &staffMember)
 	}
+	sort.Slice(newStaff, func(i, j int) bool {
+		name1 := newStaff[i].FirstName
+		if newStaff[i].NickName != "" {
+			name1 = newStaff[i].NickName
+		}
+		name2 := newStaff[j].FirstName
+		if newStaff[j].NickName != "" {
+			name2 = newStaff[j].NickName
+		}
+		return name1 < name2
+	})
 	return newStaff
 }
 
