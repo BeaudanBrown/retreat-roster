@@ -30,7 +30,7 @@ func (s *Server) MakeTimesheetStruct(activeStaff db.StaffMember) TimesheetData {
 	return TimesheetData{
 		Entries:     *entries,
 		StaffMember: activeStaff,
-		DayNames:    []string{"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"},
+		DayNames:    []string{"Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Monday"},
 		StaffMap:    s.GetStaffMap(),
 		CacheBust:   s.CacheBust,
 	}

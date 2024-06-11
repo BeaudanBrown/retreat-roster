@@ -20,6 +20,9 @@ func GetLastTuesday() time.Time {
 func GetNextTuesday() time.Time {
 	today := time.Now()
 	daysUntilTuesday := int((7 + (time.Tuesday - today.Weekday())) % 7)
+	if daysUntilTuesday == 0 {
+		daysUntilTuesday = 7
+	}
 	nextTuesday := today.AddDate(0, 0, daysUntilTuesday)
 	log.Printf("Next tuesday: %v", nextTuesday)
 	return time.Date(

@@ -87,7 +87,7 @@
 							hx-post='/addTimesheetEntry' hx-ext='json-enc'
 							hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "startDate":"{{$thisDate}}"}'
 							hx-swap='outerHTML' hx-target='#timesheet'>+</button>
-						<h3>{{$dayName}} {{$thisDate.Format "02/01"}}</h3>
+						<h3>{{$thisDate.Format "Monday 02/01"}}</h3>
 					</div>
 					{{ range $entry := $entries }}
 						{{ if (eq $entry.StartDate $thisDate) }}
