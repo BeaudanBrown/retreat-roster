@@ -18,11 +18,12 @@ docker-build:
 	@echo "Building dockerfile..."
 	docker-compose build
 
-docker-run:
+docker-run: build
 	@echo "Building dockerfile..."
+	docker-compose build
 	docker-compose up
 
-docker-push:
+docker-push: build
 	@echo "Pushing docker image..."
 	docker build -t retreat-roster .
 	docker tag retreat-roster docker.beaudan.me/retreat-roster

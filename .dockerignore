@@ -1,3 +1,13 @@
 .devenv/
 .direnv/
 .git/
+cmd
+data
+serverdata
+docker-compose.yml
+flake.lock
+flake.nix
+go.mod
+go.sum
+Makefile
+tasks
