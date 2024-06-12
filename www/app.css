@@ -145,6 +145,7 @@ fieldset {
   flex-direction: column;
   justify-content: center;
   align-items: center;
+	width: 100%;
   max-width: min(100vw, 1200px);
   margin-left: 3px auto;
   margin-right: 3px auto;

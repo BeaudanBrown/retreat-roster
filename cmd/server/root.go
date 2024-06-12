@@ -70,10 +70,6 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("roster Start Date: %v", thisStaff.Config.RosterStartDate)
 	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
-	if !thisStaff.IsAdmin && !week.IsLive {
-		http.Redirect(w, r, "/profile", http.StatusSeeOther)
-		return
-	}
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
