@@ -147,6 +147,7 @@ func (s *Server) HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_token",
 		Value:    sessionIdentifier.String(),
+		Expires:  time.Now().AddDate(10, 0, 0),
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
