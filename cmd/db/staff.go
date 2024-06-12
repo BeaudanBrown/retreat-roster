@@ -380,9 +380,13 @@ func (d *Database) DeleteLeaveReqByID(staffMember StaffMember, leaveReqID uuid.U
 		if leaveReq.ID != leaveReqID {
 			continue
 		}
-		staffMember.LeaveRequests = append(
-			staffMember.LeaveRequests[:1],
-			staffMember.LeaveRequests[i+1:]...)
+		if len(staffMember.LeaveRequests) == 1 {
+			staffMember.LeaveRequests = []LeaveRequest{}
+		} else {
+			staffMember.LeaveRequests = append(
+				staffMember.LeaveRequests[:1],
+				staffMember.LeaveRequests[i+1:]...)
+		}
 		err := d.SaveStaffMember(staffMember)
 		if err != nil {
 			log.Printf("Error deleting leave request: %v", err)

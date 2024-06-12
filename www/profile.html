@@ -1,4 +1,5 @@
 {{ define "profile" }}
+{{ $staffID := .ID }}
 <div id="profileBody" class="profileBody">
 	<div id="profile" class="profile-container">
 		<section class="user-profile">
@@ -162,7 +163,7 @@
 							class="actionBtn"
 							hx-ext="json-enc"
 							hx-post="/deleteLeaveReq"
-							hx-vals='js:{"id":"{{ .ID }}"}'
+							hx-vals='js:{"id":"{{ .ID }}", "staffID": "{{ $staffID }}"}'
 							hx-swap="outerHTML"
 							hx-target="#profile">
 							Delete

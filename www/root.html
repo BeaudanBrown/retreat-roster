@@ -157,6 +157,7 @@
 				</thead>
 				<tbody>
 					{{ range $staff }}
+					{{ $staffID := .ID }}
 					{{ $name := .FirstName }}
 					{{if not (eq .NickName "")}}
 					{{ $name = .NickName }}
@@ -173,7 +174,7 @@
 								class="actionBtn"
 								hx-ext="json-enc"
 								hx-post="/deleteLeaveReq"
-								hx-vals='js:{"id":"{{ .ID }}"}'
+								hx-vals='js:{"id":"{{ .ID }}", "staffID":"{{ $staffID }}"}'
 								hx-swap="outerHTML"
 								hx-target="#roster">
 								Delete

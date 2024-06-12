@@ -249,7 +249,8 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 type DeleteLeaveBody struct {
-	ID string `json:"id"`
+	ID      string `json:"id"`
+	StaffID string `json:"staffID"`
 }
 
 func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
@@ -264,16 +265,26 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	staffID, err := uuid.Parse(reqBody.StaffID)
+	if err != nil {
+		log.Printf("Invalid staffID: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {
 		return
 	}
 
-	staffMember := s.GetStaffByLeaveReqID(leaveID)
-	if staffMember != nil {
-		s.DeleteLeaveReqByID(*staffMember, leaveID)
+	staffMember := s.GetStaffByID(staffID)
+	if staffMember == nil {
+		log.Printf("No staff found with id %v", staffID)
+		week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+		s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+		return
 	}
 
+	s.DeleteLeaveReqByID(*staffMember, leaveID)
 	adminDelete := thisStaff.ID != staffMember.ID
 	if adminDelete {
 		week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
