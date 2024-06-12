@@ -376,22 +376,17 @@ func (d *Database) GetStaffMap() map[uuid.UUID]StaffMember {
 }
 
 func (d *Database) DeleteLeaveReqByID(staffMember StaffMember, leaveReqID uuid.UUID) {
-	for i, leaveReq := range staffMember.LeaveRequests {
-		if leaveReq.ID != leaveReqID {
+	temp := []LeaveRequest{}
+	for _, leaveReq := range staffMember.LeaveRequests {
+		if leaveReq.ID == leaveReqID {
 			continue
 		}
-		if len(staffMember.LeaveRequests) == 1 {
-			staffMember.LeaveRequests = []LeaveRequest{}
-		} else {
-			staffMember.LeaveRequests = append(
-				staffMember.LeaveRequests[:1],
-				staffMember.LeaveRequests[i+1:]...)
-		}
-		err := d.SaveStaffMember(staffMember)
-		if err != nil {
-			log.Printf("Error deleting leave request: %v", err)
-		}
-		return
+		temp = append(temp, leaveReq)
+	}
+	staffMember.LeaveRequests = temp
+	err := d.SaveStaffMember(staffMember)
+	if err != nil {
+		log.Printf("Error deleting leave request: %v", err)
 	}
 }
 
