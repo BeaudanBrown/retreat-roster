@@ -25,15 +25,13 @@
 		return `${day}_${month}_${year}`;
 	}
 
-	if (!!document.getElementById("capture")) {
-		document.getElementById("capture").addEventListener("click", function() {
-			let dateStr = formatDate({{ $startDate }});
-				html2canvas(document.querySelector("#roster-jpg")).then(canvas => {
-					let a = document.createElement('a');
-					a.href = canvas.toDataURL("image/jpeg").replace("image/jpeg", "image/octet-stream");
-					a.download = `roster_${dateStr}.jpg`; // File name incorporates formatted start date
-					a.click();
-				});
+	function saveImage() {
+		let dateStr = formatDate({{ $startDate }});
+		html2canvas(document.querySelector("#roster-jpg")).then(canvas => {
+			let a = document.createElement('a');
+			a.href = canvas.toDataURL("image/jpeg").replace("image/jpeg", "image/octet-stream");
+			a.download = `roster_${dateStr}.jpg`; // File name incorporates formatted start date
+			a.click();
 		});
 	}
 	</script>
@@ -111,37 +109,35 @@
 				{{ end }}
 			</div>
 			{{if not $isLive }}
-			</br>
-			<div class="form-container">
-				<form id="addTrialForm" hx-post="/addTrial" hx-ext="json-enc" hx-swap="outerHTML" hx-target="#roster">
-					<label>Add New Trial</label>
-					<div class="form-container">
-						<input type="text" name="name" id="customStaff" value="Trial" onfocus="this.select();" onclick="this.select();" />
-						<button type="submit">+</button>
+				</br>
+				<div class="form-container">
+					<form id="addTrialForm" hx-post="/addTrial" hx-ext="json-enc" hx-swap="outerHTML" hx-target="#roster">
+						<label>Add New Trial</label>
+						<div class="form-container">
+							<input type="text" name="name" id="customStaff" value="Trial" onfocus="this.select();" onclick="this.select();" />
+							<button type="submit">+</button>
+						</div>
+					</form>
+				</div>
+				{{ range .Staff }}
+					{{if .IsTrial }}
+					</br>
+					<div class="checkLabel">
+						<label>{{ .FirstName }}</label>
+						<button type="button"
+							class="actionBtn"
+							hx-ext="json-enc"
+							hx-post="/deleteAcc"
+							hx-vals='js:{"id":"{{ .ID }}"}'
+							hx-swap="outerHTML"
+							hx-target="#roster">
+							Delete
+						</button>
 					</div>
-				</form>
-			</div>
-			{{ range .Staff }}
-			{{if .IsTrial }}
-			</br>
-			<div class="checkLabel">
-				<label>{{ .FirstName }}</label>
-				<button type="button"
-					class="actionBtn"
-					hx-ext="json-enc"
-					hx-post="/deleteAcc"
-					hx-vals='js:{"id":"{{ .ID }}"}'
-					hx-swap="outerHTML"
-					hx-target="#roster">
-					Delete
-				</button>
-			</div>
-			{{end}}
-			{{ end }}
-			<button id="capture" style="display:none;">Capture as JPG</button>
-
+					{{ end }}
+				{{ end }}
 			{{ else }}
-			<button id="capture">Save image</button>
+				<button id="capture" onclick="saveImage()">Save image</button>
 			{{ end }}
 			<h2>Leave Requests</h2>
 			<table>
