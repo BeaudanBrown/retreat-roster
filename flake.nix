@@ -33,9 +33,17 @@
         inherit inputs pkgs;
         modules = [
           {
-            packages = [];
+            packages = with pkgs; [
+              tailwindcss
+            ];
 
-            languages.go.enable = true;
+            languages = {
+              go.enable = true;
+              javascript = {
+                enable = true;
+                npm.enable = true;
+              };
+            };
 
             services.mongodb = {
               enable = true;
@@ -44,7 +52,8 @@
             };
 
             processes = {
-              server.exec = "go run cmd/main.go";
+              server.exec = "air";
+              tailwind.exec = "tailwindcss -i ./www/input.css -o ./www/app.css --watch=always";
             };
 
             pre-commit.hooks.gofmt.enable = true;

@@ -6,8 +6,9 @@ state.json
 .prodenv
 .devenv/
 .direnv/
+tmp/
 .envrc
-serverdata/
+www/app.css
 docker-compose.yml
 .pre-commit-config.yaml
 tasks

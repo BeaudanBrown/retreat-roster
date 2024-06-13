@@ -1,0 +1,6 @@
+[build]
+cmd = "CGO_ENABLED=0 GOOS=linux go build -installsuffix cgo -o ./tmp/main ./cmd/main.go"
+exclude_dir = ["data", "dist"]
+include_dir = ["cmd", "www"]
+include_ext = ["go", "html"]
+

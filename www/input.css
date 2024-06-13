@@ -1,11 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 html {
-/*   font-size: calc(0rem + 2vw); */
   font-size: 1.8vw;
   font-family: Arial, sans-serif;
 }
 
 @media (min-width: 1000px) {
   html {
+    font-size: 1vw;
     font-size: 1vw;
   }
 }
@@ -21,16 +25,22 @@ p, a,
 ul, ol, li,
 label,
 table, th, td {
-  font-size: inherit; /* Inherit base font size */
+  font-size: inherit;
 }
+
+
 h1 {
-  font-size: 2rem; /* 32px */
+  font-size: 2rem;
 }
 h2 {
-  font-size: 1.5rem; /* 24px */
+  font-size: 1.5rem;
 }
 h3 {
-  font-size: 1.25rem; /* 20px */
+  font-size: 1.25rem;
+}
+
+.buttonStyle {
+	@apply bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full;
 }
 
 form {
@@ -40,25 +50,25 @@ form {
   flex-direction: column;
   width: 100%;
   height: 100%;
-  border: none; /* Removes the border */
-  padding: 0; /* Optional: Adjusts padding */
-  margin: 0; /* Removes default margin */
-  box-sizing: border-box; /* Include padding and border in the element's width and height */
+  border: none;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
 }
 
 select {
   text-align: center;
   width: 100%;
   height: 100%;
-  border: none; /* Removes the border */
-  padding: 0; /* Optional: Adjusts padding */
-  margin: 0; /* Removes default margin */
-  box-sizing: border-box; /* Include padding and border in the element's width and height */
+  border: none;
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
 }
 
 .actions a, label {
-  padding-left: 5px; /* Adds padding around each link */
-  padding-right: 5px; /* Adds padding around each link */
+  padding-left: 5px;
+  padding-right: 5px;
 }
 
 .actionBtn {
@@ -89,7 +99,6 @@ fieldset {
 }
 
 .shiftHighlight {
-  /* color: #006400; */
   background-color: #BFD8B8;
 }
 
@@ -102,7 +111,7 @@ fieldset {
 
 .root {
   display: flex;
-  margin: 5px; /* Removes default margin */
+  margin: 5px;
   flex-direction: column;
   justify-content: center;
   align-items: center;
@@ -112,11 +121,11 @@ fieldset {
   text-align: right;
   width: 100%;
   height: 100%;
-  border: none; /* Removes the border */
-  padding: 0; /* Optional: Adjusts padding */
+  border: none;
+  padding: 0;
   background-color: transparent;
-  margin: 0; /* Removes default margin */
-  box-sizing: border-box; /* Include padding and border in the element's width and height */
+  margin: 0;
+  box-sizing: border-box;
 }
 
 .profile {
@@ -140,7 +149,6 @@ fieldset {
 }
 
 .roster-container {
-  /* font-size: 3vw; /1* Adjust base font size to viewport width *1/ */
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -169,7 +177,7 @@ input[type="checkbox"] {
 
 .availCheckbox {
   margin: 0;
-  vertical-align: middle; /* Ensures vertical alignment with adjacent text or inline elements */
+  vertical-align: middle;
 }
 
 .day {
@@ -256,7 +264,6 @@ input[type="checkbox"] {
 }
 
 #roster-jpg {
-  /* border-bottom: 1px solid black; */
   width: 100%;
   box-sizing: border-box;
   display: flex;
@@ -270,14 +277,14 @@ input[type="checkbox"] {
   align-items: center;
   justify-content: space-between;
   padding: 10px;
-  border-bottom: 1px solid #ccc; /* A subtle bottom border for each row */
+  border-bottom: 1px solid #ccc;
 }
 
 .leave-reason,
 .leave-start-date,
 .leave-end-date {
   flex-grow: 1;
-  margin-right: 10px; /* Spacing between columns */
+  margin-right: 10px;
 }
 
 .header {
@@ -294,12 +301,12 @@ input[type="checkbox"] {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  overflow: auto; /* Adds scrollbar if table exceeds container width */
+  overflow: auto;
 }
 
 table {
   border-collapse: collapse;
-  table-layout: fixed; /* Fixes columns width */
+  table-layout: fixed;
   width: 100%;
 }
 
@@ -310,7 +317,6 @@ th, td {
   word-wrap: break-word;
   word-break: break-word;
   text-align: center;
-  /* font-size: 1.5vw; /1* Adjust base font size to viewport width *1/ */
 }
 
 h1 {
@@ -344,7 +350,7 @@ h1 {
 .form-group {
   display: flex;
   align-items: center;
-  margin-bottom: 10px; /* Spacing between each label-input pair */
+  margin-bottom: 10px;
 }
 
 .hidden {
@@ -447,7 +453,8 @@ input[type="time"] {
   border-bottom: 1px solid #ccc;
 }
 
-/* Timesheet Entry Styles */
 .timesheetDay form {
   display: contents;
 }
+
+
