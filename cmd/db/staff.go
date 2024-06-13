@@ -166,7 +166,7 @@ func (s *StaffMember) UnmarshalBSON(data []byte) error {
 	return nil
 }
 
-func (d *Database) SaveStaffMembers(staffMembers []*StaffMember) error {
+func (d *Database) SaveStaffMembers(staffMembers []StaffMember) error {
 	collection := d.DB.Collection("staff")
 	bulkWriteModels := make([]mongo.WriteModel, len(staffMembers))
 	for i, staffMember := range staffMembers {
@@ -199,23 +199,23 @@ func (d *Database) SaveStaffMember(staffMember StaffMember) error {
 	return nil
 }
 
-func (d *Database) LoadAllStaff() []*StaffMember {
+func (d *Database) LoadAllStaff() []StaffMember {
 	collection := d.DB.Collection("staff")
 	cursor, err := collection.Find(d.Context, bson.M{})
 	if err != nil {
 		log.Printf("Error executing query: %v", err)
-		return []*StaffMember{}
+		return []StaffMember{}
 	}
 	defer cursor.Close(d.Context)
 
-	newStaff := []*StaffMember{}
+	newStaff := []StaffMember{}
 
 	for cursor.Next(d.Context) {
 		var staffMember StaffMember
 		if err := cursor.Decode(&staffMember); err != nil {
 			log.Printf("Error loading staff state: %v", err)
 		}
-		newStaff = append(newStaff, &staffMember)
+		newStaff = append(newStaff, staffMember)
 	}
 	sort.Slice(newStaff, func(i, j int) bool {
 		name1 := newStaff[i].FirstName
@@ -370,7 +370,7 @@ func (d *Database) GetStaffMap() map[uuid.UUID]StaffMember {
 	staffMap := map[uuid.UUID]StaffMember{}
 	staffState := d.LoadAllStaff()
 	for _, staff := range staffState {
-		staffMap[staff.ID] = *staff
+		staffMap[staff.ID] = staff
 	}
 	return staffMap
 }

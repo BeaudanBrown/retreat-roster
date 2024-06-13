@@ -222,8 +222,8 @@ func getCurentShifts(counts []int) int {
 	return total
 }
 
-func (d *Database) CheckFlags(allStaff []*StaffMember, week RosterWeek) RosterWeek {
-	staffMap := make(map[uuid.UUID]*StaffMember, len(allStaff))
+func (d *Database) CheckFlags(allStaff []StaffMember, week RosterWeek) RosterWeek {
+	staffMap := make(map[uuid.UUID]StaffMember, len(allStaff))
 	for _, staff := range allStaff {
 		staff.CurrentShifts = 0
 		staffMap[staff.ID] = staff
@@ -284,7 +284,7 @@ func checkLateToEarly(day *RosterDay, nextDay *RosterDay) {
 	}
 }
 
-func assignFlags(day *RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int, staffMap map[uuid.UUID]*StaffMember, dayIdx int) RosterDay {
+func assignFlags(day *RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int, staffMap map[uuid.UUID]StaffMember, dayIdx int) RosterDay {
 	log.Printf("%v on date %v", day.DayName, date)
 	processSlot := func(row Row, slotStr string, dayIndex int) Highlight {
 		slot := row.getSlot(slotStr)

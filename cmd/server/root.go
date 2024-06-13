@@ -25,7 +25,7 @@ type RootStruct struct {
 	*Server
 	ActiveStaff db.StaffMember
 	db.RosterWeek
-	Staff []*db.StaffMember
+	Staff []db.StaffMember
 }
 
 func (s *Server) MakeRootStruct(activeStaff db.StaffMember, week db.RosterWeek) RootStruct {
@@ -39,7 +39,7 @@ func (s *Server) MakeRootStruct(activeStaff db.StaffMember, week db.RosterWeek) 
 
 type DayStruct struct {
 	db.RosterDay
-	Staff       []*db.StaffMember
+	Staff       []db.StaffMember
 	Date        time.Time
 	IsLive      bool
 	ActiveStaff db.StaffMember
