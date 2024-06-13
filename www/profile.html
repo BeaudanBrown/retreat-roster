@@ -163,7 +163,7 @@
 							class="actionBtn"
 							hx-ext="json-enc"
 							hx-post="/deleteLeaveReq"
-							hx-vals='js:{"id":"{{ .ID }}", "staffID": "{{ $staffID }}"}'
+							hx-vals='js:{"id":"{{ .ID }}", "staffID": "{{ $staffID }}", "page":"profile"}'
 							hx-swap="outerHTML"
 							hx-target="#profile">
 							Delete

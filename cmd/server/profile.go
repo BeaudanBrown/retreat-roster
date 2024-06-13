@@ -3,6 +3,7 @@ package server
 import (
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
@@ -251,6 +252,7 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 type DeleteLeaveBody struct {
 	ID      string `json:"id"`
 	StaffID string `json:"staffID"`
+	Page    string `json:"page"`
 }
 
 func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
@@ -285,8 +287,7 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.DeleteLeaveReqByID(*staffMember, leaveID)
-	adminDelete := thisStaff.ID != staffMember.ID
-	if adminDelete {
+	if reqBody.Page == "root" {
 		week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 		s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 	} else {
@@ -353,4 +354,31 @@ func (s *Server) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("HX-Redirect", "/")
 		w.WriteHeader(http.StatusOK)
 	}
+}
+
+type LeaveReqData struct {
+	db.LeaveRequest
+	StaffID   uuid.UUID
+	StaffName string
+}
+
+func GetSortedLeaveReqs(allStaff []db.StaffMember) []LeaveReqData {
+	reqs := []LeaveReqData{}
+	for _, staffMember := range allStaff {
+		for _, req := range staffMember.LeaveRequests {
+			name := staffMember.FirstName
+			if staffMember.NickName != "" {
+				name = staffMember.NickName
+			}
+			reqs = append(reqs, LeaveReqData{
+				req,
+				staffMember.ID,
+				name,
+			})
+		}
+	}
+	sort.Slice(reqs, func(i, j int) bool {
+		return reqs[i].StartDate.Before(*reqs[j].StartDate.Time)
+	})
+	return reqs
 }

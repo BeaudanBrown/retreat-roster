@@ -113,6 +113,7 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 			"MemberIsAssigned":         MemberIsAssigned,
 			"MakeTimesheetEntryStruct": MakeTimesheetEntryStruct,
 			"ShiftTypeToString":        db.ShiftTypeToString,
+			"GetSortedLeaveReqs":       GetSortedLeaveReqs,
 			"addDays": func(t time.Time, days int) time.Time {
 				return t.AddDate(0, 0, days)
 			},
