@@ -5,6 +5,14 @@
 {{ $isThisStaff := eq .ThisStaffID .StaffID }}
 {{ $canEdit := and (not .Approved) (or $showAll $isThisStaff) }}
 {{ $canView := and .Approved (or $showAll $isThisStaff) }}
+<script>
+	flatpickr(".timePicker", {
+			enableTime: true,
+			noCalendar: true,
+			dateFormat: "h:i K",
+			minuteIncrement: 15
+	});
+</script>
 
 {{ if $canEdit }}
 <div class="timesheetDay" id='entry-{{.ID}}'>
@@ -45,7 +53,7 @@
 				value="{{.ShiftStart.Format "15:04"}}"
 				required>
 			<label>End</label>
-			<input type="time" name="shiftEnd" id="shiftEnd-{{.ID}}"
+			<input type="text" name="shiftEnd" class="timePicker"
 				hx-post="/modifyTimesheetEntry"
 				hx-vals='js:{"approved": {{.Approved}}}'
 				value="{{.ShiftEnd.Format "15:04"}}"
