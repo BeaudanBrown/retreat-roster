@@ -2,6 +2,7 @@ package db
 
 import (
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -74,39 +75,47 @@ type ShiftType int
 
 const (
 	Bar ShiftType = iota
+	Deliveries
 	DayManager
+	AmeliaSupervisor
 	NightManager
+	GeneralManagement
 	Admin
 )
 
-func ShiftTypeToString(shiftType ShiftType) string {
-	switch shiftType {
-	case Bar:
-		return "Bar"
-	case DayManager:
-		return "Day Manager"
-	case NightManager:
-		return "Night Manager"
-	case Admin:
-		return "Admin"
-	default:
-		return "Bar"
+func GetAllShiftTypes() []ShiftType {
+	size := int(Admin-Bar) + 1
+	shiftTypes := make([]ShiftType, size)
+	for i := int(Bar); i < size; i++ {
+		shiftTypes[i] = ShiftType(i)
 	}
+	return shiftTypes
+}
+
+func (s ShiftType) Int() int {
+	return int(s)
+}
+
+func (s ShiftType) String() string {
+	return [...]string{
+		"Bar",
+		"Deliveries",
+		"Day Manager",
+		"Amelia Supervisor",
+		"Night Manager",
+		"General Management",
+		"Admin"}[s]
 }
 
 func StringToShiftType(typeStr string) ShiftType {
-	switch typeStr {
-	case "0":
-		return Bar
-	case "1":
-		return DayManager
-	case "2":
-		return NightManager
-	case "3":
-		return Admin
-	default:
+	num, err := strconv.Atoi(typeStr)
+	if err != nil {
 		return Bar
 	}
+	if num > int(Admin) {
+		return Bar
+	}
+	return ShiftType(num)
 }
 
 func (d *Database) SaveTimesheetEntry(e TimesheetEntry) error {

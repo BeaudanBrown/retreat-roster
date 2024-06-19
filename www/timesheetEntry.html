@@ -37,11 +37,13 @@
 			<select name="shiftType"
 				hx-post="/modifyTimesheetEntry"
 				hx-vals='js:{"approved": {{.Approved}}}'>
-				<option value=0 {{ if eq .ShiftType 0 }}selected{{ end }}>{{ ShiftTypeToString 0 }}</option>
-				{{ if .IsAdmin }}
-				<option value=1 {{ if eq .ShiftType 1 }}selected{{ end }}>{{ ShiftTypeToString 1 }}</option>
-				<option value=2 {{ if eq .ShiftType 2 }}selected{{ end }}>{{ ShiftTypeToString 2 }}</option>
-				<option value=3 {{ if eq .ShiftType 3 }}selected{{ end }}>{{ ShiftTypeToString 3 }}</option>
+				{{ $shiftType := .ShiftType }}
+				{{ range $st := GetAllShiftTypes }}
+					{{ if (or $isAdmin (lt $st AdminShiftTypeStart)) }}
+						<option value={{ $st.Int }} {{ if eq $shiftType $st }}selected{{ end }}>
+							{{ $st.String }}
+						</option>
+					{{ end }}
 				{{ end }}
 			</select>
 		</div>
@@ -103,10 +105,14 @@
 	<label class="timesheetEl">{{if $thisStaff.NickName}}{{$thisStaff.NickName}}{{else}}{{$thisStaff.FirstName}}{{end}}</label>
 	<div class="timesheetEl">
 		<select disabled>
-			<option value=0 {{ if eq .ShiftType 0 }}selected{{ end }}>{{ ShiftTypeToString 0 }}</option>
-			<option value=1 {{ if eq .ShiftType 1 }}selected{{ end }}>{{ ShiftTypeToString 1 }}</option>
-			<option value=2 {{ if eq .ShiftType 2 }}selected{{ end }}>{{ ShiftTypeToString 2 }}</option>
-			<option value=3 {{ if eq .ShiftType 3 }}selected{{ end }}>{{ ShiftTypeToString 3 }}</option>
+			{{ $shiftType := .ShiftType }}
+			{{ range $st := GetAllShiftTypes }}
+				{{ if (or $isAdmin (lt $st AdminShiftTypeStart)) }}
+					<option value={{ $st.Int }} {{ if eq $shiftType $st }}selected{{ end }}>
+						{{ $st.String }}
+					</option>
+				{{ end }}
+			{{ end }}
 		</select>
 	</div>
 	<div class="timesheetEl doubleCol">
