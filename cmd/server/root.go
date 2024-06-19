@@ -617,9 +617,11 @@ func (s *Server) GetWorkFromEntry(windowStart time.Time, windowEnd time.Time, en
 }
 
 type ShiftHours struct {
-	Staff   float64
-	Manager float64
-	Salary  float64
+	Manager    float64
+	Staff      float64
+	Amelia     float64
+	Salary     float64
+	Deliveries float64
 }
 
 type DayIdx int
@@ -818,9 +820,12 @@ func (s *Server) HandleExportWageReport(w http.ResponseWriter, r *http.Request) 
 					window.Staff += s.GetWorkFromEntry(windowStart, windowEnd, entry)
 				} else if entry.ShiftType == db.DayManager || entry.ShiftType == db.NightManager {
 					window.Manager += s.GetWorkFromEntry(windowStart, windowEnd, entry)
-				} else {
-					// TODO: handle salary and admin properly
+				} else if entry.ShiftType == db.AmeliaSupervisor {
+					window.Amelia += s.GetWorkFromEntry(windowStart, windowEnd, entry)
+				} else if entry.ShiftType == db.GeneralManagement {
 					window.Salary += s.GetWorkFromEntry(windowStart, windowEnd, entry)
+				} else if entry.ShiftType == db.Deliveries {
+					window.Deliveries += s.GetWorkFromEntry(windowStart, windowEnd, entry)
 				}
 				report[windowStart] = window
 			}
@@ -876,7 +881,14 @@ func createCSVContent(data map[time.Time]ShiftHours) ([]byte, error) {
 	})
 
 	// Write CSV header
-	header := []string{"Time", "Staff Hours", "Manager Hours", "Salary Hours"}
+	header := []string{
+		"Time",
+		"Manager",
+		"Staff",
+		"Amelia Supervisor",
+		"Salary",
+		"Deliveries",
+	}
 	if err := writer.Write(header); err != nil {
 		return nil, err
 	}
@@ -885,9 +897,11 @@ func createCSVContent(data map[time.Time]ShiftHours) ([]byte, error) {
 	for _, t := range times {
 		record := []string{
 			t.Format("1504"),
-			fmt.Sprintf("%.2f", data[t].Staff),
 			fmt.Sprintf("%.2f", data[t].Manager),
+			fmt.Sprintf("%.2f", data[t].Staff),
+			fmt.Sprintf("%.2f", data[t].Amelia),
 			fmt.Sprintf("%.2f", data[t].Salary),
+			fmt.Sprintf("%.2f", data[t].Deliveries),
 		}
 		if err := writer.Write(record); err != nil {
 			return nil, err
