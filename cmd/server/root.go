@@ -650,6 +650,7 @@ type StaffPayData struct {
 	Level3Hrs [7]DayBreakdown
 	Level4Hrs [7]DayBreakdown
 	Level5Hrs [7]DayBreakdown
+	General   [7]DayBreakdown
 }
 
 type DayBreakdown struct {
@@ -691,7 +692,7 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 				payData = &StaffPayData{}
 				staffData[entry.StaffID] = payData
 			}
-			if entry.ShiftType == db.Bar {
+			if entry.ShiftType == db.Bar || entry.ShiftType == db.Deliveries || entry.ShiftType == db.Admin {
 				payData.Level2Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
 				payData.Level2Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
 				payData.Level2Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
@@ -714,6 +715,14 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 				payData.Level5Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
 				payData.Level5Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
 				payData.Level5Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
+			} else if entry.ShiftType == db.AmeliaSupervisor {
+				payData.Level4Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
+				payData.Level4Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
+				payData.Level4Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
+			} else if entry.ShiftType == db.GeneralManagement {
+				payData.General[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
+				payData.General[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
+				payData.General[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
 			}
 		}
 	}
@@ -728,46 +737,43 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 		"Wed Ord", "Wed 7-12", "Wed 12+",
 		"Thurs Ord", "Thurs 7-12", "Thurs 12+",
 		"Fri Ord", "Fri 7-12", "Fri 12+",
-		"Sat Ord", "Sat 7-12", "Sat 12+",
-		"Sun Ord", "Sun 7-12", "Sun 12+",
+		"Sat Ord", "Sat 12+",
+		"Sun Ord",
 		"Mon Ord", "Mon 7-12", "Mon 12+",
 	}
 	if err := writer.Write(header); err != nil {
 		log.Printf("Error writing evan report header: %v", err)
 	}
+	reportRows := [][]string{}
 	for staffID, payData := range staffData {
 		staffMember, ok := allStaff[staffID]
 		if !ok {
 			log.Printf("Missing staffID")
 			continue
 		}
-		name := staffMember.FirstName
-		record := []string{
-			name,
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Tuesday].OrdinaryHrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Tuesday].EveningHrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Tuesday].After12Hrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Wednesday].OrdinaryHrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Wednesday].EveningHrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Wednesday].After12Hrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Thursday].OrdinaryHrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Thursday].EveningHrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Thursday].After12Hrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Friday].OrdinaryHrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Friday].EveningHrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Friday].After12Hrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Saturday].OrdinaryHrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Saturday].EveningHrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Saturday].After12Hrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Sunday].OrdinaryHrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Sunday].EveningHrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Sunday].After12Hrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Monday].OrdinaryHrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Monday].EveningHrs),
-			fmt.Sprintf("%.2f", payData.Level2Hrs[Monday].After12Hrs),
+		fullName := staffMember.LastName + ", " + staffMember.FirstName
+		if hasHours(payData.Level2Hrs) {
+			reportRows = append(reportRows, BuildReportRecord(payData.Level2Hrs, fullName))
 		}
-		if err := writer.Write(record); err != nil {
-			continue
+		if hasHours(payData.Level3Hrs) {
+			reportRows = append(reportRows, BuildReportRecord(payData.Level3Hrs, fullName+" LVL 3"))
+		}
+		if hasHours(payData.Level4Hrs) {
+			reportRows = append(reportRows, BuildReportRecord(payData.Level4Hrs, fullName+" LVL 4"))
+		}
+		if hasHours(payData.Level5Hrs) {
+			reportRows = append(reportRows, BuildReportRecord(payData.Level5Hrs, fullName+" LVL 5"))
+		}
+		if hasHours(payData.General) {
+			reportRows = append(reportRows, BuildReportRecord(payData.General, fullName+" Salary"))
+		}
+	}
+	sort.Slice(reportRows, func(i, j int) bool {
+		return reportRows[i][0] < reportRows[j][0]
+	})
+	for _, row := range reportRows {
+		if err := writer.Write(row); err != nil {
+			log.Printf("Error writing record: %v", err)
 		}
 	}
 
@@ -785,6 +791,48 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 	if _, err := w.Write(fileBuffer.Bytes()); err != nil {
 		http.Error(w, "Failed to write file to response", http.StatusInternalServerError)
 		return
+	}
+}
+
+func hasHours(hours [7]DayBreakdown) bool {
+	for i := 0; i < 7; i++ {
+		if hours[i].OrdinaryHrs+hours[i].EveningHrs+hours[i].After12Hrs > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func BuildReportRecord(hours [7]DayBreakdown, name string) []string {
+	return []string{
+		name,
+		fmt.Sprintf("%.2f", hours[Tuesday].OrdinaryHrs),
+		fmt.Sprintf("%.2f", hours[Tuesday].EveningHrs),
+		fmt.Sprintf("%.2f", hours[Tuesday].After12Hrs),
+
+		fmt.Sprintf("%.2f", hours[Wednesday].OrdinaryHrs),
+		fmt.Sprintf("%.2f", hours[Wednesday].EveningHrs),
+		fmt.Sprintf("%.2f", hours[Wednesday].After12Hrs),
+
+		fmt.Sprintf("%.2f", hours[Thursday].OrdinaryHrs),
+		fmt.Sprintf("%.2f", hours[Thursday].EveningHrs),
+		fmt.Sprintf("%.2f", hours[Thursday].After12Hrs),
+
+		fmt.Sprintf("%.2f", hours[Friday].OrdinaryHrs),
+		fmt.Sprintf("%.2f", hours[Friday].EveningHrs),
+		fmt.Sprintf("%.2f", hours[Friday].After12Hrs),
+
+		fmt.Sprintf("%.2f", hours[Saturday].OrdinaryHrs+
+			hours[Saturday].EveningHrs),
+		fmt.Sprintf("%.2f", hours[Saturday].After12Hrs),
+
+		fmt.Sprintf("%.2f", hours[Sunday].OrdinaryHrs+
+			hours[Sunday].EveningHrs+
+			hours[Sunday].After12Hrs),
+
+		fmt.Sprintf("%.2f", hours[Monday].OrdinaryHrs),
+		fmt.Sprintf("%.2f", hours[Monday].EveningHrs),
+		fmt.Sprintf("%.2f", hours[Monday].After12Hrs),
 	}
 }
 
