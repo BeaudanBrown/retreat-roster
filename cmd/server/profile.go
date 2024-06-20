@@ -362,7 +362,7 @@ type LeaveReqData struct {
 	StaffName string
 }
 
-func GetSortedLeaveReqs(allStaff []db.StaffMember) []LeaveReqData {
+func GetSortedLeaveReqs(allStaff []*db.StaffMember) []LeaveReqData {
 	reqs := []LeaveReqData{}
 	for _, staffMember := range allStaff {
 		for _, req := range staffMember.LeaveRequests {
