@@ -604,9 +604,9 @@ func (s *Server) GetWorkFromEntry(windowStart time.Time, windowEnd time.Time, en
 		return 0.0
 	}
 	overlappedShiftDuration := shiftEnd.Sub(shiftStart).Hours()
-	if entry.BreakStart != nil {
-		breakWindowStart := maxTime(shiftStart, *entry.BreakStart)
-		breakWindowEnd := minTime(shiftEnd, *entry.BreakEnd)
+	if entry.HasBreak {
+		breakWindowStart := maxTime(shiftStart, entry.BreakStart)
+		breakWindowEnd := minTime(shiftEnd, entry.BreakEnd)
 		if breakWindowStart.After(breakWindowEnd) {
 			breakWindowStart = breakWindowEnd
 		}

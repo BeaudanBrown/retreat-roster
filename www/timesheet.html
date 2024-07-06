@@ -7,7 +7,7 @@
 {{ $hideApproved := and $config.HideApproved .StaffMember.IsAdmin }}
 {{ $staffMap := .StaffMap }}
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
-<html>
+<html class="dark">
 	<head>
 		<base href="/">
 		<title>Retreat Roster</title>
@@ -15,28 +15,43 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<script src="https://unpkg.com/htmx.org@1.9.10"></script>
 		<script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+		<link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.css" rel="stylesheet" />
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js"></script>
 	</head>
-	<body id="timesheet" class="rootBody">
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+	<body id="timesheet" class="w-full px-3 m-0 flex flex-col items-center justify-center bg-gray-900">
+		<script>
+			document.addEventListener("DOMContentLoaded", function() {
+				document.getElementById('timesheet').addEventListener('htmx:afterSwap', function(event) {
+					if (event.detail.target.id === 'modalDiv') {
+						initFlowbite()
+						const button = document.getElementById('edit-modal-button');
+						button.click();
+						const modal = document.getElementById('edit-modal');
+					} else {
+						window.location.reload();
+					}
+				});
+			});
+		</script>
 		{{ template "header" (MakeHeaderStruct $staffMember.IsAdmin .RosterLive) }}
 		{{ if $staffMember.IsAdmin }}
-		</br>
-		<form action="/exportWageReport" method="get">
-				<button type="submit">Export wage report</button>
-		</form>
-		<form action="/exportEvanReport" method="get">
-				<button type="submit">Export evan report</button>
-		</form>
-		<div class="buttons" id="filters">
-			<button class="checkLabel"
+		<div class="flex items-center justify-center space-x-2">
+			<form action="/exportWageReport" method="get">
+					<button class="buttonStyle" type="submit">Wage report</button>
+			</form>
+			<form action="/exportEvanReport" method="get">
+					<button class="buttonStyle" type="submit">Evan report</button>
+			</form>
+		</div>
+		<div class="buttons mt-2" id="filters">
+			<button class="buttonStyle"
 				hx-get="/toggleShowAll"
 				hx-target="#timesheet"
 				hx-swap='outerHTML'>
 				<input type="checkbox" {{ if $showAll }}checked{{ end }}>
 				<label>Show all staff</label>
 			</button>
-			<button class="checkLabel"
+			<button class="buttonStyle"
 				hx-get="/toggleHideApproved"
 				hx-target="#timesheet"
 				hx-swap='outerHTML'>
@@ -44,25 +59,27 @@
 				<label>Hide approved</label>
 			</button>
 		</div>
-		</br>
 		{{ end }}
-		<div class="timesheet">
-			<div>
-				<button hx-post='/shiftTimesheetWindow'
+		<div class="flex flex-col items-center justify-center mt-2 w-full max-w-screen-lg">
+			<div class="flex">
+				<button class="shiftButtonL px-2 py-1.5"
+					hx-post='/shiftTimesheetWindow'
 					hx-ext='json-enc'
 					hx-vals='js:{"action":"-"}'
 					hx-swap='outerHTML'
 					hx-target='#timesheet'>
 					-
 				</button>
-				<button hx-post='/shiftTimesheetWindow'
+				<button class="shiftButtonM px-2 py-1.5"
+					hx-post='/shiftTimesheetWindow'
 					hx-ext='json-enc'
 					hx-vals='js:{"action":"0"}'
 					hx-swap='outerHTML'
 					hx-target='#timesheet'>
 					This Week
 				</button>
-				<button hx-post='/shiftTimesheetWindow'
+				<button class="shiftButtonR px-2 py-1.5"
+					hx-post='/shiftTimesheetWindow'
 					hx-ext='json-enc'
 					hx-vals='js:{"action":"+"}'
 					hx-swap='outerHTML'
@@ -71,44 +88,91 @@
 				</button>
 			</div>
 			<div>
-				<h3>Week {{$config.TimesheetStartDate.Format "02/01"}} - {{(addDays $config.TimesheetStartDate 7).Format "02/01"}}</h3>
+				<h3 class="text-white">Week {{$config.TimesheetStartDate.Format "02/01"}} - {{(addDays $config.TimesheetStartDate 7).Format "02/01"}}</h3>
 			</div>
-			<div class="week-form">
-				<div class="timesheetDay day-header">
-					<div class="timesheetEl">Staff</div>
-					<div class="timesheetEl">Type</div>
-					<div class="timesheetEl">Shift</div>
-					<div class="timesheetEl">Break</div>
-					<div class="timesheetEl">Total</div>
-					<div class="timesheetEl">Action</div>
-				</div>
-				{{ range $idx, $dayName := .DayNames }}
-					{{ $thisDate := addDays $config.TimesheetStartDate $idx }}
-					<div class="day-name">
-						<button class="add-entry-btn"
-							hx-post='/addTimesheetEntry' hx-ext='json-enc'
-							hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "startDate":"{{$thisDate}}"}'
-							hx-swap='outerHTML' hx-target='#timesheet'>+</button>
-						<h3>{{$thisDate.Format "Monday 02/01"}}</h3>
-					</div>
-					{{ range $entry := $entries }}
-						{{ if (eq $entry.StartDate $thisDate) }}
-							{{ if $showAll }}
-								{{ if not (and .Approved $hideApproved)}}
-									{{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry .StaffID $staffMap $showAll $staffMember.IsAdmin) }}
-								{{ end }}
-							{{ else }}
-								{{ if (eq .StaffID $staffMember.ID) }}
-									{{ if (or (not .Approved) (not $hideApproved)) }}
+			<div class="w-full relative overflow-x-auto shadow-md sm:rounded-lg">
+				<table class="w-full text-sm text-center text-gray-400">
+					<thead class="text-xs uppercase bg-gray-700 text-gray-400">
+						<tr>
+							<th colspan="4">Entries</th>
+						</tr>
+					</thead>
+					<tbody>
+					{{ range $idx, $dayName := .DayNames }}
+						{{ $thisDate := addDays $config.TimesheetStartDate $idx }}
+						<tr class="w-full odd:bg-gray-900 even:bg-gray-800 border-gray-700">
+							<th colspan="4" class="py-2 text-left font-medium whitespace-nowrap text-white">
+								<div class="flex items-center justify-center">
+									<button class="buttonAll rounded-lg px-2 mr-2"
+										hx-post='/addTimesheetEntry' hx-ext='json-enc'
+										hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "startDate":"{{$thisDate}}"}'
+										hx-swap='outerHTML' hx-target='#timesheet'>+</button>
+									<h2 class="text-white">{{$thisDate.Format "Monday 02/01"}}</h3>
+								</div>
+							</th>
+						</tr>
+						{{ range $entry := $entries }}
+							{{ if (eq $entry.StartDate $thisDate) }}
+								{{ if $showAll }}
+									{{ if not (and .Approved $hideApproved)}}
 										{{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry .StaffID $staffMap $showAll $staffMember.IsAdmin) }}
+									{{ end }}
+								{{ else }}
+									{{ if (eq .StaffID $staffMember.ID) }}
+										{{ if (or (not .Approved) (not $hideApproved)) }}
+											{{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry .StaffID $staffMap $showAll $staffMember.IsAdmin) }}
+										{{ end }}
 									{{ end }}
 								{{ end }}
 							{{ end }}
 						{{ end }}
 					{{ end }}
-				{{ end }}
+					</tbody>
+				</table>
+
 			</div>
 		</div>
+
+<script>
+	formatTime = function(date) {
+		const options = {
+			hour: 'numeric',
+			minute: '2-digit',
+			hour12: true,
+			timeZone: 'UTC',
+		};
+		return date.toLocaleTimeString('en-AU', options);
+	}
+
+	function getSelectedTime(id, name) {
+		const form = document.getElementById(id + "-entryForm");
+		const selectedRadio = form.querySelector(`input[name="${name}"]:checked`);
+		return selectedRadio ? selectedRadio.value : null;
+	}
+
+	onSaveTime = function(id, name) {
+		const buttonTime = document.getElementById(id + "-" + name + "-timeSpan");
+		const selectedTime = getSelectedTime(id, name);
+		if (selectedTime) {
+			const date = new Date(selectedTime);
+			buttonTime.textContent = formatTime(date);
+		} else {
+			console.log("no time")
+		}
+	};
+
+	toggleBreak = function(checkbox, id) {
+		const breakStartBtn = document.getElementById(id + "-breakStart-button");
+		const breakEndBtn = document.getElementById(id + "-breakEnd-button");
+		if (checkbox.checked) {
+			breakStartBtn.disabled = false;
+			breakEndBtn.disabled = false;
+		} else {
+			breakStartBtn.disabled = true;
+			breakEndBtn.disabled = true;
+		}
+	};
+</script>
 	</body>
 </html>
 {{ end }}

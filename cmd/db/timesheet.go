@@ -13,16 +13,17 @@ import (
 
 type TimesheetEntry struct {
 	ID          uuid.UUID
-	StaffID     uuid.UUID  `bson:"days"`
-	StartDate   time.Time  `bson:"startDate"`
-	ShiftStart  time.Time  `json:"shiftStart"`
-	ShiftEnd    time.Time  `json:"shiftEnd"`
-	BreakStart  *time.Time `json:"breakStart"`
-	BreakEnd    *time.Time `json:"breakEnd"`
-	BreakLength float64    `json:"breakLength"`
-	ShiftLength float64    `json:"shiftLength"`
-	Approved    bool       `json:"approved"`
-	ShiftType   ShiftType  `json:"shiftType"`
+	StaffID     uuid.UUID `bson:"days"`
+	StartDate   time.Time `bson:"startDate"`
+	ShiftStart  time.Time `json:"shiftStart"`
+	ShiftEnd    time.Time `json:"shiftEnd"`
+	HasBreak    bool      `json:"hasBreak"`
+	BreakStart  time.Time `json:"breakStart"`
+	BreakEnd    time.Time `json:"breakEnd"`
+	BreakLength float64   `json:"breakLength"`
+	ShiftLength float64   `json:"shiftLength"`
+	Approved    bool      `json:"approved"`
+	ShiftType   ShiftType `json:"shiftType"`
 }
 
 func (s TimesheetEntry) MarshalBSON() ([]byte, error) {
@@ -52,14 +53,8 @@ func (s *TimesheetEntry) UnmarshalBSON(data []byte) error {
 	s.StartDate = s.StartDate.In(time.Now().Location())
 	s.ShiftStart = s.ShiftStart.In(time.Now().Location())
 	s.ShiftEnd = s.ShiftEnd.In(time.Now().Location())
-	if s.BreakStart != nil {
-		breakStartWithLoc := s.BreakStart.In(time.Now().Location())
-		s.BreakStart = &breakStartWithLoc
-	}
-	if s.BreakEnd != nil {
-		breakEndWithLoc := s.BreakEnd.In(time.Now().Location())
-		s.BreakEnd = &breakEndWithLoc
-	}
+	s.BreakStart = s.BreakStart.In(time.Now().Location())
+	s.BreakEnd = s.BreakEnd.In(time.Now().Location())
 	return nil
 }
 
@@ -110,6 +105,7 @@ func (s ShiftType) String() string {
 func StringToShiftType(typeStr string) ShiftType {
 	num, err := strconv.Atoi(typeStr)
 	if err != nil {
+		log.Printf("Error converting shift type: %v", err)
 		return Bar
 	}
 	if num > int(Admin) {

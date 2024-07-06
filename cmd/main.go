@@ -81,11 +81,13 @@ func main() {
 	http.HandleFunc("/addTimesheetEntry", s.VerifySession(s.HandleAddTimesheetEntry))
 	http.HandleFunc("/deleteTimesheetEntry", s.VerifySession(s.HandleDeleteTimesheetEntry))
 	http.HandleFunc("/modifyTimesheetEntry", s.VerifySession(s.HandleModifyTimesheetEntry))
+	http.HandleFunc("/getTimesheetEditModal", s.VerifySession(s.HandleGetTimesheetEditModal))
 	http.HandleFunc("/toggleHideApproved", s.VerifyAdmin(s.HandleToggleHideApproved))
 	http.HandleFunc("/toggleShowAll", s.VerifyAdmin(s.HandleToggleShowAll))
 	http.HandleFunc("/importRosterWeek", s.VerifyAdmin(s.HandleImportRosterWeek))
 	http.HandleFunc("/exportWageReport", s.VerifyAdmin(s.HandleExportWageReport))
 	http.HandleFunc("/exportEvanReport", s.VerifyAdmin(s.HandleExportEvanReport))
+	http.HandleFunc("/toggleApproved", s.VerifyAdmin(s.HandleToggleApproved))
 
 	log.Println(http.ListenAndServe(":6969", nil))
 }

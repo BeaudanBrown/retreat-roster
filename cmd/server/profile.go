@@ -42,6 +42,24 @@ func MakeProfileStruct(rosterLive bool, staffMember db.StaffMember, adminRights 
 	}
 }
 
+type PickerData struct {
+	Name     string
+	Label    string
+	ID       uuid.UUID
+	Time     time.Time
+	Disabled bool
+}
+
+func MakePickerStruct(name string, label string, id uuid.UUID, time time.Time, disabled bool) PickerData {
+	return PickerData{
+		Name:     name,
+		Label:    label,
+		ID:       id,
+		Time:     time,
+		Disabled: disabled,
+	}
+}
+
 func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
 	editStaff := s.GetSessionUser(w, r)
 	if editStaff == nil {
@@ -124,7 +142,8 @@ func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
 		s.SaveStaffMember(*staff)
 	}
 	data.StaffMember = *staff
-	s.renderTemplate(w, "profile", data)
+	// TODO: Maybe won't need to reload the datepicker if I just swap the leave list
+	// s.renderTemplate(w, "profile", data)
 }
 
 type ModifyProfileBody struct {
@@ -137,27 +156,27 @@ type ModifyProfileBody struct {
 	Phone        string `json:"phone"`
 	ContactName  string `json:"contactName"`
 	ContactPhone string `json:"contactPhone"`
-	TuesEarly    string `json:"Tues-early-avail"`
-	TuesMid      string `json:"Tues-mid-avail"`
-	TuesLate     string `json:"Tues-late-avail"`
-	WedEarly     string `json:"Wed-early-avail"`
-	WedMid       string `json:"Wed-mid-avail"`
-	WedLate      string `json:"Wed-late-avail"`
-	ThursEarly   string `json:"Thurs-early-avail"`
-	ThursMid     string `json:"Thurs-mid-avail"`
-	ThursLate    string `json:"Thurs-late-avail"`
-	FriEarly     string `json:"Fri-early-avail"`
-	FriMid       string `json:"Fri-mid-avail"`
-	FriLate      string `json:"Fri-late-avail"`
-	SatEarly     string `json:"Sat-early-avail"`
-	SatMid       string `json:"Sat-mid-avail"`
-	SatLate      string `json:"Sat-late-avail"`
-	SunEarly     string `json:"Sun-early-avail"`
-	SunMid       string `json:"Sun-mid-avail"`
-	SunLate      string `json:"Sun-late-avail"`
-	MonEarly     string `json:"Mon-early-avail"`
-	MonMid       string `json:"Mon-mid-avail"`
-	MonLate      string `json:"Mon-late-avail"`
+	TuesEarly    string `json:"Tuesday-early-avail"`
+	TuesMid      string `json:"Tuesday-mid-avail"`
+	TuesLate     string `json:"Tuesday-late-avail"`
+	WedEarly     string `json:"Wednesday-early-avail"`
+	WedMid       string `json:"Wednesday-mid-avail"`
+	WedLate      string `json:"Wednesday-late-avail"`
+	ThursEarly   string `json:"Thursday-early-avail"`
+	ThursMid     string `json:"Thursday-mid-avail"`
+	ThursLate    string `json:"Thursday-late-avail"`
+	FriEarly     string `json:"Friday-early-avail"`
+	FriMid       string `json:"Friday-mid-avail"`
+	FriLate      string `json:"Friday-late-avail"`
+	SatEarly     string `json:"Saturday-early-avail"`
+	SatMid       string `json:"Saturday-mid-avail"`
+	SatLate      string `json:"Saturday-late-avail"`
+	SunEarly     string `json:"Sunday-early-avail"`
+	SunMid       string `json:"Sunday-mid-avail"`
+	SunLate      string `json:"Sunday-late-avail"`
+	MonEarly     string `json:"Monday-early-avail"`
+	MonMid       string `json:"Monday-mid-avail"`
+	MonLate      string `json:"Monday-late-avail"`
 }
 
 func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
@@ -197,43 +216,43 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 
 	staff.Availability = []db.DayAvailability{
 		{
-			Name:  "Tues",
+			Name:  "Tuesday",
 			Early: reqBody.TuesEarly == "on",
 			Mid:   reqBody.TuesMid == "on",
 			Late:  reqBody.TuesLate == "on",
 		},
 		{
-			Name:  "Wed",
+			Name:  "Wednesday",
 			Early: reqBody.WedEarly == "on",
 			Mid:   reqBody.WedMid == "on",
 			Late:  reqBody.WedLate == "on",
 		},
 		{
-			Name:  "Thurs",
+			Name:  "Thursday",
 			Early: reqBody.ThursEarly == "on",
 			Mid:   reqBody.ThursMid == "on",
 			Late:  reqBody.ThursLate == "on",
 		},
 		{
-			Name:  "Fri",
+			Name:  "Friday",
 			Early: reqBody.FriEarly == "on",
 			Mid:   reqBody.FriMid == "on",
 			Late:  reqBody.FriLate == "on",
 		},
 		{
-			Name:  "Sat",
+			Name:  "Saturday",
 			Early: reqBody.SatEarly == "on",
 			Mid:   reqBody.SatMid == "on",
 			Late:  reqBody.SatLate == "on",
 		},
 		{
-			Name:  "Sun",
+			Name:  "Sunday",
 			Early: reqBody.SunEarly == "on",
 			Mid:   reqBody.SunMid == "on",
 			Late:  reqBody.SunLate == "on",
 		},
 		{
-			Name:  "Mon",
+			Name:  "Monday",
 			Early: reqBody.MonEarly == "on",
 			Mid:   reqBody.MonMid == "on",
 			Late:  reqBody.MonLate == "on",

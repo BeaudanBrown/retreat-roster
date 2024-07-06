@@ -6,7 +6,7 @@
 {{ $startDate := $config.RosterStartDate }}
 {{ $server := .Server }}
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
-<html>
+<html lang="en">
 	<head>
 		<base href="/">
 		<title>Retreat Roster</title>
@@ -15,6 +15,8 @@
 		<script src="https://unpkg.com/htmx.org@1.9.10"></script>
 		<script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
 		<script src="https://unpkg.com/html2canvas"></script>
+		<link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.css" rel="stylesheet" />
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.3.0/flowbite.min.js"></script>
 	</head>
 	<script>
 	function formatDate(dateStr) {
@@ -27,37 +29,50 @@
 
 	function saveImage() {
 		let dateStr = formatDate({{ $startDate }});
+
+		const style = document.createElement('style');
+		document.head.appendChild(style);
+		style.sheet?.insertRule('body > div:last-child img { display: inline-block; }');
+
 		html2canvas(document.querySelector("#roster-jpg")).then(canvas => {
+			style.remove();
 			let a = document.createElement('a');
 			a.href = canvas.toDataURL("image/jpeg").replace("image/jpeg", "image/octet-stream");
-			a.download = `roster_${dateStr}.jpg`; // File name incorporates formatted start date
+			a.download = `roster_${dateStr}.jpg`;
 			a.click();
 		});
 	}
 	</script>
-	<body id="roster" class="rootBody">
+	<body id="roster" class="w-full p-0 m-0 flex flex-col items-center justify-center bg-gray-900">
+	<script>
+			if (typeof initFlowbite !== 'undefined') {
+				initFlowbite();
+				console.log('Flowbite has been initialized.');
+			} else {
+				console.error('initFlowbite is not available.');
+			}
+	</script>
 		{{ template "header" (MakeHeaderStruct .ActiveStaff.IsAdmin .IsLive) }}
-		<div class="roster-container">
+		<div class="flex flex-col max-w-[60rem] justify-center items-center w-full m-wi">
 			<div class="buttons">
 				{{ if .ActiveStaff.IsAdmin }}
-					<div>
-						<button class="checkLabel"
+						<button class="buttonStyle"
 							hx-get="/toggleLive"
 							hx-target="#roster"
 							hx-swap='outerHTML'>
 							<input type="checkbox" {{ if $isLive }}checked{{ end }}>
 							<label>Make Public</label>
 						</button>
-					</div>
 				{{ end }}
-				<div>
-					<button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"-"}' hx-swap='outerHTML' hx-target='#roster'>-</button>
-					<button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"0"}' hx-swap='outerHTML' hx-target='#roster'>This week</button>
-					<button hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"+"}' hx-swap='outerHTML' hx-target='#roster'>+</button>
+				<div class="flex">
+					<button class="shiftButtonL px-2 py-1.5" hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"-"}' hx-swap='outerHTML' hx-target='#roster'>-</button>
+					<button class="shiftButtonM px-2 py-1.5" hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"0"}' hx-swap='outerHTML' hx-target='#roster'>This week</button>
+					<button class="shiftButtonR px-2 py-1.5" hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"+"}' hx-swap='outerHTML' hx-target='#roster'>+</button>
 				</div>
 				{{ if .ActiveStaff.IsAdmin }}
 					<div>
-						<button hx-get='/importRosterWeek'
+						<button class="buttonStyle"
+							hx-get='/importRosterWeek'
 							hx-swap='outerHTML'
 							hx-confirm="Are you sure you want to overwrite this week? CAN'T BE UNDONE"
 							hx-target='#roster'>
@@ -67,7 +82,7 @@
 				{{ end }}
 			</div>
 			<div>
-				<h3>Week {{$config.RosterStartDate.Format "02/01"}} - {{(addDays $config.RosterStartDate 7).Format "02/01"}}</h3>
+				<h3 class="text-white">Week {{$config.RosterStartDate.Format "02/01"}} - {{(addDays $config.RosterStartDate 7).Format "02/01"}}</h3>
 			</div>
 			{{ if not .ActiveStaff.IsAdmin }}
 				<div id="roster-jpg">
@@ -82,33 +97,44 @@
 				</div>
 			{{ else }}
 				{{if not $isLive }}
-				<div>
-					<label>Hide staff with:</label>
-				</div>
-				<div class="buttons" id="filters">
-					<button class="checkLabel"
-						hx-get="/toggleHideByIdeal"
-						hx-target="#roster"
-						hx-swap='outerHTML'>
-						<input type="checkbox" {{ if $config.HideByIdeal }}checked{{ end }}>
-						<label>Ideal # shifts</label>
-					</button>
-					<button class="checkLabel"
-						hx-get="/toggleHideByPreferences"
-						hx-target="#roster"
-						hx-swap='outerHTML'>
-						<input type="checkbox" {{ if $config.HideByPrefs }}checked{{ end }}>
-						<label>Preference conflict</label>
-					</button>
-					<button class="checkLabel"
-						hx-get="/toggleHideByLeave"
-						hx-target="#roster"
-						hx-swap='outerHTML'>
-						<input type="checkbox" {{ if $config.HideByLeave }}checked{{ end }}>
-						<label>Leave requests</label>
-					</button>
+				<button id="hideDropdown" data-dropdown-toggle="hideDropdownOpts" class="buttonStyle" type="button">Hide staff with <svg class="w-2.5 h-2.5 ms-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
+						<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 4 4 4-4"/>
+					</svg>
+				</button>
+				<!-- Dropdown menu -->
+				<div id="hideDropdownOpts" class="z-10 hidden w-48 divide-y rounded-lg shadow bg-gray-700 divide-gray-600">
+					<ul class="p-3 space-y-3 text-sm text-gray-200" aria-labelledby="hideDropdown">
+						<li>
+							<div class="flex items-center p-2 rounded hover:bg-gray-600">
+								<input {{ if $config.HideByIdeal }}checked{{ end }} id="hideIdeal" type="checkbox" class="w-4 h-4 rounded focus:ring-blue-600 ring-offset-gray-700 focus:ring-offset-gray-700 focus:ring-2 bg-gray-600 border-gray-500"
+								hx-get="/toggleHideByIdeal"
+								hx-target="#roster"
+								hx-swap='outerHTML'>
+								<label for="hideIdeal" class="w-full ms-2 text-sm font-medium rounded text-gray-300">Ideal # shifts</label>
+							</div>
+						</li>
+						<li>
+							<div class="flex items-center p-2 rounded hover:bg-gray-600">
+								<input {{ if $config.HideByPrefs }}checked{{ end }} id="hidePrefs" type="checkbox" class="w-4 h-4 rounded focus:ring-blue-600 ring-offset-gray-700 focus:ring-offset-gray-700 focus:ring-2 bg-gray-600 border-gray-500"
+								hx-get="/toggleHideByPreferences"
+								hx-target="#roster"
+								hx-swap='outerHTML'>
+								<label for="hidePrefs" class="w-full ms-2 text-sm font-medium rounded text-gray-300">Preference conflict</label>
+							</div>
+						</li>
+						<li>
+							<div class="flex items-center p-2 rounded hover:bg-gray-600">
+								<input {{ if $config.HideByLeave }}checked{{ end }} id="hideLeave" type="checkbox" class="w-4 h-4 rounded focus:ring-blue-600 ring-offset-gray-700 focus:ring-offset-gray-700 focus:ring-2 bg-gray-600 border-gray-500"
+								hx-get="/toggleHideByLeave"
+								hx-target="#roster"
+								hx-swap='outerHTML'>
+								<label for="hideLeave" class="w-full ms-2 text-sm font-medium rounded text-gray-300">Leave requests</label>
+							</div>
+						</li>
+					</ul>
 				</div>
 				{{ end }}
+				</br>
 				<div id="roster-jpg">
 					{{ range .Days }}
 					{{ $dayStruct := MakeDayStruct $isLive . $server $activeStaff }}
@@ -123,20 +149,19 @@
 					</br>
 					<div class="form-container">
 						<form id="addTrialForm" hx-post="/addTrial" hx-ext="json-enc" hx-swap="outerHTML" hx-target="#roster">
-							<label>Add New Trial</label>
-							<div class="form-container">
-								<input type="text" name="name" id="customStaff" value="Trial" onfocus="this.select();" onclick="this.select();" />
-								<button type="submit">+</button>
+							<label class="text-white">Add New Trial</label>
+							<div class="inline-flex rounded-md shadow-sm">
+								<input type="text" name="name" id="customStaff" value="Trial" onfocus="this.select();" onclick="this.select();" class="shiftInput" />
+								<button class="px-1.5 shiftButtonR" type="submit">+</button>
 							</div>
 						</form>
 					</div>
 					{{ range .Staff }}
 						{{if .IsTrial }}
-						</br>
-						<div class="checkLabel">
-							<label>{{ .FirstName }}</label>
+						<div class="py-2 inline-flex items-center justify-center rounded-md">
+							<label class="text-center shiftLabel">{{ .FirstName }}</label>
 							<button type="button"
-								class="actionBtn"
+								class="px-1.5 shiftButtonR"
 								hx-ext="json-enc"
 								hx-post="/deleteAcc"
 								hx-vals='js:{"id":"{{ .ID }}"}'
@@ -148,48 +173,50 @@
 						{{ end }}
 					{{ end }}
 				{{ else }}
-					<button id="capture" onclick="saveImage()">Save image</button>
+					<button id="capture" class="buttonStyle mt-2" onclick="saveImage()">Save image</button>
 				{{ end }}
-				<h2>Leave Requests</h2>
-				<table>
-					<thead>
-						<tr>
-							<th>Staff</th>
-							<th>Created</th>
-							<th>Reason</th>
-							<th>Unavailable from</th>
-							<th>Available again</th>
-							<th>Delete</th>
-						</tr>
-					</thead>
-					<tbody>
-						{{ $reqData := GetSortedLeaveReqs $staff }}
-						{{ range $reqData }}
+				<h2 class="text-white">Leave Requests</h2>
+				<div class="w-full relative overflow-x-auto shadow-md sm:rounded-lg">
+					<table class="w-full text-sm text-center text-gray-400">
+						<thead class="text-xs uppercase bg-gray-700 text-gray-400">
 							<tr>
-								<td>{{ .StaffName }}</td>
-								<td>{{ .CreationDate.Format "02/01/06" }}</td>
-								<td>{{ .Reason }}</td>
-								<td>{{ .StartDate.Format "02/01/06" }}</td>
-								<td>{{ .EndDate.Format "02/01/06" }}</td>
-								<td>
-									<button type="button"
-										class="actionBtn"
-										hx-ext="json-enc"
-										hx-post="/deleteLeaveReq"
-										hx-vals='js:{"id":"{{ .ID }}", "staffID":"{{ .StaffID }}", "page":"root"}'
-										hx-swap="outerHTML"
-										hx-target="#roster">
-										Delete
-									</button>
-								</td>
+								<th>Staff</th>
+								<th>Created</th>
+								<th>Reason</th>
+								<th>Unavailable from</th>
+								<th>Available again</th>
+								<th>Delete</th>
 							</tr>
-						{{ end }}
-					</tbody>
-				</table>
-				<h2>All Staff</h2>
-				<div class="staff-container">
-					<table>
-						<thead>
+						</thead>
+						<tbody>
+							{{ $reqData := GetSortedLeaveReqs $staff }}
+							{{ range $reqData }}
+								<tr class="odd:bg-gray-900 even:bg-gray-800 border-gray-700">
+									<th class="font-medium whitespace-nowrap text-white">{{ .StaffName }}</td>
+									<td>{{ .CreationDate.Format "02/01/06" }}</td>
+									<td>{{ .Reason }}</td>
+									<td>{{ .StartDate.Format "02/01/06" }}</td>
+									<td>{{ .EndDate.Format "02/01/06" }}</td>
+									<td>
+										<button type="button"
+											class="buttonStyle w-full"
+											hx-ext="json-enc"
+											hx-post="/deleteLeaveReq"
+											hx-vals='js:{"id":"{{ .ID }}", "staffID":"{{ .StaffID }}", "page":"root"}'
+											hx-swap="outerHTML"
+											hx-target="#roster">
+											Delete
+										</button>
+									</td>
+								</tr>
+							{{ end }}
+						</tbody>
+					</table>
+				</div>
+				<h2 class="text-white">All Staff</h2>
+				<div class="w-full relative overflow-x-auto shadow-md sm:rounded-lg">
+					<table class="w-full text-sm text-center text-gray-400">
+						<thead class="text-xs uppercase bg-gray-700 text-gray-400">
 							<tr>
 								<th>Name</th>
 								<th>Email</th>
@@ -207,7 +234,7 @@
 						<tbody>
 							{{ range .Staff }}
 							{{if not .IsTrial }}
-							<tr class="staff-row">
+							<tr class="odd:bg-gray-900 even:bg-gray-800 border-gray-700">
 								{{if not (eq .NickName "") }}
 								<td>{{ .NickName }}</td>
 								{{else}}
@@ -242,7 +269,7 @@
 								</td>
 								<td>
 									<button type="button"
-										class="actionBtn"
+										class="buttonStyle w-full"
 										hx-ext="json-enc"
 										hx-post="/deleteAcc"
 										hx-vals='js:{"id":"{{ .ID }}"}'

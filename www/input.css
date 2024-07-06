@@ -1,9 +1,9 @@
-/* @tailwind base; */
-/* @tailwind components; */
-/* @tailwind utilities; */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 html {
-  font-size: 1.8vw;
+  font-size: 3vw;
   font-family: Arial, sans-serif;
 }
 
@@ -39,32 +39,60 @@ h3 {
   font-size: 1.25rem;
 }
 
+button:disabled,
+button:disabled * {
+  cursor: not-allowed !important;
+}
+
+.buttonStyle,
+.buttonStyle *,
+.shiftButtonL,
+.shiftButtonL *,
+.shiftButtonM,
+.shiftButtonM *,
+.shiftButtonR,
+.shiftButtonR * {
+    cursor: pointer;
+}
+
+.buttonAll {
+	@apply flex justify-center items-center text-sm font-medium border;
+	@apply bg-gray-800 text-white border-gray-600 hover:bg-gray-700 hover:border-gray-600 disabled:opacity-50 !important;
+}
+
 .buttonStyle {
-	@apply hover:cursor-default bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full;
+	@apply px-3 py-1.5 rounded-lg;
+	@apply buttonAll
 }
 
-form {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
-  border: none;
-  padding: 0;
-  margin: 0;
-  box-sizing: border-box;
+.shiftButtonL {
+	@apply border rounded-s-lg;
+	@apply buttonAll
 }
 
-select {
-  text-align: center;
-  width: 100%;
-  height: 100%;
-  border: none;
-  padding: 0;
-  margin: 0;
-  box-sizing: border-box;
+.shiftButtonM {
+	@apply border-t border-b;
+	@apply buttonAll
 }
+
+.shiftButtonR {
+	@apply border rounded-e-lg;
+	@apply buttonAll
+}
+
+.shiftLabel {
+	@apply px-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-s-lg;
+}
+
+.shiftInput {
+	@apply px-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-s-lg dark:border-gray-700;
+}
+
+.inputAll {
+	@apply w-full mb-2 p-2.5 border text-sm rounded-lg block !important;
+	@apply bg-gray-700 border-gray-600 placeholder-gray-400 text-white focus:ring-blue-500 focus:border-blue-500 !important;
+}
+
 
 .actions a, label {
   padding-left: 5px;
@@ -91,13 +119,6 @@ select {
   gap: 10px;
 }
 
-fieldset {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-}
-
 .shiftHighlight {
   background-color: #BFD8B8;
 }
@@ -122,9 +143,9 @@ fieldset {
   width: 100%;
   height: 100%;
   border: none;
-  padding: 0;
-  background-color: transparent;
-  margin: 0;
+  padding: 0 !important;
+  background-color: transparent !important;
+  margin: 0 !important;
   box-sizing: border-box;
 }
 
@@ -140,26 +161,10 @@ fieldset {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  width: 500px;
+  max-width: 500px;
 }
 @media (max-width: 806px) {
     .profile-container {
-        width: calc(100% - 6px);
-    }
-}
-
-.roster-container {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-	width: 100%;
-  max-width: min(100vw, 1200px);
-  margin-left: 3px auto;
-  margin-right: 3px auto;
-}
-@media (max-width: 806px) {
-    .roster-container {
         width: calc(100% - 6px);
     }
 }
@@ -180,7 +185,7 @@ input[type="checkbox"] {
   vertical-align: middle;
 }
 
-.day {
+#roster-jpg .day {
   width: 100%;
   display: flex;
   box-sizing: border-box;
@@ -243,8 +248,7 @@ input[type="checkbox"] {
   box-sizing: border-box;
 }
 
-.rosterCell {
-  padding: 1px;
+.row .rosterCell {
   display: flex;
   min-width: 0;
   max-width: 100%;
@@ -253,10 +257,6 @@ input[type="checkbox"] {
   box-sizing: border-box;
   border-right: 1px solid black;
   border-bottom: 1px solid black;
-}
-
-.day:first-child {
-  border-top: 1px solid black;
 }
 
 #roster-jpg * {
@@ -289,34 +289,6 @@ input[type="checkbox"] {
 
 .header {
   margin: 5px;
-}
-
-.headerLinks {
-  font-weight: bold;
-}
-
-.staff-container {
-  max-width: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  overflow: auto;
-}
-
-table {
-  border-collapse: collapse;
-  table-layout: fixed;
-  width: 100%;
-}
-
-th, td {
-  border: 1px solid black;
-  padding: 2px;
-  text-align: center;
-  word-wrap: break-word;
-  word-break: break-word;
-  text-align: center;
 }
 
 h1 {
@@ -357,24 +329,37 @@ h1 {
   display: none;
 }
 
-.rootBody {
-  width: 100%;
-  padding: 0;
-  margin: 0;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
+/* form { */
+/*   display: flex; */
+/*   justify-content: center; */
+/*   align-items: center; */
+/*   flex-direction: column; */
+/*   width: 100%; */
+/*   height: 100%; */
+/*   border: none; */
+/*   padding: 0; */
+/*   margin: 0; */
+/*   box-sizing: border-box; */
+/* } */
 
-.timesheet {
-  max-width: min(100vw, 1200px);
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
+/* select { */
+/*   text-align: center; */
+/*   width: 100%; */
+/*   height: 100%; */
+/*   border: none; */
+/*   padding: 0; */
+/*   margin: 0; */
+/*   box-sizing: border-box; */
+/* } */
+
+/* .timesheet { */
+/*   max-width: min(100vw, 1200px); */
+/*   width: 100%; */
+/*   display: flex; */
+/*   flex-direction: column; */
+/*   align-items: center; */
+/*   justify-content: center; */
+/* } */
 
 @media (max-width: 768px) {
   .timesheetDay {
@@ -386,12 +371,6 @@ h1 {
 .timesheet-container {
   height: 100%;
   width: 100%;
-}
-
-.week-form {
-  width: 100%;
-  margin: 0px;
-  padding: 0px;
 }
 
 .timesheetDay {
@@ -434,13 +413,6 @@ h1 {
   row-gap: 0.5rem;
   align-items: center;
   justify-content: center;
-}
-
-input[type="time"] {
-  max-width: 100%;
-  width: 100%;
-  box-sizing: border-box;
-  overflow: hidden;
 }
 
 .day-name {

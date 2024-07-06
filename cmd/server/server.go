@@ -120,6 +120,29 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 			"AdminShiftTypeStart": func() db.ShiftType {
 				return db.DayManager
 			},
+			"MakePickerStruct": MakePickerStruct,
+			"GetTimesheetTimes": func() [][]string {
+				var intervals [][]string
+				now := time.Now()
+				start := time.Date(now.Year(), now.Month(), now.Day(), 10, 0, 0, 0, now.Location())
+				end := time.Date(now.Year(), now.Month(), now.Day()+1, 4, 45, 0, 0, now.Location())
+				current := start
+
+				for !current.After(end) {
+					hour := current.Format("3")
+					minute := current.Format("04")
+					period := current.Format("pm")
+
+					display := fmt.Sprintf("%s-%02s-%s", hour, minute, period)
+					readable := current.Format("3:04 PM")
+					full := current.Format("2006-01-02T15:04:05Z")
+
+					intervals = append(intervals, []string{display, readable, full})
+					current = current.Add(15 * time.Minute)
+				}
+
+				return intervals
+			},
 		}),
 		Database: db.Database{
 			DB:      d,
