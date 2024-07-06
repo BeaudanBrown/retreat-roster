@@ -51,12 +51,12 @@
 								hx-post="/getTimesheetEditModal"
 								hx-ext="json-enc"
 								hx-vals='js:{"entryID":"{{ .ID }}"}'
-								hx-target="#modalDiv"
+								hx-target="#modalDiv-{{ .ID }}"
 								hx-swap="outerHTML">
 						Edit
 				</button>
 			{{ end }}
-			<div id="modalDiv"></div>
+			<div id="modalDiv-{{ .ID }}"></div>
 		</div>
 	</td>
 </tr>

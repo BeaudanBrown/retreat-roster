@@ -192,7 +192,7 @@ func NextWholeHour() time.Time {
 	return t.Truncate(time.Hour).Add(time.Hour)
 }
 
-func (d *Database) CreateTimesheetEntry(startDate time.Time, staffID uuid.UUID) error {
+func (d *Database) CreateTimesheetEntry(startDate time.Time, staffID uuid.UUID) (*TimesheetEntry, error) {
 	collection := d.DB.Collection("timesheets")
 	year, month, day := startDate.Date()
 	dateOnly := time.Date(year, month, day, 0, 0, 0, 0, time.Now().Location())
@@ -208,7 +208,7 @@ func (d *Database) CreateTimesheetEntry(startDate time.Time, staffID uuid.UUID) 
 	}
 	_, err := collection.InsertOne(d.Context, newEntry)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return &newEntry, nil
 }

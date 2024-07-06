@@ -131,13 +131,19 @@ func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	err = s.CreateTimesheetEntry(*reqBody.StartDate.Time, staffID)
+	thisStaff := s.GetSessionUser(w, r)
+	if thisStaff == nil {
+		return
+	}
+	newEntry, err := s.CreateTimesheetEntry(*reqBody.StartDate.Time, staffID)
 	if err != nil {
 		log.Printf("Couldn't create new timesheet entry: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	s.RenderTimesheetTemplate(w, r)
+
+	data := MakeTimesheetEditModalStruct(*newEntry, thisStaff.ID, s.GetStaffMap(), thisStaff.IsAdmin)
+	s.renderTemplate(w, "timesheetEditModal", data)
 }
 
 type ModifyTimesheetEntryBody struct {

@@ -22,7 +22,7 @@
 		<script>
 			document.addEventListener("DOMContentLoaded", function() {
 				document.getElementById('timesheet').addEventListener('htmx:afterSwap', function(event) {
-					if (event.detail.target.id === 'modalDiv') {
+					if (event.detail.target.id.includes('modalDiv')) {
 						initFlowbite()
 						const button = document.getElementById('edit-modal-button');
 						button.click();
@@ -103,10 +103,14 @@
 						<tr class="w-full odd:bg-gray-900 even:bg-gray-800 border-gray-700">
 							<th colspan="4" class="py-2 text-left font-medium whitespace-nowrap text-white">
 								<div class="flex items-center justify-center">
+
 									<button class="buttonAll rounded-lg px-2 mr-2"
 										hx-post='/addTimesheetEntry' hx-ext='json-enc'
 										hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "startDate":"{{$thisDate}}"}'
-										hx-swap='outerHTML' hx-target='#timesheet'>+</button>
+										hx-swap='outerHTML' hx-target='#new-{{$dayName}}-modalDiv'>
+                    +
+                  </button>
+
 									<h2 class="text-white">{{$thisDate.Format "Monday 02/01"}}</h3>
 								</div>
 							</th>
@@ -126,6 +130,7 @@
 								{{ end }}
 							{{ end }}
 						{{ end }}
+            <div id="new-{{$dayName}}-modalDiv"></div>
 					{{ end }}
 					</tbody>
 				</table>
