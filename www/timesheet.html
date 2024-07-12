@@ -91,7 +91,7 @@
 				<h3 class="text-white">Week {{$config.TimesheetStartDate.Format "02/01"}} - {{(addDays $config.TimesheetStartDate 6).Format "02/01"}}</h3>
 			</div>
 			<div class="w-full relative overflow-x-auto shadow-md sm:rounded-lg">
-				<table class="w-full text-sm text-center text-gray-400">
+				<table class="w-full text-sm text-center text-gray-400 border-separate border-spacing-y-2">
 					<thead class="text-xs uppercase bg-gray-700 text-gray-400">
 						<tr>
 							<th colspan="4">Entries</th>
@@ -100,18 +100,16 @@
 					<tbody>
 					{{ range $idx, $dayName := .DayNames }}
 						{{ $thisDate := addDays $config.TimesheetStartDate $idx }}
-						<tr class="w-full odd:bg-gray-900 even:bg-gray-800 border-gray-700">
-							<th colspan="4" class="py-2 text-left font-medium whitespace-nowrap text-white">
+						<tr class="w-full">
+							<th colspan="4" class="py-2 text-left text-xl font-bold whitespace-nowrap text-white">
 								<div class="flex items-center justify-center">
 
-									<button class="buttonAll rounded-lg px-2 mr-2"
+									<button class="buttonAll w-full rounded-lg text-xl px-2 mx-2"
 										hx-post='/addTimesheetEntry' hx-ext='json-enc'
 										hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "startDate":"{{$thisDate}}"}'
 										hx-swap='outerHTML' hx-target='#new-{{$dayName}}-modalDiv'>
-                    +
+                    + {{$thisDate.Format "Monday 02/01"}}
                   </button>
-
-									<h2 class="text-white">{{$thisDate.Format "Monday 02/01"}}</h3>
 								</div>
 							</th>
 						</tr>
