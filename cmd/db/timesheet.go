@@ -70,6 +70,7 @@ type ShiftType int
 
 const (
 	Bar ShiftType = iota
+	Door
 	Deliveries
 	DayManager
 	AmeliaSupervisor
@@ -94,6 +95,7 @@ func (s ShiftType) Int() int {
 func (s ShiftType) String() string {
 	return [...]string{
 		"Bar",
+		"Door",
 		"Deliveries",
 		"Day Manager",
 		"Amelia Supervisor",
@@ -143,6 +145,41 @@ func (d *Database) GetTimesheetEntryByID(entryID uuid.UUID) *TimesheetEntry {
 		return nil
 	}
 	return &timesheetEntry
+}
+
+func (d *Database) GetAllTimesheetEntries() *[]*TimesheetEntry {
+	collection := d.DB.Collection("timesheets")
+	cursor, err := collection.Find(d.Context, bson.M{})
+	if err != nil {
+		log.Printf("Error executing query: %v", err)
+		return nil
+	}
+	defer cursor.Close(d.Context)
+	var entries []*TimesheetEntry
+	if err = cursor.All(d.Context, &entries); err != nil {
+		log.Printf("Error decoding timesheet entries: %v", err)
+		return nil
+	}
+	return &entries
+}
+
+func (d *Database) SaveAllTimesheetEntries(entries []*TimesheetEntry) error {
+	collection := d.DB.Collection("timesheets")
+	bulkWriteModels := make([]mongo.WriteModel, len(entries))
+	for i, entry := range entries {
+		filter := bson.M{"id": entry.ID}
+		update := bson.M{"$set": *entry}
+		bulkWriteModels[i] = mongo.NewUpdateOneModel().SetFilter(filter).SetUpdate(update).SetUpsert(true)
+	}
+
+	opts := options.BulkWrite().SetOrdered(false)
+	results, err := collection.BulkWrite(d.Context, bulkWriteModels, opts)
+	if err != nil {
+		log.Printf("Failed to save timesheet entries: %v\n", err)
+		return err
+	}
+	log.Printf("Saved %v timesheet entries, Upserted %v timesheet entries", results.ModifiedCount, results.UpsertedCount)
+	return nil
 }
 
 func (d *Database) GetTimesheetWeek(startDate time.Time) *[]TimesheetEntry {

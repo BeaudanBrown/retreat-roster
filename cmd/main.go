@@ -44,6 +44,11 @@ func main() {
 		log.Printf("Error migrating old data: %v", err)
 	}
 
+	err = migrate.MigrateV2(s)
+	if err != nil {
+		log.Printf("Error migrating to V2: %v", err)
+	}
+
 	http.HandleFunc("/", s.VerifySession(s.HandleIndex))
 	http.HandleFunc("/landing", s.HandleLanding)
 
