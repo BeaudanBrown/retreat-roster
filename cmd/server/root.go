@@ -11,6 +11,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"roster/cmd/db"
@@ -755,7 +756,7 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 			log.Printf("Missing staffID")
 			continue
 		}
-		fullName := staffMember.LastName + ", " + staffMember.FirstName
+		fullName := strings.TrimSpace(staffMember.LastName) + ", " + strings.TrimSpace(staffMember.FirstName)
 		if hasHours(payData.Level2Hrs) {
 			reportRows = append(reportRows, BuildReportRecord(payData.Level2Hrs, fullName))
 		}

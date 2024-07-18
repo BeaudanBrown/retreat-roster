@@ -101,15 +101,14 @@
 					{{ range $idx, $dayName := .DayNames }}
 						{{ $thisDate := addDays $config.TimesheetStartDate $idx }}
 						<tr class="w-full">
-							<th colspan="4" class="py-2 text-left text-xl font-bold whitespace-nowrap text-white">
+							<th colspan="4" class="text-left text-xl font-bold whitespace-nowrap">
 								<div class="flex items-center justify-center">
-
-									<button class="buttonAll w-full rounded-lg text-xl px-2 mx-2"
+									<button class="buttonGreen w-full rounded-lg text-xl m-2 px-2"
 										hx-post='/addTimesheetEntry' hx-ext='json-enc'
 										hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "startDate":"{{$thisDate}}"}'
 										hx-swap='outerHTML' hx-target='#new-{{$dayName}}-modalDiv'>
-                    + {{$thisDate.Format "Monday 02/01"}}
-                  </button>
+										+ {{$thisDate.Format "Monday 02/01"}}
+									</button>
 								</div>
 							</th>
 						</tr>

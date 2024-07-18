@@ -44,6 +44,11 @@ button:disabled * {
     cursor: pointer;
 }
 
+.buttonGreen {
+	@apply flex justify-center items-center text-sm font-medium border;
+	@apply bg-emerald-900 text-white border-gray-600 hover:bg-emerald-800 hover:border-gray-600 disabled:opacity-50 !important;
+}
+
 .buttonAll {
 	@apply flex justify-center items-center text-sm font-medium border;
 	@apply bg-gray-800 text-white border-gray-600 hover:bg-gray-700 hover:border-gray-600 disabled:opacity-50 !important;
