@@ -859,7 +859,7 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 	// Set the appropriate headers
 	w.Header().Set("Content-Type", "text/csv")
 	formattedDate := thisStaff.Config.TimesheetStartDate.Format("2006-01-02")
-	reportFilename := "staff_hours-" + formattedDate + ".csv"
+	reportFilename := "staff_hours_starting-" + formattedDate + ".csv"
 	w.Header().Set("Content-Disposition", "attachment;filename="+reportFilename)
 	w.Header().Set("Content-Length", strconv.Itoa(len(fileBuffer.Bytes())))
 
