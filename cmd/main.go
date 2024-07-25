@@ -62,6 +62,8 @@ func main() {
 	http.HandleFunc("/auth/login", s.HandleGoogleLogin)
 	http.HandleFunc("/auth/logout", s.HandleGoogleLogout)
 	http.HandleFunc("/auth/callback", s.HandleGoogleCallback)
+	http.HandleFunc("/newAccount", s.VerifySession(s.HandleNewAccount))
+	http.HandleFunc("/createAccount", s.VerifySession(s.HandleCreateAccount))
 
 	http.HandleFunc("/toggleHideByIdeal", s.VerifySession(s.HandleToggleHideByIdeal))
 	http.HandleFunc("/toggleHideByPreferences", s.VerifySession(s.HandleToggleHideByPreferences))

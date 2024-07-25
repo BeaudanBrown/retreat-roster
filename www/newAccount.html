@@ -1,0 +1,26 @@
+{{ define "newAccount" }}
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<html class="dark">
+	<head>
+		<base href="/newAccount">
+		<title>Retreat Account</title>
+		<meta content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=0" name="viewport">
+		<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+		<script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
+		<link rel="stylesheet" href="app.css?v={{ .CacheBust }}">
+	</head>
+	<body class="w-full p-0 m-0 flex flex-col items-center justify-center bg-gray-900">
+
+	<h1 class="text-white">Create new account</h1>
+	<form class="flex flex-col items-center justify-center" hx-ext='json-enc' hx-post="/createAccount">
+		{{ template "profileData" . }}
+    <div class="buttons">
+      <button class="buttonStyle" type="submit">Submit</button>
+      <a href="/auth/logout" class="buttonStyle">Cancel</a>
+    </div>
+	</form>
+
+	</body>
+</html>
+{{ end }}
+

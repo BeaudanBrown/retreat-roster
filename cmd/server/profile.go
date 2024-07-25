@@ -63,7 +63,7 @@ func MakePickerStruct(name string, label string, id uuid.UUID, time time.Time, d
 func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
 	editStaff := s.GetSessionUser(w, r)
 	if editStaff == nil {
-		w.WriteHeader(http.StatusUnauthorized)
+		http.Redirect(w, r, "/landing", http.StatusSeeOther)
 		return
 	}
 	adminRights := editStaff.IsAdmin
@@ -179,42 +179,18 @@ type ModifyProfileBody struct {
 	MonLate      string `json:"Monday-late-avail"`
 }
 
-func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
-	log.Println("Modify profile")
-	var reqBody ModifyProfileBody
-	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
-		return
-	}
-	staffID, err := uuid.Parse(reqBody.ID)
-	if err != nil {
-		log.Printf("Invalid staffID: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	staff := s.GetStaffByID(staffID)
-	if staff == nil {
-		return
-	}
-	activeStaff := s.GetSessionUser(w, r)
-	if activeStaff == nil {
-		return
-	}
-	if activeStaff.ID != staff.ID && !activeStaff.IsAdmin {
-		log.Printf("Insufficient privilledges: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	staff.NickName = reqBody.NickName
-	staff.FirstName = reqBody.FirstName
-	staff.LastName = reqBody.LastName
-	staff.Email = reqBody.Email
-	staff.Phone = reqBody.Phone
-	staff.ContactName = reqBody.ContactName
-	staff.ContactPhone = reqBody.ContactPhone
+func (s *Server) ApplyModifyProfileBody(reqBody ModifyProfileBody, staffMember db.StaffMember) db.StaffMember {
+	staffMember.NickName = reqBody.NickName
+	staffMember.FirstName = reqBody.FirstName
+	staffMember.LastName = reqBody.LastName
+	staffMember.Email = reqBody.Email
+	staffMember.Phone = reqBody.Phone
+	staffMember.ContactName = reqBody.ContactName
+	staffMember.ContactPhone = reqBody.ContactPhone
 	// This can fail but not from me
-	staff.IdealShifts, _ = strconv.Atoi(reqBody.IdealShifts)
+	staffMember.IdealShifts, _ = strconv.Atoi(reqBody.IdealShifts)
 
-	staff.Availability = []db.DayAvailability{
+	staffMember.Availability = []db.DayAvailability{
 		{
 			Name:  "Tuesday",
 			Early: reqBody.TuesEarly == "on",
@@ -258,13 +234,42 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 			Late:  reqBody.MonLate == "on",
 		},
 	}
+	return staffMember
+}
+
+func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
+	log.Println("Modify profile")
+	var reqBody ModifyProfileBody
+	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
+		return
+	}
+	staffID, err := uuid.Parse(reqBody.ID)
+	if err != nil {
+		log.Printf("Invalid staffID: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	staff := s.GetStaffByID(staffID)
+	if staff == nil {
+		return
+	}
+	activeStaff := s.GetSessionUser(w, r)
+	if activeStaff == nil {
+		return
+	}
+	if activeStaff.ID != staff.ID && !activeStaff.IsAdmin {
+		log.Printf("Insufficient privilledges: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	updatedStaff := s.ApplyModifyProfileBody(reqBody, *staff)
 	data := ProfileData{
 		AdminRights:       activeStaff.IsAdmin,
-		StaffMember:       *staff,
+		StaffMember:       updatedStaff,
 		RosterLive:        s.LoadRosterWeek(staff.Config.RosterStartDate).IsLive,
 		ShowUpdateSuccess: true,
 	}
-	s.SaveStaffMember(*staff)
+	s.SaveStaffMember(updatedStaff)
 	s.renderTemplate(w, "profile", data)
 }
 
