@@ -1,0 +1,120 @@
+{{ define "profileData" }}
+<div class="w-full grid gap-x-6 md:grid-cols-2 box-border">
+  <div>
+    <label for="firstName" class="block mb-2 text-sm font-medium text-white">First Name</label>
+    <input type="text" id="firstName" name="firstName" class="inputAll" value="{{.FirstName}}" required />
+  </div>
+  <div>
+    <label for="lastName" class="block mb-2 text-sm font-medium text-white">Last Name</label>
+    <input type="text" id="lastName" name="lastName" class="inputAll" value="{{.LastName}}" required />
+  </div>
+</div>
+<div class="w-full">
+  <label for="nickName" class="block mb-2 text-sm font-medium text-white">Preferred Name</label>
+  <input type="text" id="nickName" name="nickName" class="inputAll" value="{{.NickName}}"/>
+</div>
+<div class="w-full grid gap-x-6 md:grid-cols-2">
+  <div>
+    <label for="email" class="block mb-2 text-sm font-medium text-white">Email</label>
+    <input type="text" id="email" name="email" class="inputAll" value="{{.Email}}" required />
+  </div>
+  <div>
+    <label for="phone" class="block mb-2 text-sm font-medium text-white">Phone #</label>
+    <input type="tel" id="phone" name="phone" class="inputAll" value="{{.Phone}}" required />
+  </div>
+</div>
+<div class="w-full grid gap-x-6 md:grid-cols-2">
+  <div>
+    <label for="contactName" class="block mb-2 text-sm font-medium text-white">Emergency Contact Name</label>
+    <input type="text" id="contactName" name="contactName" class="inputAll" value="{{.ContactName}}" />
+  </div>
+  <div>
+    <label for="contactPhone" class="block mb-2 text-sm font-medium text-white">Emergency Contact Phone</label>
+    <input type="tel" id="contactPhone" name="contactPhone" class="inputAll" value="{{.ContactPhone}}" />
+  </div>
+</div>
+
+<!-- Ideal shifts -->
+<button id="shiftsDropdown" data-dropdown-toggle="ideal-shifts" class="buttonStyle" type="button">Ideal # Shifts <svg class="w-2.5 h-2.5 ms-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
+    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 4 4 4-4"/>
+  </svg>
+</button>
+
+<div id="ideal-shifts" class="z-10 hidden w-36 divide-y rounded-lg shadow bg-gray-700 divide-gray-600">
+  <ul class="p-3 space-y-3 text-sm text-gray-200" aria-labelledby="shiftsDropdown">
+    <li>
+      <div class="flex items-center">
+        <input name="ideal-shifts" {{ if eq .IdealShifts 0 }}checked{{ end }} id="shifts-0" type="radio" value=0 class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-700 dark:focus:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
+        <label for="shifts-0" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">No shifts</label>
+      </div>
+    </li>
+    <li>
+      <div class="flex items-center">
+        <input name="ideal-shifts" {{ if eq .IdealShifts 1 }}checked{{ end }} id="shifts-1" type="radio" value=1 class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-700 dark:focus:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
+        <label for="shifts-1" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">1 shift</label>
+      </div>
+    </li>
+    <li>
+      <div class="flex items-center">
+        <input name="ideal-shifts" {{ if eq .IdealShifts 2 }}checked{{ end }} id="shifts-2" type="radio" value=2 class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-700 dark:focus:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
+        <label for="shifts-2" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">2 shifts</label>
+      </div>
+    </li>
+    <li>
+      <div class="flex items-center">
+        <input name="ideal-shifts" {{ if eq .IdealShifts 3 }}checked{{ end }} id="shifts-3" type="radio" value=3 class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-700 dark:focus:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
+        <label for="shifts-3" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">3 shifts</label>
+      </div>
+    </li>
+    <li>
+      <div class="flex items-center">
+        <input name="ideal-shifts" {{ if eq .IdealShifts 4 }}checked{{ end }} id="shifts-4" type="radio" value=4 class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-700 dark:focus:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
+        <label for="shifts-4" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">4 shifts</label>
+      </div>
+    </li>
+    <li>
+      <div class="flex items-center">
+        <input name="ideal-shifts" {{ if eq .IdealShifts 5 }}checked{{ end }} id="shifts-5" type="radio" value=5 class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-700 dark:focus:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
+        <label for="shifts-5" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">5 shifts</label>
+      </div>
+    </li>
+    <li>
+      <div class="flex items-center">
+        <input name="ideal-shifts" {{ if eq .IdealShifts 6 }}checked{{ end }} id="shifts-6" type="radio" value=6 class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-700 dark:focus:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
+        <label for="shifts-6" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">6 shifts</label>
+      </div>
+    </li>
+    <li>
+      <div class="flex items-center">
+        <input name="ideal-shifts" {{ if eq .IdealShifts 7 }}checked{{ end }} id="shifts-7" type="radio" value=7 class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-700 dark:focus:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500">
+        <label for="shifts-7" class="ms-2 text-sm font-medium text-gray-900 dark:text-gray-300">7 shifts</label>
+      </div>
+    </li>
+  </ul>
+</div>
+
+<!-- Availability -->
+<div class="w-full mt-4 space-y-4">
+  {{ range .Availability }}
+  <div class="w-full flex justify-between items-center pb-2 mb-2">
+    <label class="text-white basis-1/4">{{ .Name }}</label>
+    <div class="inline-flex basis-3/4 rounded-md w-full justify-end">
+      <label class="shiftButtonL flex-1 text-center p-2" for="{{.Name}}-early-avail">
+        <input type="checkbox" name="{{.Name}}-early-avail" id="{{.Name}}-early-avail" {{ if .Early }}checked{{ end }} class="mr-1">
+        Early
+      </label>
+      <label class="shiftButtonM py-1.5 flex-1 text-center p-2" for="{{.Name}}-mid-avail">
+        <input type="checkbox" name="{{.Name}}-mid-avail" id="{{.Name}}-mid-avail" {{ if .Mid }}checked{{ end }} class="mr-1">
+        Mid
+      </label>
+      <label class="shiftButtonR flex-1 text-center p-2" for="{{.Name}}-late-avail">
+        <input type="checkbox" name="{{.Name}}-late-avail" id="{{.Name}}-late-avail" {{ if .Late }}checked{{ end }} class="mr-1">
+        Late
+      </label>
+    </div>
+  </div>
+  {{ end }}
+</div>
+{{ end }}
+
+
