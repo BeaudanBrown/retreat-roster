@@ -44,33 +44,45 @@ func (s *Server) VerifyAdmin(handler http.HandlerFunc) http.HandlerFunc {
 	})
 }
 
+func GetTokenFromCookies(r *http.Request) *uuid.UUID {
+	cookie, err := r.Cookie("session_token")
+	if err != nil {
+		log.Printf("Error getting session_token: %v", err)
+		return nil
+	}
+	sessionTokenStr := cookie.Value
+
+	sessionToken, err := uuid.Parse(sessionTokenStr)
+	if err != nil {
+		log.Printf("Error parsing session token: %v", err)
+		return nil
+	}
+	log.Printf("Retrieved token: %v", sessionToken)
+	return &sessionToken
+}
+
 func (s *Server) VerifySession(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Println("Verify")
-		cookie, err := r.Cookie("session_token")
-		if err != nil {
-			if err == http.ErrNoCookie {
-				http.Redirect(w, r, "/landing", http.StatusSeeOther)
-			} else {
-				http.Error(w, "Bad Request", http.StatusBadRequest)
-			}
-			return
-		}
-
-		sessionTokenStr := cookie.Value
-
-		sessionToken, err := uuid.Parse(sessionTokenStr)
-		if err != nil {
+		sessionToken := GetTokenFromCookies(r)
+		if sessionToken == nil {
 			http.Redirect(w, r, "/landing", http.StatusSeeOther)
 			return
 		}
 
-		if !s.isValidSession(sessionToken) {
+		staffMember := s.GetStaffByToken(*sessionToken)
+		if staffMember == nil {
+			log.Println("Invalid session")
 			http.Redirect(w, r, "/landing", http.StatusSeeOther)
 			return
 		}
+		if staffMember.FirstName == "" && r.URL.String() != "/newAccount" && r.URL.String() != "/createAccount" {
+			log.Println("Account not created yet")
+			http.Redirect(w, r, "/newAccount", http.StatusSeeOther)
+			return
+		}
 
-		ctx := context.WithValue(r.Context(), SESSION_KEY, sessionToken)
+		ctx := context.WithValue(r.Context(), SESSION_KEY, *sessionToken)
 		reqWithToken := r.WithContext(ctx)
 		handler(w, reqWithToken)
 	}
