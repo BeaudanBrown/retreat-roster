@@ -858,7 +858,9 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 
 	// Set the appropriate headers
 	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment;filename=data.csv")
+	formattedDate := thisStaff.Config.TimesheetStartDate.Format("2006-01-02")
+	reportFilename := "staff_hours-" + formattedDate + ".csv"
+	w.Header().Set("Content-Disposition", "attachment;filename="+reportFilename)
 	w.Header().Set("Content-Length", strconv.Itoa(len(fileBuffer.Bytes())))
 
 	// Write the zip file to the response
