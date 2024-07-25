@@ -67,6 +67,8 @@ func MemberIsAssigned(activeID uuid.UUID, assignedID *uuid.UUID) bool {
 func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {
+		s.HandleGoogleLogout(w, r)
+		log.Printf("Couldn't find staff member")
 		return
 	}
 	log.Printf("roster Start Date: %v", thisStaff.Config.RosterStartDate)
@@ -109,8 +111,7 @@ func (s *Server) HandleGoogleLogout(w http.ResponseWriter, r *http.Request) {
 	if staff != nil {
 		staff.Tokens = []uuid.UUID{}
 	}
-	w.Header().Set("HX-Redirect", "/landing")
-	w.WriteHeader(http.StatusOK)
+	http.Redirect(w, r, "/landing", http.StatusSeeOther)
 }
 
 type GoogleCallbackBody struct {
@@ -144,10 +145,10 @@ func (s *Server) HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	sessionIdentifier := uuid.New()
+	sessionToken := uuid.New()
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_token",
-		Value:    sessionIdentifier.String(),
+		Value:    sessionToken.String(),
 		Expires:  time.Now().AddDate(10, 0, 0),
 		HttpOnly: true,
 		Secure:   true,
@@ -155,12 +156,80 @@ func (s *Server) HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 	})
 
-	err := s.CreateOrUpdateStaffGoogleID(userInfo.ID, sessionIdentifier)
-	if err != nil {
-		log.Printf("Error logging in with google: %v", err)
+	staffMember := s.GetStaffByGoogleID(userInfo.ID)
+	if staffMember == nil {
+		log.Printf("Creating new staff member")
+		err := s.CreateStaffMember(userInfo.ID, sessionToken)
+		if err != nil {
+			log.Printf("Error creating staff member: %v", err)
+			http.Redirect(w, r, "/landing", http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, "/newAccount", http.StatusSeeOther)
+	} else {
+		log.Printf("Updating staff token ID")
+		err := s.UpdateStaffToken(staffMember, sessionToken)
+		if err != nil {
+			log.Printf("Error logging in with google: %v", err)
+		}
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+	}
+}
+
+func (s *Server) HandleCreateAccount(w http.ResponseWriter, r *http.Request) {
+	sessionToken := GetTokenFromCookies(r)
+	if sessionToken == nil {
+		log.Printf("No token for new account")
+		http.Redirect(w, r, "/landing", http.StatusSeeOther)
+		return
+	}
+	thisStaff := s.GetSessionUser(w, r)
+	if thisStaff == nil {
+		log.Printf("No database entry for new account")
+		http.Redirect(w, r, "/landing", http.StatusSeeOther)
+		return
+	}
+	var reqBody ModifyProfileBody
+	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
+		log.Printf("Error parsing create account body: %v", err)
+		http.Redirect(w, r, "/landing", http.StatusSeeOther)
+		return
+	}
+	updatedStaff := s.ApplyModifyProfileBody(reqBody, *thisStaff)
+	if err := s.SaveStaffMember(updatedStaff); err != nil {
+		log.Printf("Error creating staff member: %v", err)
+		http.Redirect(w, r, "/landing", http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (s *Server) HandleNewAccount(w http.ResponseWriter, r *http.Request) {
+	sessionToken := GetTokenFromCookies(r)
+	if sessionToken == nil {
+		log.Printf("No token for new account")
+		http.Redirect(w, r, "/landing", http.StatusSeeOther)
+		return
+	}
+	thisStaff := s.GetSessionUser(w, r)
+	if thisStaff == nil {
+		log.Printf("No database entry for new account")
+		http.Redirect(w, r, "/landing", http.StatusSeeOther)
+		return
+	}
+	if thisStaff.FirstName != "" {
+		log.Printf("Account is already initialised")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
 	}
 
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	data := ProfileIndexData{
+		CacheBust:   s.CacheBust,
+		StaffMember: *thisStaff,
+		AdminRights: thisStaff.IsAdmin,
+		RosterLive:  false,
+	}
+	s.renderTemplate(w, "newAccount", data)
 }
 
 func (s *Server) HandleModifyDescriptionSlot(w http.ResponseWriter, r *http.Request) {
