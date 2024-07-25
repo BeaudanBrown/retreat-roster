@@ -1,6 +1,7 @@
 package db
 
 import (
+	"errors"
 	"log"
 	"sort"
 	"strings"
@@ -210,27 +211,29 @@ func (d *Database) LoadAllStaff() []*StaffMember {
 	}
 	defer cursor.Close(d.Context)
 
-	newStaff := []*StaffMember{}
+	allStaff := []*StaffMember{}
 
 	for cursor.Next(d.Context) {
 		var staffMember StaffMember
 		if err := cursor.Decode(&staffMember); err != nil {
 			log.Printf("Error loading staff state: %v", err)
 		}
-		newStaff = append(newStaff, &staffMember)
-	}
-	sort.Slice(newStaff, func(i, j int) bool {
-		name1 := newStaff[i].FirstName
-		if newStaff[i].NickName != "" {
-			name1 = newStaff[i].NickName
+		if staffMember.FirstName != "" {
+			allStaff = append(allStaff, &staffMember)
 		}
-		name2 := newStaff[j].FirstName
-		if newStaff[j].NickName != "" {
-			name2 = newStaff[j].NickName
+	}
+	sort.Slice(allStaff, func(i, j int) bool {
+		name1 := allStaff[i].FirstName
+		if allStaff[i].NickName != "" {
+			name1 = allStaff[i].NickName
+		}
+		name2 := allStaff[j].FirstName
+		if allStaff[j].NickName != "" {
+			name2 = allStaff[j].NickName
 		}
 		return name1 < name2
 	})
-	return newStaff
+	return allStaff
 }
 
 func (d *Database) GetStaffByGoogleID(googleID string) *StaffMember {
@@ -338,32 +341,36 @@ func AddToken(slice []uuid.UUID, value uuid.UUID) []uuid.UUID {
 	return append(slice, value)
 }
 
-func (d *Database) CreateOrUpdateStaffGoogleID(googleId string, token uuid.UUID) error {
+func (d *Database) UpdateStaffToken(staffMember *StaffMember, token uuid.UUID) error {
+	staffMember.Tokens = AddToken(staffMember.Tokens, token)
+	err := d.SaveStaffMember(*staffMember)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *Database) CreateStaffMember(googleId string, token uuid.UUID) error {
 	staffMember := d.GetStaffByGoogleID(googleId)
 	if staffMember != nil {
-		staffMember.Tokens = AddToken(staffMember.Tokens, token)
-		err := d.SaveStaffMember(*staffMember)
-		if err != nil {
-			return err
-		}
-	} else {
-		isAdmin := len(d.LoadAllStaff()) == 0
-		staffMember = &StaffMember{
-			ID:           uuid.New(),
-			GoogleID:     googleId,
-			FirstName:    "",
-			IsAdmin:      isAdmin,
-			Tokens:       []uuid.UUID{token},
-			Availability: emptyAvailability,
-			Config: StaffConfig{
-				TimesheetStartDate: utils.GetLastTuesday(),
-				RosterStartDate:    utils.GetNextTuesday(),
-			},
-		}
-		err := d.SaveStaffMember(*staffMember)
-		if err != nil {
-			return err
-		}
+		return errors.New("Staff exists")
+	}
+	isAdmin := len(d.LoadAllStaff()) == 0
+	staffMember = &StaffMember{
+		ID:           uuid.New(),
+		GoogleID:     googleId,
+		FirstName:    "",
+		IsAdmin:      isAdmin,
+		Tokens:       []uuid.UUID{token},
+		Availability: emptyAvailability,
+		Config: StaffConfig{
+			TimesheetStartDate: utils.GetLastTuesday(),
+			RosterStartDate:    utils.GetNextTuesday(),
+		},
+	}
+	err := d.SaveStaffMember(*staffMember)
+	if err != nil {
+		return err
 	}
 	return nil
 }
