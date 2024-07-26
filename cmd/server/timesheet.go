@@ -135,20 +135,15 @@ func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request)
 	if thisStaff == nil {
 		return
 	}
-	newEntry, err := s.CreateTimesheetEntry(*reqBody.StartDate.Time, staffID)
-	if err != nil {
-		log.Printf("Couldn't create new timesheet entry: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	data := MakeTimesheetEditModalStruct(*newEntry, thisStaff.ID, s.GetStaffMap(), thisStaff.IsAdmin)
+	newEntry := MakeEmptyTimesheetEntry(*reqBody.StartDate.Time, staffID)
+	data := MakeTimesheetEditModalStruct(newEntry, thisStaff.ID, s.GetStaffMap(), thisStaff.IsAdmin)
 	s.renderTemplate(w, "timesheetEditModal", data)
 }
 
 type ModifyTimesheetEntryBody struct {
 	StaffID    string        `json:"staffID"`
 	EntryID    string        `json:"entryID"`
+	StartDate  db.CustomDate `json:"startDate"`
 	ShiftStart db.CustomDate `json:"shiftStart"`
 	ShiftEnd   db.CustomDate `json:"shiftEnd"`
 	BreakStart db.CustomDate `json:"breakStart"`
@@ -191,9 +186,11 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
 	}
 	entry := s.GetTimesheetEntryByID(entryID)
 	if entry == nil {
-		log.Println("Couldn't find entry to modify")
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		newEntry := db.TimesheetEntry{
+			ID:        entryID,
+			StartDate: *reqBody.StartDate.Time,
+		}
+		entry = &newEntry
 	}
 	entry.StaffID = staffID
 	entry.Approved = reqBody.Approved
@@ -219,7 +216,6 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
 		entry.HasBreak = false
 		entry.BreakLength = 0
 	}
-
 	entry.ShiftStart = getAdjustedTime(reqBody.ShiftStart, entry.StartDate)
 	entry.ShiftEnd = getAdjustedTime(reqBody.ShiftEnd, entry.StartDate)
 
@@ -302,6 +298,22 @@ type TimesheetEditModalData struct {
 	ThisStaffID uuid.UUID
 	StaffMap    map[uuid.UUID]db.StaffMember
 	IsAdmin     bool
+}
+
+func MakeEmptyTimesheetEntry(startDate time.Time, staffID uuid.UUID) db.TimesheetEntry {
+	year, month, day := startDate.Date()
+	dateOnly := time.Date(year, month, day, 0, 0, 0, 0, time.Now().Location())
+	start := db.LastWholeHour()
+	end := db.NextWholeHour()
+	newEntry := db.TimesheetEntry{
+		ID:          uuid.New(),
+		StaffID:     staffID,
+		StartDate:   dateOnly,
+		ShiftStart:  start,
+		ShiftEnd:    end,
+		ShiftLength: end.Sub(start).Hours(),
+	}
+	return newEntry
 }
 
 func MakeTimesheetEditModalStruct(entry db.TimesheetEntry, thisStaffID uuid.UUID, staffMap map[uuid.UUID]db.StaffMember, isAdmin bool) TimesheetEditModalData {

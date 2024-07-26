@@ -31,6 +31,7 @@
 				class="w-full px-2 grid grid-cols-2 gap-x-6 gap-y-3 box-border">
 				<div>
 					<label for="{{$id}}-staffID" class="text-left block mb-2 text-sm font-medium text-white">Name</label>
+					<input type="hidden" name="startDate" value="{{ $entry.StartDate }}">
 					{{ if not $isAdmin }}
 					<input type="hidden" name="staffID" value="{{ $thisStaff.ID }}">
 					{{ end }}
