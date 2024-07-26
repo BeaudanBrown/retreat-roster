@@ -233,6 +233,12 @@ func NextWholeHour() time.Time {
 func DisableTimesheet(startDate time.Time, isAdmin bool) bool {
 	lastTuesday := utils.GetLastTuesday().Add(-time.Minute) // Inclusive
 	nextTuesday := utils.GetNextTuesday()
+	now := time.Now()
+	if now.Sub(lastTuesday).Hours() < 12 {
+		// 12 hour overlap between weeks
+		lastTuesday = lastTuesday.AddDate(0, 0, -7)
+		nextTuesday = nextTuesday.AddDate(0, 0, -7)
+	}
 	if startDate.After(lastTuesday) && startDate.Before(nextTuesday) {
 		return false
 	}
