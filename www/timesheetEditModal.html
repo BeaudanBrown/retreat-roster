@@ -1,5 +1,6 @@
 {{ define "timesheetEditModal" }}
 {{ $id := .ID }}
+{{ $entry := .TimesheetEntry }}
 {{ $isAdmin := .IsAdmin }}
 {{ $thisStaff := (index .StaffMap .ThisStaffID) }}
 <button class="hidden" id="edit-modal-button" data-modal-target="edit-modal" data-modal-toggle="edit-modal">
@@ -37,7 +38,7 @@
 									{{ if not $isAdmin }}disabled{{ end }}
 									class="w-full p-2 text-sm border rounded-lg bg-gray-700 border-gray-600 placeholder-gray-400 text-white focus:ring-blue-500 focus:border-blue-500">
 						{{ range $staffID, $member := .StaffMap }}
-							<option value={{$staffID}} {{ if eq $staffID $thisStaff.ID }}selected{{ end }}>
+							<option value={{$staffID}} {{ if eq $staffID $entry.StaffID }}selected{{ end }}>
 								{{(or $member.NickName $member.FirstName)}}
 							</option>
 						{{ end }}
