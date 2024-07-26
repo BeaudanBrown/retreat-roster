@@ -201,7 +201,8 @@ func (s *Server) HandleCreateAccount(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/landing", http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	w.Header().Set("HX-Redirect", "/")
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) HandleNewAccount(w http.ResponseWriter, r *http.Request) {
