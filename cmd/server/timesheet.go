@@ -13,7 +13,7 @@ import (
 )
 
 type TimesheetData struct {
-	Entries     []db.TimesheetEntry
+	Entries     []*db.TimesheetEntry
 	StaffMember db.StaffMember
 	DayNames    []string
 	StaffMap    map[uuid.UUID]db.StaffMember

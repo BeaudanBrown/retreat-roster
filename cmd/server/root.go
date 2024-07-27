@@ -769,36 +769,36 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 				staffData[entry.StaffID] = payData
 			}
 			if entry.ShiftType == db.Bar || entry.ShiftType == db.Deliveries || entry.ShiftType == db.Admin {
-				payData.Level2Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
-				payData.Level2Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
-				payData.Level2Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
+				payData.Level2Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
+				payData.Level2Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, *entry)
+				payData.Level2Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, *entry)
 			} else if entry.ShiftType == db.DayManager {
 				if day != Friday && day != Saturday && day != Sunday {
-					payData.Level3Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
-					payData.Level3Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
-					payData.Level3Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
+					payData.Level3Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
+					payData.Level3Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, *entry)
+					payData.Level3Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, *entry)
 				} else if day == Friday || day == Sunday {
-					payData.Level4Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
-					payData.Level4Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
-					payData.Level4Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
+					payData.Level4Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
+					payData.Level4Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, *entry)
+					payData.Level4Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, *entry)
 				} else {
 					// day == Saturday
-					payData.Level5Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
-					payData.Level5Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
-					payData.Level5Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
+					payData.Level5Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
+					payData.Level5Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, *entry)
+					payData.Level5Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, *entry)
 				}
 			} else if entry.ShiftType == db.NightManager {
-				payData.Level5Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
-				payData.Level5Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
-				payData.Level5Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
+				payData.Level5Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
+				payData.Level5Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, *entry)
+				payData.Level5Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, *entry)
 			} else if entry.ShiftType == db.AmeliaSupervisor {
-				payData.Level4Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
-				payData.Level4Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
-				payData.Level4Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
+				payData.Level4Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
+				payData.Level4Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, *entry)
+				payData.Level4Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, *entry)
 			} else if entry.ShiftType == db.GeneralManagement {
-				payData.General[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
-				payData.General[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
-				payData.General[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
+				payData.General[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
+				payData.General[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, *entry)
+				payData.General[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, *entry)
 			}
 		}
 	}
@@ -859,7 +859,7 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 	// Set the appropriate headers
 	w.Header().Set("Content-Type", "text/csv")
 	formattedDate := thisStaff.Config.TimesheetStartDate.Format("2006-01-02")
-	reportFilename := "staff_hours-" + formattedDate + ".csv"
+	reportFilename := "staff_hours_starting-" + formattedDate + ".csv"
 	w.Header().Set("Content-Disposition", "attachment;filename="+reportFilename)
 	w.Header().Set("Content-Length", strconv.Itoa(len(fileBuffer.Bytes())))
 
@@ -941,15 +941,15 @@ func (s *Server) HandleExportWageReport(w http.ResponseWriter, r *http.Request) 
 				}
 				window := report[windowStart]
 				if entry.ShiftType == db.Bar {
-					window.Staff += s.GetWorkFromEntry(windowStart, windowEnd, entry)
+					window.Staff += s.GetWorkFromEntry(windowStart, windowEnd, *entry)
 				} else if entry.ShiftType == db.DayManager || entry.ShiftType == db.NightManager {
-					window.Manager += s.GetWorkFromEntry(windowStart, windowEnd, entry)
+					window.Manager += s.GetWorkFromEntry(windowStart, windowEnd, *entry)
 				} else if entry.ShiftType == db.AmeliaSupervisor {
-					window.Amelia += s.GetWorkFromEntry(windowStart, windowEnd, entry)
+					window.Amelia += s.GetWorkFromEntry(windowStart, windowEnd, *entry)
 				} else if entry.ShiftType == db.GeneralManagement {
-					window.Salary += s.GetWorkFromEntry(windowStart, windowEnd, entry)
+					window.Salary += s.GetWorkFromEntry(windowStart, windowEnd, *entry)
 				} else if entry.ShiftType == db.Deliveries {
-					window.Deliveries += s.GetWorkFromEntry(windowStart, windowEnd, entry)
+					window.Deliveries += s.GetWorkFromEntry(windowStart, windowEnd, *entry)
 				}
 				report[windowStart] = window
 			}

@@ -2,6 +2,7 @@ package db
 
 import (
 	"log"
+	"sort"
 	"strconv"
 	"time"
 
@@ -147,6 +148,33 @@ func (d *Database) GetTimesheetEntryByID(entryID uuid.UUID) *TimesheetEntry {
 	return &timesheetEntry
 }
 
+func (d *Database) SortTimesheetEntries(entries []*TimesheetEntry) []*TimesheetEntry {
+	copiedEntries := make([]*TimesheetEntry, len(entries))
+	copy(copiedEntries, entries)
+	sort.Slice(copiedEntries, func(i, j int) bool {
+		entry1 := copiedEntries[i]
+		entry2 := copiedEntries[j]
+		if entry1.ShiftType == entry2.ShiftType {
+			staff1 := d.GetStaffByID(entry1.StaffID)
+			staff2 := d.GetStaffByID(entry2.StaffID)
+			if staff1 == nil || staff2 == nil {
+				return false
+			}
+			name1 := staff1.FirstName
+			if staff1.NickName != "" {
+				name1 = staff1.NickName
+			}
+			name2 := staff2.FirstName
+			if staff2.NickName != "" {
+				name2 = staff2.NickName
+			}
+			return name1 < name2
+		}
+		return entry1.ShiftType > entry2.ShiftType
+	})
+	return copiedEntries
+}
+
 func (d *Database) GetAllTimesheetEntries() *[]*TimesheetEntry {
 	collection := d.DB.Collection("timesheets")
 	cursor, err := collection.Find(d.Context, bson.M{})
@@ -160,6 +188,7 @@ func (d *Database) GetAllTimesheetEntries() *[]*TimesheetEntry {
 		log.Printf("Error decoding timesheet entries: %v", err)
 		return nil
 	}
+	entries = d.SortTimesheetEntries(entries)
 	return &entries
 }
 
@@ -182,7 +211,7 @@ func (d *Database) SaveAllTimesheetEntries(entries []*TimesheetEntry) error {
 	return nil
 }
 
-func (d *Database) GetTimesheetWeek(startDate time.Time) *[]TimesheetEntry {
+func (d *Database) GetTimesheetWeek(startDate time.Time) *[]*TimesheetEntry {
 	collection := d.DB.Collection("timesheets")
 	year, month, day := startDate.Date()
 	weekStart := time.Date(year, month, day, 0, 0, 0, 0, time.Now().Location())
@@ -200,11 +229,12 @@ func (d *Database) GetTimesheetWeek(startDate time.Time) *[]TimesheetEntry {
 		return nil
 	}
 	defer cursor.Close(d.Context)
-	var entries []TimesheetEntry
+	var entries []*TimesheetEntry
 	if err = cursor.All(d.Context, &entries); err != nil {
 		log.Printf("Error decoding timesheet weeks: %v", err)
 		return nil
 	}
+	entries = d.SortTimesheetEntries(entries)
 	return &entries
 }
 
