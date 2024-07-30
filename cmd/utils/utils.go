@@ -1,14 +1,12 @@
 package utils
 
 import (
-	"log"
 	"time"
 )
 
 func GetLastTuesday() time.Time {
 	nextTuesday := GetNextTuesday()
 	lastTuesday := nextTuesday.AddDate(0, 0, -7)
-	log.Printf("Last tuesday: %v", lastTuesday)
 	return time.Date(
 		lastTuesday.Year(),
 		lastTuesday.Month(),
@@ -24,7 +22,6 @@ func GetNextTuesday() time.Time {
 		daysUntilTuesday = 7
 	}
 	nextTuesday := today.AddDate(0, 0, daysUntilTuesday)
-	log.Printf("Next tuesday: %v", nextTuesday)
 	return time.Date(
 		nextTuesday.Year(),
 		nextTuesday.Month(),

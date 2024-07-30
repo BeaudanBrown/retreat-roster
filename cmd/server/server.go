@@ -126,6 +126,7 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 			"MakeTimesheetEntryStruct": MakeTimesheetEntryStruct,
 			"GetSortedLeaveReqs":       GetSortedLeaveReqs,
 			"GetAllShiftTypes":         db.GetAllShiftTypes,
+			"DisableTimesheet":         db.DisableTimesheet,
 			"addDays": func(t time.Time, days int) time.Time {
 				return t.AddDate(0, 0, days)
 			},

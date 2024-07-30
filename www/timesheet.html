@@ -104,6 +104,7 @@
 							<th colspan="4" class="text-left text-xl font-bold whitespace-nowrap">
 								<div class="flex items-center justify-center">
 									<button class="buttonGreen w-full rounded-lg text-xl m-2 px-2"
+                    {{if (DisableTimesheet $thisDate $staffMember.IsAdmin)}}disabled{{end}}
 										hx-post='/addTimesheetEntry' hx-ext='json-enc'
 										hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "startDate":"{{$thisDate}}"}'
 										hx-swap='outerHTML' hx-target='#new-{{$dayName}}-modalDiv'>

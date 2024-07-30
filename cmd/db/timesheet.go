@@ -2,6 +2,7 @@ package db
 
 import (
 	"log"
+	"roster/cmd/utils"
 	"sort"
 	"strconv"
 	"time"
@@ -259,8 +260,22 @@ func NextWholeHour() time.Time {
 	return t.Truncate(time.Hour).Add(time.Hour)
 }
 
+func DisableTimesheet(startDate time.Time, isAdmin bool) bool {
+	lastTuesday := utils.GetLastTuesday().Add(-time.Minute) // Inclusive
+	nextTuesday := utils.GetNextTuesday()
+	now := time.Now()
+	if now.Sub(lastTuesday).Hours() < 12 {
+		// 12 hour overlap between weeks
+		lastTuesday = lastTuesday.AddDate(0, 0, -7)
+		nextTuesday = nextTuesday.AddDate(0, 0, -7)
+	}
+	if startDate.After(lastTuesday) && startDate.Before(nextTuesday) {
+		return false
+	}
+	return !isAdmin
+}
+
 func (d *Database) CreateTimesheetEntry(startDate time.Time, staffID uuid.UUID) (*TimesheetEntry, error) {
-	collection := d.DB.Collection("timesheets")
 	year, month, day := startDate.Date()
 	dateOnly := time.Date(year, month, day, 0, 0, 0, 0, time.Now().Location())
 	start := LastWholeHour()
@@ -273,6 +288,7 @@ func (d *Database) CreateTimesheetEntry(startDate time.Time, staffID uuid.UUID) 
 		ShiftEnd:    end,
 		ShiftLength: end.Sub(start).Hours(),
 	}
+	collection := d.DB.Collection("timesheets")
 	_, err := collection.InsertOne(d.Context, newEntry)
 	if err != nil {
 		return nil, err
