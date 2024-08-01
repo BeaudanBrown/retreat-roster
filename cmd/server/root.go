@@ -778,15 +778,11 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 					payData.Level3Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
 					payData.Level3Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, *entry)
 					payData.Level3Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, *entry)
-				} else if day == Friday || day == Sunday {
+				} else {
+					// day == Friday, Saturday or Sunday
 					payData.Level4Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
 					payData.Level4Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, *entry)
 					payData.Level4Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, *entry)
-				} else {
-					// day == Saturday
-					payData.Level5Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
-					payData.Level5Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, *entry)
-					payData.Level5Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, *entry)
 				}
 			} else if entry.ShiftType == db.NightManager {
 				payData.Level5Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
