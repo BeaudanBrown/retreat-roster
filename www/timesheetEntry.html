@@ -1,10 +1,8 @@
 {{ define "timesheetEntry" }}
-{{ $isAdmin := and .IsAdmin }}
-{{ $showAll := and .ShowAll .IsAdmin }}
-{{ $thisStaff := (index .StaffMap .ThisStaffID) }}
-{{ $isThisStaff := eq .ThisStaffID .StaffID }}
+{{ $activeStaff := .ActiveStaff }}
+{{ $showAll := and .ShowAll .ActiveStaff.IsAdmin }}
+{{ $isThisStaff := eq .EntryStaff.ID .StaffID }}
 {{ $canEdit := and (not .Approved) (or $showAll $isThisStaff) }}
-{{ $canView := and .Approved (or $showAll $isThisStaff) }}
 {{ $id := .ID }}
 
 <tr class="odd:bg-slate-700 even:bg-gray-800 border-gray-700">
@@ -16,7 +14,7 @@
 					<label class="text-white">{{ $st.String }}</label>
 				{{ end }}
 			{{ end }}
-			<label class="text-white">{{(or $thisStaff.NickName $thisStaff.FirstName)}}</label>
+			<label class="text-white">{{(or .EntryStaff.NickName .EntryStaff.FirstName)}}</label>
 		</div>
 	</td>
 	<td>
@@ -35,7 +33,7 @@
 	</td>
 	<td>
 		<div class="flex mx-2 flex-col items-center justify-center">
-			{{ if $isAdmin }}
+			{{ if .ActiveStaff.IsAdmin }}
 				<button class="buttonStyle w-full"
 					hx-post="/toggleApproved"
 					hx-ext="json-enc"

@@ -745,7 +745,7 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 	}
 
 	staffData := map[uuid.UUID]*StaffPayData{}
-	allStaff := s.GetStaffMap()
+	allStaff := s.LoadAllStaff()
 
 	for day := Tuesday; day <= 6; day++ {
 		thisDate := thisStaff.Config.TimesheetStartDate.AddDate(0, 0, int(day))
@@ -756,9 +756,9 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 		after12WindowStart := eveningWindowEnd
 		after12WindowEnd := thisDate.Add(time.Duration(30) * time.Hour)
 		for _, entry := range *entries {
-			staffMember, ok := allStaff[entry.StaffID]
-			if !ok {
-				log.Printf("Missing staffID")
+			staffMember := db.GetStaffFromList(entry.StaffID, allStaff)
+			if staffMember == nil {
+				log.Printf("Missing staffmember")
 				continue
 			}
 			if !entry.Approved || staffMember.IsTrial {
@@ -817,8 +817,8 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 	}
 	reportRows := [][]string{}
 	for staffID, payData := range staffData {
-		staffMember, ok := allStaff[staffID]
-		if !ok {
+		staffMember := db.GetStaffFromList(staffID, allStaff)
+		if staffMember == nil {
 			log.Printf("Missing staffID")
 			continue
 		}

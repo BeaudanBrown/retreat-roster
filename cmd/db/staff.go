@@ -375,13 +375,13 @@ func (d *Database) CreateStaffMember(googleId string, token uuid.UUID) error {
 	return nil
 }
 
-func (d *Database) GetStaffMap() map[uuid.UUID]StaffMember {
-	staffMap := map[uuid.UUID]StaffMember{}
-	staffState := d.LoadAllStaff()
-	for _, staff := range staffState {
-		staffMap[staff.ID] = *staff
+func GetStaffFromList(staffID uuid.UUID, allStaff []*StaffMember) *StaffMember {
+	for _, staff := range allStaff {
+		if staff.ID == staffID {
+			return staff
+		}
 	}
-	return staffMap
+	return nil
 }
 
 func (d *Database) DeleteLeaveReqByID(staffMember StaffMember, leaveReqID uuid.UUID) {

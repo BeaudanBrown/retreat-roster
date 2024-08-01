@@ -16,7 +16,7 @@ type TimesheetData struct {
 	Entries     []*db.TimesheetEntry
 	StaffMember db.StaffMember
 	DayNames    []string
-	StaffMap    map[uuid.UUID]db.StaffMember
+	AllStaff    []*db.StaffMember
 	RosterLive  bool
 	CacheBust   string
 }
@@ -31,7 +31,7 @@ func (s *Server) MakeTimesheetStruct(activeStaff db.StaffMember) TimesheetData {
 		Entries:     *entries,
 		StaffMember: activeStaff,
 		DayNames:    []string{"Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Monday"},
-		StaffMap:    s.GetStaffMap(),
+		AllStaff:    s.LoadAllStaff(),
 		CacheBust:   s.CacheBust,
 	}
 }
@@ -136,7 +136,7 @@ func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	newEntry := MakeEmptyTimesheetEntry(*reqBody.StartDate.Time, staffID)
-	data := MakeTimesheetEditModalStruct(newEntry, thisStaff.ID, s.GetStaffMap(), thisStaff.IsAdmin)
+	data := MakeTimesheetEditModalStruct(newEntry, thisStaff.ID, s.LoadAllStaff(), thisStaff.IsAdmin)
 	s.renderTemplate(w, "timesheetEditModal", data)
 }
 
@@ -277,26 +277,29 @@ func (s *Server) HandleToggleApproved(w http.ResponseWriter, r *http.Request) {
 
 type TimesheetEntryData struct {
 	db.TimesheetEntry
-	ThisStaffID uuid.UUID
-	StaffMap    map[uuid.UUID]db.StaffMember
+	ActiveStaff db.StaffMember
+	EntryStaff  db.StaffMember
 	ShowAll     bool
-	IsAdmin     bool
 }
 
-func MakeTimesheetEntryStruct(entry db.TimesheetEntry, thisStaffID uuid.UUID, staffMap map[uuid.UUID]db.StaffMember, showAll bool, isAdmin bool) TimesheetEntryData {
+func MakeTimesheetEntryStruct(entry db.TimesheetEntry, activeStaff db.StaffMember, allStaff []*db.StaffMember, showAll bool) TimesheetEntryData {
+	entryStaff := db.GetStaffFromList(entry.StaffID, allStaff)
+	if entryStaff == nil {
+		// TODO: This is not ideal
+		entryStaff = &db.StaffMember{}
+	}
 	return TimesheetEntryData{
 		TimesheetEntry: entry,
-		ThisStaffID:    thisStaffID,
-		StaffMap:       staffMap,
+		ActiveStaff:    activeStaff,
+		EntryStaff:     *entryStaff,
 		ShowAll:        showAll,
-		IsAdmin:        isAdmin,
 	}
 }
 
 type TimesheetEditModalData struct {
 	db.TimesheetEntry
 	ThisStaffID uuid.UUID
-	StaffMap    map[uuid.UUID]db.StaffMember
+	AllStaff    []*db.StaffMember
 	IsAdmin     bool
 }
 
@@ -316,11 +319,11 @@ func MakeEmptyTimesheetEntry(startDate time.Time, staffID uuid.UUID) db.Timeshee
 	return newEntry
 }
 
-func MakeTimesheetEditModalStruct(entry db.TimesheetEntry, thisStaffID uuid.UUID, staffMap map[uuid.UUID]db.StaffMember, isAdmin bool) TimesheetEditModalData {
+func MakeTimesheetEditModalStruct(entry db.TimesheetEntry, thisStaffID uuid.UUID, allStaff []*db.StaffMember, isAdmin bool) TimesheetEditModalData {
 	return TimesheetEditModalData{
 		TimesheetEntry: entry,
 		ThisStaffID:    thisStaffID,
-		StaffMap:       staffMap,
+		AllStaff:       allStaff,
 		IsAdmin:        isAdmin,
 	}
 }
@@ -350,6 +353,6 @@ func (s *Server) HandleGetTimesheetEditModal(w http.ResponseWriter, r *http.Requ
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	data := MakeTimesheetEditModalStruct(*entry, thisStaff.ID, s.GetStaffMap(), thisStaff.IsAdmin)
+	data := MakeTimesheetEditModalStruct(*entry, thisStaff.ID, s.LoadAllStaff(), thisStaff.IsAdmin)
 	s.renderTemplate(w, "timesheetEditModal", data)
 }

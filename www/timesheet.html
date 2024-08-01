@@ -5,7 +5,7 @@
 {{ $isAdmin := .StaffMember.IsAdmin }}
 {{ $showAll := and $config.ShowAll .StaffMember.IsAdmin }}
 {{ $hideApproved := and $config.HideApproved .StaffMember.IsAdmin }}
-{{ $staffMap := .StaffMap }}
+{{ $allStaff := .AllStaff }}
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html class="dark">
 	<head>
@@ -117,12 +117,12 @@
 							{{ if (eq $entry.StartDate $thisDate) }}
 								{{ if $showAll }}
 									{{ if not (and .Approved $hideApproved)}}
-										{{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry .StaffID $staffMap $showAll $staffMember.IsAdmin) }}
+										{{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry $staffMember $allStaff $showAll) }}
 									{{ end }}
 								{{ else }}
 									{{ if (eq .StaffID $staffMember.ID) }}
 										{{ if (or (not .Approved) (not $hideApproved)) }}
-											{{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry .StaffID $staffMap $showAll $staffMember.IsAdmin) }}
+											{{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry $staffMember $allStaff $showAll) }}
 										{{ end }}
 									{{ end }}
 								{{ end }}
