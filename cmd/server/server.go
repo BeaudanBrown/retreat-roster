@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"time"
 
@@ -129,6 +130,9 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 			"DisableTimesheet":         db.DisableTimesheet,
 			"addDays": func(t time.Time, days int) time.Time {
 				return t.AddDate(0, 0, days)
+			},
+			"roundFloat": func(val float64) float64 {
+				return math.Round(val*100) / 100
 			},
 			"AdminShiftTypeStart": func() db.ShiftType {
 				return db.DayManager

@@ -668,7 +668,7 @@ func maxTime(t1, t2 time.Time) time.Time {
 	return t2
 }
 
-func (s *Server) GetWorkFromEntry(windowStart time.Time, windowEnd time.Time, entry db.TimesheetEntry) float64 {
+func GetWorkFromEntry(windowStart time.Time, windowEnd time.Time, entry db.TimesheetEntry) float64 {
 	shiftStart := maxTime(windowStart, entry.ShiftStart)
 	shiftEnd := minTime(windowEnd, entry.ShiftEnd)
 	if shiftStart.After(shiftEnd) {
@@ -730,6 +730,40 @@ type DayBreakdown struct {
 	After12Hrs  float64
 }
 
+func ApplyEntryToLevel(dayBreakdown DayBreakdown, thisDate time.Time, entry db.TimesheetEntry) DayBreakdown {
+	ordinaryWindowStart := thisDate.Add(time.Duration(7) * time.Hour)
+	ordinaryWindowEnd := thisDate.Add(time.Duration(19) * time.Hour)
+	eveningWindowStart := ordinaryWindowEnd
+	eveningWindowEnd := thisDate.Add(time.Duration(24) * time.Hour)
+	after12WindowStart := eveningWindowEnd
+	after12WindowEnd := thisDate.Add(time.Duration(30) * time.Hour)
+
+	dayBreakdown.OrdinaryHrs += GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
+	dayBreakdown.EveningHrs += GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
+	dayBreakdown.After12Hrs += GetWorkFromEntry(after12WindowStart, after12WindowEnd, entry)
+	return dayBreakdown
+}
+
+func AddEntryToPaydata(entry db.TimesheetEntry, thisDate time.Time, day DayIdx, payData StaffPayData) StaffPayData {
+	if entry.ShiftType == db.Bar || entry.ShiftType == db.Deliveries || entry.ShiftType == db.Admin {
+		payData.Level2Hrs[day] = ApplyEntryToLevel(payData.Level2Hrs[day], thisDate, entry)
+	} else if entry.ShiftType == db.DayManager {
+		if day != Friday && day != Saturday && day != Sunday {
+			payData.Level3Hrs[day] = ApplyEntryToLevel(payData.Level3Hrs[day], thisDate, entry)
+		} else {
+			// day == Friday, Saturday or Sunday
+			payData.Level4Hrs[day] = ApplyEntryToLevel(payData.Level4Hrs[day], thisDate, entry)
+		}
+	} else if entry.ShiftType == db.NightManager {
+		payData.Level5Hrs[day] = ApplyEntryToLevel(payData.Level5Hrs[day], thisDate, entry)
+	} else if entry.ShiftType == db.AmeliaSupervisor {
+		payData.Level4Hrs[day] = ApplyEntryToLevel(payData.Level4Hrs[day], thisDate, entry)
+	} else if entry.ShiftType == db.GeneralManagement {
+		payData.General[day] = ApplyEntryToLevel(payData.General[day], thisDate, entry)
+	}
+	return payData
+}
+
 func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) {
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {
@@ -744,17 +778,11 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	staffData := map[uuid.UUID]*StaffPayData{}
+	staffData := map[uuid.UUID]StaffPayData{}
 	allStaff := s.LoadAllStaff()
 
 	for day := Tuesday; day <= 6; day++ {
 		thisDate := thisStaff.Config.TimesheetStartDate.AddDate(0, 0, int(day))
-		ordinaryWindowStart := thisDate.Add(time.Duration(7) * time.Hour)
-		ordinaryWindowEnd := thisDate.Add(time.Duration(19) * time.Hour)
-		eveningWindowStart := ordinaryWindowEnd
-		eveningWindowEnd := thisDate.Add(time.Duration(24) * time.Hour)
-		after12WindowStart := eveningWindowEnd
-		after12WindowEnd := thisDate.Add(time.Duration(30) * time.Hour)
 		for _, entry := range *entries {
 			staffMember := db.GetStaffFromList(entry.StaffID, allStaff)
 			if staffMember == nil {
@@ -766,37 +794,10 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 			}
 			payData, exists := staffData[entry.StaffID]
 			if !exists {
-				payData = &StaffPayData{}
+				payData = StaffPayData{}
 				staffData[entry.StaffID] = payData
 			}
-			if entry.ShiftType == db.Bar || entry.ShiftType == db.Deliveries || entry.ShiftType == db.Admin {
-				payData.Level2Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
-				payData.Level2Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, *entry)
-				payData.Level2Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, *entry)
-			} else if entry.ShiftType == db.DayManager {
-				if day != Friday && day != Saturday && day != Sunday {
-					payData.Level3Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
-					payData.Level3Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, *entry)
-					payData.Level3Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, *entry)
-				} else {
-					// day == Friday, Saturday or Sunday
-					payData.Level4Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
-					payData.Level4Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, *entry)
-					payData.Level4Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, *entry)
-				}
-			} else if entry.ShiftType == db.NightManager {
-				payData.Level5Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
-				payData.Level5Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, *entry)
-				payData.Level5Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, *entry)
-			} else if entry.ShiftType == db.AmeliaSupervisor {
-				payData.Level4Hrs[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
-				payData.Level4Hrs[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, *entry)
-				payData.Level4Hrs[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, *entry)
-			} else if entry.ShiftType == db.GeneralManagement {
-				payData.General[day].OrdinaryHrs += s.GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, *entry)
-				payData.General[day].EveningHrs += s.GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, *entry)
-				payData.General[day].After12Hrs += s.GetWorkFromEntry(after12WindowStart, after12WindowEnd, *entry)
-			}
+			staffData[entry.StaffID] = AddEntryToPaydata(*entry, thisDate, day, payData)
 		}
 	}
 	var fileBuffer bytes.Buffer
@@ -938,15 +939,15 @@ func (s *Server) HandleExportWageReport(w http.ResponseWriter, r *http.Request) 
 				}
 				window := report[windowStart]
 				if entry.ShiftType == db.Bar {
-					window.Staff += s.GetWorkFromEntry(windowStart, windowEnd, *entry)
+					window.Staff += GetWorkFromEntry(windowStart, windowEnd, *entry)
 				} else if entry.ShiftType == db.DayManager || entry.ShiftType == db.NightManager {
-					window.Manager += s.GetWorkFromEntry(windowStart, windowEnd, *entry)
+					window.Manager += GetWorkFromEntry(windowStart, windowEnd, *entry)
 				} else if entry.ShiftType == db.AmeliaSupervisor {
-					window.Amelia += s.GetWorkFromEntry(windowStart, windowEnd, *entry)
+					window.Amelia += GetWorkFromEntry(windowStart, windowEnd, *entry)
 				} else if entry.ShiftType == db.GeneralManagement {
-					window.Salary += s.GetWorkFromEntry(windowStart, windowEnd, *entry)
+					window.Salary += GetWorkFromEntry(windowStart, windowEnd, *entry)
 				} else if entry.ShiftType == db.Deliveries {
-					window.Deliveries += s.GetWorkFromEntry(windowStart, windowEnd, *entry)
+					window.Deliveries += GetWorkFromEntry(windowStart, windowEnd, *entry)
 				}
 				report[windowStart] = window
 			}
@@ -1061,4 +1062,52 @@ func (s *Server) HandleImportRosterWeek(w http.ResponseWriter, r *http.Request) 
 	thisWeek = &newWeek
 	s.SaveRosterWeek(*thisWeek)
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *thisWeek))
+}
+
+func (s *Server) GetPayWeekForStaff(staffID uuid.UUID, startDate time.Time) StaffPayData {
+	payData := StaffPayData{}
+	entries := s.GetStaffTimesheetWeek(staffID, startDate)
+	for day := Tuesday; day <= 6; day++ {
+		thisDate := startDate.AddDate(0, 0, int(day))
+		for _, entry := range *entries {
+			if entry.Approved {
+				payData = AddEntryToPaydata(*entry, thisDate, day, payData)
+			}
+		}
+	}
+	return payData
+}
+
+type StaffPaySummary struct {
+	TotalHrs    float64
+	PayEstimate float64
+}
+
+func AddLevelSummary(paySummary StaffPaySummary, breakdown [7]DayBreakdown, levelPay float64) StaffPaySummary {
+	for i, day := range breakdown {
+		paySummary.TotalHrs += day.OrdinaryHrs
+		paySummary.TotalHrs += day.EveningHrs
+		paySummary.TotalHrs += day.After12Hrs
+
+		dayIdx := DayIdx(i)
+		if dayIdx == Saturday {
+			paySummary.PayEstimate += (day.OrdinaryHrs + day.EveningHrs + day.After12Hrs) * levelPay * SAT_PAY_MULT
+		} else if dayIdx == Sunday {
+			paySummary.PayEstimate += (day.OrdinaryHrs + day.EveningHrs + day.After12Hrs) * levelPay * SUN_PAY_MULT
+		} else {
+			paySummary.PayEstimate += day.OrdinaryHrs * levelPay * WEEK_PAY_MULT
+			paySummary.PayEstimate += day.EveningHrs * (levelPay*WEEK_PAY_MULT + EVENING_PENALTY)
+			paySummary.PayEstimate += day.After12Hrs * (levelPay*WEEK_PAY_MULT + AFTER_12_PENALTY)
+		}
+	}
+	return paySummary
+}
+
+func (s *Server) GetPaySummary(payData StaffPayData) StaffPaySummary {
+	paySummary := StaffPaySummary{}
+	paySummary = AddLevelSummary(paySummary, payData.Level2Hrs, LEVEL_2_PAY)
+	paySummary = AddLevelSummary(paySummary, payData.Level3Hrs, LEVEL_3_PAY)
+	paySummary = AddLevelSummary(paySummary, payData.Level4Hrs, LEVEL_4_PAY)
+	paySummary = AddLevelSummary(paySummary, payData.Level5Hrs, LEVEL_5_PAY)
+	return paySummary
 }

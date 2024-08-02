@@ -14,7 +14,8 @@ import (
 )
 
 type TimesheetEntry struct {
-	ID          uuid.UUID
+	ID uuid.UUID
+	// TODO: Fucked up the name
 	StaffID     uuid.UUID `bson:"days"`
 	StartDate   time.Time `bson:"startDate"`
 	ShiftStart  time.Time `json:"shiftStart"`
@@ -210,6 +211,34 @@ func (d *Database) SaveAllTimesheetEntries(entries []*TimesheetEntry) error {
 	}
 	log.Printf("Saved %v timesheet entries, Upserted %v timesheet entries", results.ModifiedCount, results.UpsertedCount)
 	return nil
+}
+
+func (d *Database) GetStaffTimesheetWeek(staffID uuid.UUID, startDate time.Time) *[]*TimesheetEntry {
+	collection := d.DB.Collection("timesheets")
+	year, month, day := startDate.Date()
+	weekStart := time.Date(year, month, day, 0, 0, 0, 0, time.Now().Location())
+	weekEnd := weekStart.AddDate(0, 0, 7)
+	filter := bson.M{
+		"startDate": bson.M{
+			"$gte": weekStart,
+			"$lt":  weekEnd,
+		},
+		// TODO: Fucked up the bson name
+		"days": staffID,
+	}
+
+	cursor, err := collection.Find(d.Context, filter)
+	if err != nil {
+		log.Printf("Error finding timesheet week: %v", err)
+		return nil
+	}
+	defer cursor.Close(d.Context)
+	var entries []*TimesheetEntry
+	if err = cursor.All(d.Context, &entries); err != nil {
+		log.Printf("Error decoding timesheet weeks: %v", err)
+		return nil
+	}
+	return &entries
 }
 
 func (d *Database) GetTimesheetWeek(startDate time.Time) *[]*TimesheetEntry {

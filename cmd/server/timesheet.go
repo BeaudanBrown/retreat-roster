@@ -12,13 +12,26 @@ import (
 	"github.com/google/uuid"
 )
 
+const LEVEL_2_PAY = 24.98
+const LEVEL_3_PAY = 25.8
+const LEVEL_4_PAY = 27.17
+const LEVEL_5_PAY = 28.87
+
+const EVENING_PENALTY = 2.72
+const AFTER_12_PENALTY = 4.08
+
+const WEEK_PAY_MULT = 1.25
+const SAT_PAY_MULT = 1.5
+const SUN_PAY_MULT = 1.75
+
 type TimesheetData struct {
-	Entries     []*db.TimesheetEntry
-	StaffMember db.StaffMember
-	DayNames    []string
-	AllStaff    []*db.StaffMember
-	RosterLive  bool
-	CacheBust   string
+	Entries         []*db.TimesheetEntry
+	StaffMember     db.StaffMember
+	DayNames        []string
+	AllStaff        []*db.StaffMember
+	StaffPaySummary StaffPaySummary
+	RosterLive      bool
+	CacheBust       string
 }
 
 func (s *Server) MakeTimesheetStruct(activeStaff db.StaffMember) TimesheetData {
@@ -27,12 +40,17 @@ func (s *Server) MakeTimesheetStruct(activeStaff db.StaffMember) TimesheetData {
 		log.Printf("Failed to load timesheet week when making struct")
 	}
 
+	//TODO: this can be optimised
+	staffPayData := s.GetPayWeekForStaff(activeStaff.ID, activeStaff.Config.TimesheetStartDate)
+	paySummary := s.GetPaySummary(staffPayData)
+
 	return TimesheetData{
-		Entries:     *entries,
-		StaffMember: activeStaff,
-		DayNames:    []string{"Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Monday"},
-		AllStaff:    s.LoadAllStaff(),
-		CacheBust:   s.CacheBust,
+		Entries:         *entries,
+		StaffMember:     activeStaff,
+		DayNames:        []string{"Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Monday"},
+		AllStaff:        s.LoadAllStaff(),
+		StaffPaySummary: paySummary,
+		CacheBust:       s.CacheBust,
 	}
 }
 
