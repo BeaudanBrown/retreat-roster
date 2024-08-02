@@ -39,14 +39,9 @@ func main() {
 		log.Fatalf("Error loading server state: %v", err)
 	}
 
-	err = migrate.MigrateToMongo(s)
+	err = migrate.MigrateV3(s)
 	if err != nil {
-		log.Printf("Error migrating old data: %v", err)
-	}
-
-	err = migrate.MigrateV2(s)
-	if err != nil {
-		log.Printf("Error migrating to V2: %v", err)
+		log.Printf("Error migrating to V3: %v", err)
 	}
 
 	http.HandleFunc("/", s.VerifySession(s.HandleIndex))

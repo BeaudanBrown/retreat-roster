@@ -73,7 +73,6 @@ type ShiftType int
 
 const (
 	Bar ShiftType = iota
-	Door
 	Deliveries
 	DayManager
 	AmeliaSupervisor
@@ -98,7 +97,6 @@ func (s ShiftType) Int() int {
 func (s ShiftType) String() string {
 	return [...]string{
 		"Bar",
-		"Door",
 		"Deliveries",
 		"Day Manager",
 		"Amelia Supervisor",

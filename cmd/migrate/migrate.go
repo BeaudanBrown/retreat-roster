@@ -30,30 +30,50 @@ type OldData struct {
 const STATE_FILE = "./data/state.json"
 
 type Version struct {
-	id      string
-	version int
+	ID      string
+	Version int
 }
 
 func LoadVersion(s *server.Server) *Version {
 	versionCollection := s.DB.Collection("version")
 	var version Version
-	err := versionCollection.FindOne(s.Context, bson.M{}).Decode(&version)
+	err := versionCollection.FindOne(s.Context, bson.M{"id": "version"}).Decode(&version)
 	if err != nil {
 		if err != mongo.ErrNoDocuments {
 			log.Printf("Error reading version: %v", err)
 			return nil
 		}
+		log.Printf("Creating new version")
 		version = Version{
-			id:      "version",
-			version: 1,
+			ID:      "version",
+			Version: 1,
+		}
+	}
+	if version.ID != "version" {
+		// Fix up borked databases
+		_, err := versionCollection.DeleteMany(s.Context, bson.M{})
+		if err != nil {
+			log.Printf("Error deleting versions: %v", err)
+			return nil
+		}
+		log.Printf("Fixing old version")
+		version = Version{
+			ID:      "version",
+			Version: 2,
+		}
+		_, err = versionCollection.InsertOne(s.Context, version)
+		if err != nil {
+			log.Printf("Error inserting new version: %v", err)
+			return nil
 		}
 	}
 	return &version
 }
 
 func SaveVersion(s *server.Server, v Version) error {
+	log.Printf("saving version: %v", v.ID)
 	collection := s.DB.Collection("version")
-	filter := bson.M{"id": v.id}
+	filter := bson.M{"id": v.ID}
 	update := bson.M{"$set": v}
 	opts := options.Update().SetUpsert(true)
 	_, err := collection.UpdateOne(s.Context, filter, update, opts)
@@ -65,10 +85,36 @@ func SaveVersion(s *server.Server, v Version) error {
 	return nil
 }
 
+func MigrateV3(s *server.Server) error {
+	version := LoadVersion(s)
+	log.Printf("Version: %v", version.Version)
+	if version == nil || (version.Version != 2 && version.Version != 0) {
+		log.Println("No v3 migration required")
+		return nil
+	}
+	allEntries := s.GetAllTimesheetEntries()
+	if allEntries == nil {
+		log.Println("No entries to migrate")
+		return nil
+	}
+	for _, entry := range *allEntries {
+		log.Printf("Shift before: %v", entry.ShiftType)
+		if entry.ShiftType != db.Bar {
+			entry.ShiftType = entry.ShiftType - 1
+			log.Printf("Shift after: %v", entry.ShiftType)
+		}
+	}
+	s.SaveAllTimesheetEntries(*allEntries)
+	version.Version = 3
+	SaveVersion(s, *version)
+	log.Println("V3 migration complete")
+	return nil
+}
+
 func MigrateV2(s *server.Server) error {
 	version := LoadVersion(s)
-	if version == nil || version.version != 1 {
-		log.Println("Invalid version")
+	if version == nil || version.Version != 1 {
+		log.Println("No v2 migration required")
 		return nil
 	}
 	allEntries := s.GetAllTimesheetEntries()
@@ -84,9 +130,9 @@ func MigrateV2(s *server.Server) error {
 		}
 	}
 	s.SaveAllTimesheetEntries(*allEntries)
-	version.version = version.version + 1
+	version.Version = version.Version + 1
 	SaveVersion(s, *version)
-	log.Println("Migration complete")
+	log.Println("V2 migration complete")
 	return nil
 }
 
