@@ -12,6 +12,7 @@ cleandb:
 
 build:
 	@echo "Building static binary..."
+	tailwindcss -i ./www/input.css -o ./www/app.css
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o $(DIST_FOLDER)/$(BINARY_NAME) ./cmd/main.go
 
 docker-build:
