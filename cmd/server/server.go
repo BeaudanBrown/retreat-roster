@@ -141,7 +141,7 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 			"GetTimesheetTimes": func() [][]string {
 				var intervals [][]string
 				now := time.Now()
-				start := time.Date(now.Year(), now.Month(), now.Day(), 10, 0, 0, 0, now.Location())
+				start := time.Date(now.Year(), now.Month(), now.Day(), 7, 0, 0, 0, now.Location())
 				end := time.Date(now.Year(), now.Month(), now.Day()+1, 4, 45, 0, 0, now.Location())
 				current := start
 
