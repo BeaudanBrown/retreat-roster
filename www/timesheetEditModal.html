@@ -61,7 +61,7 @@
 				</div>
 				{{ template "timepicker" (MakePickerStruct "shiftStart" "Shift start" $id .ShiftStart false) }}
 				{{ template "timepicker" (MakePickerStruct "shiftEnd" "Shift end" $id .ShiftEnd false) }}
-				<div class="flex items-center justify-center col-span-2">
+				<div class="flex text-white items-center justify-center col-span-2">
 					<input onChange="toggleBreak(this, {{$id}})" id="{{$id}}-hasBreak" name="hasBreak" type="checkbox" {{ if .HasBreak }}checked{{ end }}>
 					<label for="{{$id}}-hasBreak">Had Break</label>
 				</div>
