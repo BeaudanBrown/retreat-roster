@@ -15,6 +15,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const CONFIG_REFRESH_TIME = time.Hour * 6
+
 type StaffMember struct {
 	ID            uuid.UUID
 	IsAdmin       bool
@@ -37,6 +39,7 @@ type StaffMember struct {
 }
 
 type StaffConfig struct {
+	LastVisit          time.Time
 	TimesheetStartDate time.Time
 	RosterStartDate    time.Time
 	HideByIdeal        bool
@@ -186,6 +189,26 @@ func (d *Database) SaveStaffMembers(staffMembers []*StaffMember) error {
 	}
 	log.Printf("Saved %v staff members, Upserted %v staff members", results.ModifiedCount, results.UpsertedCount)
 	return nil
+}
+
+func (d *Database) RefreshStaffConfig(staffMember StaffMember) StaffMember {
+	if time.Now().Sub(staffMember.Config.LastVisit) > CONFIG_REFRESH_TIME {
+		// Reset staff config
+		staffMember.Config.TimesheetStartDate = utils.GetLastTuesday()
+		staffMember.Config.RosterStartDate = utils.GetNextTuesday()
+	}
+	staffMember.Config.LastVisit = time.Now()
+	collection := d.DB.Collection("staff")
+	filter := bson.M{"id": staffMember.ID}
+	update := bson.M{"$set": staffMember}
+	opts := options.Update().SetUpsert(true)
+	_, err := collection.UpdateOne(d.Context, filter, update, opts)
+	if err != nil {
+		log.Println("Failed to save staffMember")
+	} else {
+		log.Println("Staff config refreshed")
+	}
+	return staffMember
 }
 
 func (d *Database) SaveStaffMember(staffMember StaffMember) error {
@@ -364,6 +387,7 @@ func (d *Database) CreateStaffMember(googleId string, token uuid.UUID) error {
 		Tokens:       []uuid.UUID{token},
 		Availability: emptyAvailability,
 		Config: StaffConfig{
+			LastVisit:          time.Now(),
 			TimesheetStartDate: utils.GetLastTuesday(),
 			RosterStartDate:    utils.GetNextTuesday(),
 		},

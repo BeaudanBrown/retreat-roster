@@ -184,7 +184,8 @@ func (s *Server) GetSessionUser(w http.ResponseWriter, r *http.Request) *db.Staf
 		log.Printf("Error retrieving session user")
 		return nil
 	}
-	return staff
+	refreshedStaff := s.RefreshStaffConfig(*staff)
+	return &refreshedStaff
 }
 
 func (s *Server) HandleLanding(w http.ResponseWriter, r *http.Request) {
