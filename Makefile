@@ -15,9 +15,9 @@ build:
 	tailwindcss -i ./www/input.css -o ./www/app.css
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o $(DIST_FOLDER)/$(BINARY_NAME) ./cmd/main.go
 
-docker-build:
+docker-update: build
 	@echo "Building dockerfile..."
-	docker-compose build
+	sudo docker compose up --build -d
 
 docker-run: build
 	@echo "Building dockerfile..."
