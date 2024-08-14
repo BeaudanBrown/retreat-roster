@@ -59,16 +59,16 @@
 						{{ end }}
 					</select>
 				</div>
-				{{ template "timepicker" (MakePickerStruct "shiftStart" "Shift start" $id .ShiftStart false) }}
-				{{ template "timepicker" (MakePickerStruct "shiftEnd" "Shift end" $id .ShiftEnd false) }}
+				{{ template "timepicker" (MakePickerStruct "shiftStart" "Shift start" $id $entry.StartDate .ShiftStart false) }}
+				{{ template "timepicker" (MakePickerStruct "shiftEnd" "Shift end" $id $entry.StartDate .ShiftEnd false) }}
 				<div class="flex text-white items-center justify-center col-span-2">
 					<input onChange="toggleBreak(this, {{$id}})" id="{{$id}}-hasBreak" name="hasBreak" type="checkbox" {{ if .HasBreak }}checked{{ end }}>
 					<label for="{{$id}}-hasBreak">Had Break</label>
 				</div>
 
 				<div id="{{$id}}-breaks" class="grid grid-cols-2 gap-x-6 gap-y-3 col-span-2">
-					{{ template "timepicker" (MakePickerStruct "breakStart" "Break start" $id .BreakStart (not .HasBreak)) }}
-					{{ template "timepicker" (MakePickerStruct "breakEnd" "Break end" $id .BreakEnd (not .HasBreak)) }}
+					{{ template "timepicker" (MakePickerStruct "breakStart" "Break start" $id $entry.StartDate .BreakStart (not .HasBreak)) }}
+					{{ template "timepicker" (MakePickerStruct "breakEnd" "Break end" $id $entry.StartDate .BreakEnd (not .HasBreak)) }}
 				</div>
 				<div class="flex items-center justify-center col-span-2">
 					<button type="button"

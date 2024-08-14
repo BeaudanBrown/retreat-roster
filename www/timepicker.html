@@ -1,6 +1,7 @@
 {{ define "timepicker" }}
 {{ $name := .Name }}
 {{ $id := .ID }}
+{{ $date := .Date }}
 {{ $time := .Time }}
 {{ $timeStr := .Time.Format "3:04 PM" }}
 <div>
@@ -36,7 +37,7 @@
 						Pick your time
 					</label>
 					<ul id="{{$id}}-timetable" class="grid w-full grid-cols-4 gap-2">
-						{{range $strs := GetTimesheetTimes}}
+						{{range $strs := GetTimesheetTimes $date}}
 							<li>
 								<input {{ if eq $timeStr (index $strs 1)}} checked {{end}}
 									name="{{$name}}" type="radio" id="{{$id}}-{{$name}}-{{index $strs 0}}" value="{{index $strs 2}}" class="hidden peer">

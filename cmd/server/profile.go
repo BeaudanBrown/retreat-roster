@@ -46,15 +46,17 @@ type PickerData struct {
 	Name     string
 	Label    string
 	ID       uuid.UUID
+	Date     time.Time
 	Time     time.Time
 	Disabled bool
 }
 
-func MakePickerStruct(name string, label string, id uuid.UUID, time time.Time, disabled bool) PickerData {
+func MakePickerStruct(name string, label string, id uuid.UUID, date time.Time, time time.Time, disabled bool) PickerData {
 	return PickerData{
 		Name:     name,
 		Label:    label,
 		ID:       id,
+		Date:     date,
 		Time:     time,
 		Disabled: disabled,
 	}

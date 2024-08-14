@@ -172,18 +172,6 @@ type ModifyTimesheetEntryBody struct {
 	HasBreak   string        `json:"hasBreak"`
 }
 
-func getAdjustedTime(t db.CustomDate, dayDate time.Time) time.Time {
-	year, month, day := dayDate.Date()
-	if t.Time != nil {
-		hour, min, _ := t.Clock()
-		adjustedTime := time.Date(year, month, day, hour, min, 0, 0, time.Now().Location())
-		return adjustedTime
-	} else {
-		adjustedTime := time.Date(year, month, day, 12, 0, 0, 0, time.Now().Location())
-		return adjustedTime
-	}
-}
-
 func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Request) {
 	var reqBody ModifyTimesheetEntryBody
 	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
@@ -214,12 +202,10 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
 	entry.Approved = reqBody.Approved
 	entry.ShiftType = db.StringToShiftType(reqBody.ShiftType)
 	if reqBody.BreakStart.Time != nil {
-		bs := getAdjustedTime(reqBody.BreakStart, entry.StartDate)
-		entry.BreakStart = bs
+		entry.BreakStart = *reqBody.BreakStart.Time
 	}
 	if reqBody.BreakEnd.Time != nil {
-		be := getAdjustedTime(reqBody.BreakEnd, entry.StartDate)
-		entry.BreakEnd = be
+		entry.BreakEnd = *reqBody.BreakEnd.Time
 	}
 
 	if reqBody.HasBreak == "on" {
@@ -234,8 +220,8 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
 		entry.HasBreak = false
 		entry.BreakLength = 0
 	}
-	entry.ShiftStart = getAdjustedTime(reqBody.ShiftStart, entry.StartDate)
-	entry.ShiftEnd = getAdjustedTime(reqBody.ShiftEnd, entry.StartDate)
+	entry.ShiftStart = *reqBody.ShiftStart.Time
+	entry.ShiftEnd = *reqBody.ShiftEnd.Time
 
 	if entry.ShiftStart.After(entry.ShiftEnd) {
 		entry.ShiftEnd = entry.ShiftEnd.AddDate(0, 0, 1)

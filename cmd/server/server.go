@@ -138,11 +138,10 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 				return db.DayManager
 			},
 			"MakePickerStruct": MakePickerStruct,
-			"GetTimesheetTimes": func() [][]string {
+			"GetTimesheetTimes": func(date time.Time) [][]string {
 				var intervals [][]string
-				now := time.Now()
-				start := time.Date(now.Year(), now.Month(), now.Day(), 7, 0, 0, 0, now.Location())
-				end := time.Date(now.Year(), now.Month(), now.Day()+1, 4, 45, 0, 0, now.Location())
+				start := time.Date(date.Year(), date.Month(), date.Day(), 7, 0, 0, 0, date.Location())
+				end := time.Date(date.Year(), date.Month(), date.Day()+1, 4, 45, 0, 0, date.Location())
 				current := start
 
 				for !current.After(end) {
