@@ -64,6 +64,7 @@ func main() {
 	http.HandleFunc("/toggleHideByPreferences", s.VerifySession(s.HandleToggleHideByPreferences))
 	http.HandleFunc("/toggleHideByLeave", s.VerifySession(s.HandleToggleHideByLeave))
 
+	http.HandleFunc("/toggleKitchen", s.VerifySession(s.HandleToggleKitchen))
 	http.HandleFunc("/toggleAdmin", s.VerifySession(s.HandleToggleAdmin))
 	http.HandleFunc("/toggleHidden", s.VerifySession(s.HandleToggleHidden))
 	http.HandleFunc("/toggleLive", s.VerifySession(s.HandleToggleLive))
@@ -88,6 +89,7 @@ func main() {
 	http.HandleFunc("/toggleShowAll", s.VerifyAdmin(s.HandleToggleShowAll))
 	http.HandleFunc("/importRosterWeek", s.VerifyAdmin(s.HandleImportRosterWeek))
 	http.HandleFunc("/exportWageReport", s.VerifyAdmin(s.HandleExportWageReport))
+	http.HandleFunc("/exportKitchenReport", s.VerifyAdmin(s.HandleExportKitchenReport))
 	http.HandleFunc("/exportEvanReport", s.VerifyAdmin(s.HandleExportEvanReport))
 	http.HandleFunc("/toggleApproved", s.VerifyAdmin(s.HandleToggleApproved))
 

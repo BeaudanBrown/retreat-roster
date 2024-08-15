@@ -342,6 +342,38 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
+// TODO: Make these toggles consolidated
+type ToggleKitchenBody struct {
+	ID string `json:"id"`
+}
+
+func (s *Server) HandleToggleKitchen(w http.ResponseWriter, r *http.Request) {
+	log.Println("Toggle kitchen")
+	var reqBody ToggleKitchenBody
+	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
+		log.Println("Failed to load")
+		return
+	}
+	accID, err := uuid.Parse(reqBody.ID)
+	if err != nil {
+		log.Printf("Invalid accID: %v", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	staffMember := s.GetStaffByID(accID)
+	if staffMember != nil {
+		staffMember.IsKitchen = !staffMember.IsKitchen
+		s.SaveStaffMember(*staffMember)
+	}
+	thisStaff := s.GetSessionUser(w, r)
+	if thisStaff == nil {
+		log.Println("Couldn't find staff")
+		return
+	}
+	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+}
+
 type ToggleAdminBody struct {
 	ID string `json:"id"`
 }
@@ -687,6 +719,10 @@ func GetWorkFromEntry(windowStart time.Time, windowEnd time.Time, entry db.Times
 	return overlappedShiftDuration
 }
 
+type KitchenShiftHours struct {
+	Chef float64
+}
+
 type ShiftHours struct {
 	Manager    float64
 	Staff      float64
@@ -722,6 +758,7 @@ type StaffPayData struct {
 	Level4Hrs [7]DayBreakdown
 	Level5Hrs [7]DayBreakdown
 	General   [7]DayBreakdown
+	Kitchen   [7]DayBreakdown
 }
 
 type DayBreakdown struct {
@@ -760,49 +797,29 @@ func AddEntryToPaydata(entry db.TimesheetEntry, thisDate time.Time, day DayIdx, 
 		payData.Level4Hrs[day] = ApplyEntryToLevel(payData.Level4Hrs[day], thisDate, entry)
 	} else if entry.ShiftType == db.GeneralManagement {
 		payData.General[day] = ApplyEntryToLevel(payData.General[day], thisDate, entry)
+	} else if entry.ShiftType == db.Kitchen {
+		payData.Kitchen[day] = ApplyEntryToLevel(payData.Kitchen[day], thisDate, entry)
 	}
 	return payData
 }
 
-func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) {
+func (s *Server) getSessionUserAndEntries(w http.ResponseWriter, r *http.Request) (*db.StaffMember, *[]*db.TimesheetEntry, bool) {
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {
 		log.Println("Couldn't find session user")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
+		return nil, nil, false
 	}
 	entries := s.GetTimesheetWeek(thisStaff.Config.TimesheetStartDate)
 	if entries == nil {
 		log.Println("No timesheet entries to export")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
+		return nil, nil, false
 	}
+	return thisStaff, entries, true
+}
 
-	staffData := map[uuid.UUID]StaffPayData{}
-	allStaff := s.LoadAllStaff()
-
-	for day := Tuesday; day <= 6; day++ {
-		thisDate := thisStaff.Config.TimesheetStartDate.AddDate(0, 0, int(day))
-		for _, entry := range *entries {
-			staffMember := db.GetStaffFromList(entry.StaffID, allStaff)
-			if staffMember == nil {
-				log.Printf("Missing staffmember")
-				continue
-			}
-			if !entry.Approved || staffMember.IsTrial {
-				continue
-			}
-			payData, exists := staffData[entry.StaffID]
-			if !exists {
-				payData = StaffPayData{}
-				staffData[entry.StaffID] = payData
-			}
-			staffData[entry.StaffID] = AddEntryToPaydata(*entry, thisDate, day, payData)
-		}
-	}
-	var fileBuffer bytes.Buffer
-	writer := csv.NewWriter(&fileBuffer)
-
+func writeRecordsToCSV(staffData map[uuid.UUID]StaffPayData, allStaff []*db.StaffMember, writer *csv.Writer, reportType string) {
 	header := []string{
 		"Employee",
 		"Tues Ord", "Tues 7-12", "Tues 12+",
@@ -814,7 +831,7 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 		"Mon Ord", "Mon 7-12", "Mon 12+",
 	}
 	if err := writer.Write(header); err != nil {
-		log.Printf("Error writing evan report header: %v", err)
+		log.Printf("Error writing kitchen report header: %v", err)
 	}
 	reportRows := [][]string{}
 	for staffID, payData := range staffData {
@@ -824,20 +841,27 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 			continue
 		}
 		fullName := strings.TrimSpace(staffMember.LastName) + ", " + strings.TrimSpace(staffMember.FirstName)
-		if hasHours(payData.Level2Hrs) {
-			reportRows = append(reportRows, BuildReportRecord(payData.Level2Hrs, fullName))
-		}
-		if hasHours(payData.Level3Hrs) {
-			reportRows = append(reportRows, BuildReportRecord(payData.Level3Hrs, fullName+" LVL 3"))
-		}
-		if hasHours(payData.Level4Hrs) {
-			reportRows = append(reportRows, BuildReportRecord(payData.Level4Hrs, fullName+" LVL 4"))
-		}
-		if hasHours(payData.Level5Hrs) {
-			reportRows = append(reportRows, BuildReportRecord(payData.Level5Hrs, fullName+" LVL 5"))
-		}
-		if hasHours(payData.General) {
-			reportRows = append(reportRows, BuildReportRecord(payData.General, fullName+" Salary"))
+
+		if reportType == "kitchen" {
+			if hasHours(payData.Kitchen) {
+				reportRows = append(reportRows, BuildReportRecord(payData.Kitchen, fullName+" Kitchen"))
+			}
+		} else if reportType == "evan" {
+			if hasHours(payData.Level2Hrs) {
+				reportRows = append(reportRows, BuildReportRecord(payData.Level2Hrs, fullName))
+			}
+			if hasHours(payData.Level3Hrs) {
+				reportRows = append(reportRows, BuildReportRecord(payData.Level3Hrs, fullName+" LVL 3"))
+			}
+			if hasHours(payData.Level4Hrs) {
+				reportRows = append(reportRows, BuildReportRecord(payData.Level4Hrs, fullName+" LVL 4"))
+			}
+			if hasHours(payData.Level5Hrs) {
+				reportRows = append(reportRows, BuildReportRecord(payData.Level5Hrs, fullName+" LVL 5"))
+			}
+			if hasHours(payData.General) {
+				reportRows = append(reportRows, BuildReportRecord(payData.General, fullName+" Salary"))
+			}
 		}
 	}
 	sort.Slice(reportRows, func(i, j int) bool {
@@ -848,8 +872,78 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 			log.Printf("Error writing record: %v", err)
 		}
 	}
-
 	writer.Flush()
+}
+
+func processEntries(thisStaff db.StaffMember, entries []*db.TimesheetEntry, allStaff []*db.StaffMember) map[uuid.UUID]StaffPayData {
+	staffData := map[uuid.UUID]StaffPayData{}
+	for day := Tuesday; day <= 6; day++ {
+		thisDate := thisStaff.Config.TimesheetStartDate.AddDate(0, 0, int(day))
+		for _, entry := range entries {
+			if !entry.Approved {
+				continue
+			}
+			staffMember := db.GetStaffFromList(entry.StaffID, allStaff)
+			if staffMember == nil || staffMember.IsTrial {
+				log.Printf("Missing staffmember")
+				continue
+			}
+
+			payData, exists := staffData[entry.StaffID]
+			if !exists {
+				payData = StaffPayData{}
+				staffData[entry.StaffID] = payData
+			}
+			staffData[entry.StaffID] = AddEntryToPaydata(*entry, thisDate, day, payData)
+		}
+	}
+	return staffData
+}
+
+func (s *Server) HandleExportKitchenReport(w http.ResponseWriter, r *http.Request) {
+	thisStaff, entries, ok := s.getSessionUserAndEntries(w, r)
+	if !ok {
+		return
+	}
+
+	allStaff := s.LoadAllStaff()
+	staffData := processEntries(*thisStaff, *entries, allStaff)
+
+	var fileBuffer bytes.Buffer
+	writer := csv.NewWriter(&fileBuffer)
+
+	writeRecordsToCSV(staffData, allStaff, writer, "kitchen")
+	if err := writer.Error(); err != nil {
+		log.Printf("Error creating kitchen report: %v", err)
+	}
+
+	// Set the appropriate headers
+	w.Header().Set("Content-Type", "text/csv")
+	formattedDate := thisStaff.Config.TimesheetStartDate.Format("2006-01-02")
+	reportFilename := "kitchen_staff_hrs_starting-" + formattedDate + ".csv"
+	w.Header().Set("Content-Disposition", "attachment;filename="+reportFilename)
+	w.Header().Set("Content-Length", strconv.Itoa(len(fileBuffer.Bytes())))
+
+	// Write the zip file to the response
+	if _, err := w.Write(fileBuffer.Bytes()); err != nil {
+		http.Error(w, "Failed to write file to response", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) {
+	thisStaff, entries, ok := s.getSessionUserAndEntries(w, r)
+	if !ok {
+		return
+	}
+
+	allStaff := s.LoadAllStaff()
+	staffData := processEntries(*thisStaff, *entries, allStaff)
+
+	var fileBuffer bytes.Buffer
+	writer := csv.NewWriter(&fileBuffer)
+
+	writeRecordsToCSV(staffData, allStaff, writer, "evan")
 	if err := writer.Error(); err != nil {
 		log.Printf("Error creating evan report: %v", err)
 	}
@@ -857,7 +951,7 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 	// Set the appropriate headers
 	w.Header().Set("Content-Type", "text/csv")
 	formattedDate := thisStaff.Config.TimesheetStartDate.Format("2006-01-02")
-	reportFilename := "staff_hours_starting-" + formattedDate + ".csv"
+	reportFilename := "staff_hrs_starting-" + formattedDate + ".csv"
 	w.Header().Set("Content-Disposition", "attachment;filename="+reportFilename)
 	w.Header().Set("Content-Length", strconv.Itoa(len(fileBuffer.Bytes())))
 

@@ -134,6 +134,9 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 			"roundFloat": func(val float64) float64 {
 				return math.Round(val*100) / 100
 			},
+			"IsKichenShift": func(shiftType db.ShiftType) bool {
+				return shiftType == db.Kitchen
+			},
 			"AdminShiftTypeStart": func() db.ShiftType {
 				return db.DayManager
 			},

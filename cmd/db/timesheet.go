@@ -78,6 +78,7 @@ const (
 	AmeliaSupervisor
 	NightManager
 	GeneralManagement
+	Kitchen
 	Admin
 )
 
@@ -102,6 +103,7 @@ func (s ShiftType) String() string {
 		"Amelia Supervisor",
 		"Night Manager",
 		"General Management",
+		"Kitchen",
 		"Admin"}[s]
 }
 

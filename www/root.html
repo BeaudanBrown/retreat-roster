@@ -228,6 +228,7 @@
 								<th>Hidden</th>
 								<th>Admin</th>
 								<th>Edit</th>
+								<th>Kitchen</th>
 								<th>Delete</th>
 							</tr>
 						</thead>
@@ -266,6 +267,15 @@
 								</td>
 								<td>
 									<a href="/profile?editStaffId={{ .ID }}">✏️</a>
+								</td>
+								<td>
+									<input type="checkbox" {{ if .IsKitchen }}checked{{ end }}
+										hx-ext="json-enc"
+										hx-post="/toggleKitchen"
+										hx-target="#roster"
+										hx-trigger="change"
+										hx-vals='{"id": "{{ .ID }}"}'
+										hx-swap='outerHTML'>
 								</td>
 								<td>
 									<button type="button"

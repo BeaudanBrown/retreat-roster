@@ -22,6 +22,7 @@ type StaffMember struct {
 	IsAdmin       bool
 	IsTrial       bool
 	IsHidden      bool
+	IsKitchen     bool
 	GoogleID      string
 	NickName      string
 	FirstName     string

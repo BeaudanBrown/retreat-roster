@@ -154,7 +154,7 @@ func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	newEntry := MakeEmptyTimesheetEntry(*reqBody.StartDate.Time, staffID)
-	data := MakeTimesheetEditModalStruct(newEntry, thisStaff.ID, s.LoadAllStaff(), thisStaff.IsAdmin)
+	data := MakeTimesheetEditModalStruct(newEntry, thisStaff.ID, s.LoadAllStaff(), thisStaff.IsAdmin, thisStaff.IsKitchen)
 	s.renderTemplate(w, "timesheetEditModal", data)
 }
 
@@ -305,6 +305,7 @@ type TimesheetEditModalData struct {
 	ThisStaffID uuid.UUID
 	AllStaff    []*db.StaffMember
 	IsAdmin     bool
+	IsKitchen   bool
 }
 
 func MakeEmptyTimesheetEntry(startDate time.Time, staffID uuid.UUID) db.TimesheetEntry {
@@ -323,12 +324,13 @@ func MakeEmptyTimesheetEntry(startDate time.Time, staffID uuid.UUID) db.Timeshee
 	return newEntry
 }
 
-func MakeTimesheetEditModalStruct(entry db.TimesheetEntry, thisStaffID uuid.UUID, allStaff []*db.StaffMember, isAdmin bool) TimesheetEditModalData {
+func MakeTimesheetEditModalStruct(entry db.TimesheetEntry, thisStaffID uuid.UUID, allStaff []*db.StaffMember, isAdmin bool, isKitchen bool) TimesheetEditModalData {
 	return TimesheetEditModalData{
 		TimesheetEntry: entry,
 		ThisStaffID:    thisStaffID,
 		AllStaff:       allStaff,
 		IsAdmin:        isAdmin,
+		IsKitchen:      isKitchen,
 	}
 }
 
@@ -357,6 +359,6 @@ func (s *Server) HandleGetTimesheetEditModal(w http.ResponseWriter, r *http.Requ
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	data := MakeTimesheetEditModalStruct(*entry, thisStaff.ID, s.LoadAllStaff(), thisStaff.IsAdmin)
+	data := MakeTimesheetEditModalStruct(*entry, thisStaff.ID, s.LoadAllStaff(), thisStaff.IsAdmin, thisStaff.IsKitchen)
 	s.renderTemplate(w, "timesheetEditModal", data)
 }

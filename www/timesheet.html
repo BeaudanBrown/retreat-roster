@@ -36,6 +36,9 @@
 		{{ template "header" (MakeHeaderStruct $staffMember.IsAdmin .RosterLive) }}
 		{{ if $staffMember.IsAdmin }}
 		<div class="flex items-center justify-center space-x-2">
+			<form action="/exportKitchenReport" method="get">
+					<button class="buttonStyle" type="submit">Kitchen report</button>
+			</form>
 			<form action="/exportWageReport" method="get">
 					<button class="buttonStyle" type="submit">Wage report</button>
 			</form>
