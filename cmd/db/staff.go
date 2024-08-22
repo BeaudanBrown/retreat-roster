@@ -15,7 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const CONFIG_REFRESH_TIME = time.Hour * 6
+const CONFIG_REFRESH_TIME = time.Hour * 1
 
 type StaffMember struct {
 	ID            uuid.UUID

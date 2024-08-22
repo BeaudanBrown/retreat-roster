@@ -289,16 +289,24 @@ func NextWholeHour() time.Time {
 	return t.Truncate(time.Hour).Add(time.Hour)
 }
 
-func DisableTimesheet(startDate time.Time, isAdmin bool) bool {
+func DisableTimesheet(timesheetDate time.Time, isAdmin bool) bool {
 	lastTuesday := utils.GetLastTuesday().Add(-time.Minute) // Inclusive
-	nextTuesday := utils.GetNextTuesday()
 	now := time.Now()
 	if now.Sub(lastTuesday).Hours() < 12 {
 		// 12 hour overlap between weeks
 		lastTuesday = lastTuesday.AddDate(0, 0, -7)
-		nextTuesday = nextTuesday.AddDate(0, 0, -7)
 	}
-	if startDate.After(lastTuesday) && startDate.Before(nextTuesday) {
+	tomorrow := time.Date(
+		now.Year(),
+		now.Month(),
+		now.Day()+1,
+		0, 0, 0, 0,
+		now.Location())
+	if now.Hour() < 8 {
+		// early morning shift date is the day before
+		tomorrow = tomorrow.AddDate(0, 0, -1)
+	}
+	if timesheetDate.After(lastTuesday) && timesheetDate.Before(tomorrow) {
 		return false
 	}
 	return !isAdmin
