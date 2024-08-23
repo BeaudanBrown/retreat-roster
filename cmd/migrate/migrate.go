@@ -1,15 +1,11 @@
 package migrate
 
 import (
-	"encoding/json"
 	"log"
-	"os"
 	"roster/cmd/db"
 	"roster/cmd/server"
-	"roster/cmd/utils"
 	"time"
 
-	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -85,6 +81,51 @@ func SaveVersion(s *server.Server, v Version) error {
 	return nil
 }
 
+func MigrateV5(s *server.Server) error {
+	version := LoadVersion(s)
+	log.Printf("Version: %v", version.Version)
+	if version == nil || (version.Version != 4) {
+		log.Println("No v5 migration required")
+		return nil
+	}
+	allWeeks := s.LoadAllRosterWeeks()
+	for _, week := range allWeeks {
+		// Migrate to using timezone
+		week.StartDate = week.StartDate.Add(time.Hour * -10)
+	}
+	s.SaveAllRosterWeeks(allWeeks)
+	version.Version = 5
+	SaveVersion(s, *version)
+	log.Println("V5 migration complete")
+	return nil
+}
+
+func MigrateV4(s *server.Server) error {
+	version := LoadVersion(s)
+	log.Printf("Version: %v", version.Version)
+	if version == nil || (version.Version != 3) {
+		log.Println("No v4 migration required")
+		return nil
+	}
+	allEntries := s.GetAllTimesheetEntries()
+	if allEntries == nil {
+		log.Println("No entries to migrate")
+		return nil
+	}
+	for _, entry := range *allEntries {
+		// Migrate to using timezone
+		entry.ShiftStart = entry.ShiftStart.Add(time.Hour * -10)
+		entry.ShiftEnd = entry.ShiftEnd.Add(time.Hour * -10)
+		entry.BreakStart = entry.BreakStart.Add(time.Hour * -10)
+		entry.BreakEnd = entry.BreakEnd.Add(time.Hour * -10)
+	}
+	s.SaveAllTimesheetEntries(*allEntries)
+	version.Version = 4
+	SaveVersion(s, *version)
+	log.Println("V4 migration complete")
+	return nil
+}
+
 func MigrateV3(s *server.Server) error {
 	version := LoadVersion(s)
 	log.Printf("Version: %v", version.Version)
@@ -134,58 +175,4 @@ func MigrateV2(s *server.Server) error {
 	SaveVersion(s, *version)
 	log.Println("V2 migration complete")
 	return nil
-}
-
-func MigrateToMongo(s *server.Server) error {
-	var state OldData
-	if _, err := os.Stat(STATE_FILE); err != nil {
-		log.Println("No state to migrate")
-		return err
-	}
-	data, err := os.ReadFile(STATE_FILE)
-	if err != nil {
-		log.Printf("Couldn't read state file: %v", err)
-		return err
-	}
-	if err = json.Unmarshal(data, &state); err != nil {
-		log.Printf("Couldn't unmarshal state file: %v", err)
-		return err
-	}
-	for _, staffMember := range *state.Staff {
-		staffMember.Config = db.StaffConfig{
-			TimesheetStartDate: utils.GetLastTuesday(),
-			RosterStartDate:    utils.GetNextTuesday(),
-		}
-		err = s.SaveStaffMember(*staffMember)
-		if err != nil {
-			log.Printf("Error while migrating staff: %v", err)
-			return err
-		}
-	}
-	year, month, day := state.StartDate.Date()
-	startDate := time.Date(year, month, day, 0, 0, 0, 0, time.Now().Location())
-	rosterWeek := db.RosterWeek{
-		ID:        uuid.New(),
-		StartDate: startDate,
-		Days:      state.Days,
-		IsLive:    state.IsLive,
-	}
-	err = s.SaveRosterWeek(rosterWeek)
-	if err != nil {
-		log.Printf("Error while migrating roster week: %v", err)
-		return err
-	}
-	MoveOldState()
-	return nil
-}
-
-func MoveOldState() {
-	if _, err := os.Stat(STATE_FILE); err == nil {
-		filename := "./data/state-" + time.Now().Format("01-02--15-04") + ".json"
-		err := os.Rename(STATE_FILE, filename)
-		if err != nil {
-			log.Fatalf("Failed to move old staffState: %v", err)
-		}
-		log.Println("Successfully migrated staff state")
-	}
 }

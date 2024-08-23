@@ -116,6 +116,46 @@ func (d *Database) SaveRosterWeek(w RosterWeek) error {
 	return nil
 }
 
+func (d *Database) SaveAllRosterWeeks(weeks []*RosterWeek) error {
+	collection := d.DB.Collection("rosters")
+	bulkWriteModels := make([]mongo.WriteModel, len(weeks))
+	for i, week := range weeks {
+		filter := bson.M{"id": week.ID}
+		update := bson.M{"$set": *week}
+		bulkWriteModels[i] = mongo.NewUpdateOneModel().SetFilter(filter).SetUpdate(update).SetUpsert(true)
+	}
+
+	opts := options.BulkWrite().SetOrdered(false)
+	results, err := collection.BulkWrite(d.Context, bulkWriteModels, opts)
+	if err != nil {
+		log.Printf("Failed to save roster weeks: %v\n", err)
+		return err
+	}
+	log.Printf("Saved %v roster weeks, Upserted %v roster weeks", results.ModifiedCount, results.UpsertedCount)
+	return nil
+}
+
+func (d *Database) LoadAllRosterWeeks() []*RosterWeek {
+	collection := d.DB.Collection("rosters")
+	cursor, err := collection.Find(d.Context, bson.M{})
+	if err != nil {
+		log.Printf("Error executing query: %v", err)
+		return []*RosterWeek{}
+	}
+	defer cursor.Close(d.Context)
+
+	allWeeks := []*RosterWeek{}
+	for cursor.Next(d.Context) {
+		var week RosterWeek
+		if err := cursor.Decode(&week); err != nil {
+			log.Printf("Error loading all roster weeks: %v", err)
+			continue
+		}
+		allWeeks = append(allWeeks, &week)
+	}
+	return allWeeks
+}
+
 func (d *Database) LoadRosterWeek(startDate time.Time) *RosterWeek {
 	var rosterWeek RosterWeek
 	log.Printf("Loading week starting: %v", startDate)
