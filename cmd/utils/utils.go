@@ -12,7 +12,7 @@ func GetLastTuesday() time.Time {
 		lastTuesday.Month(),
 		lastTuesday.Day(),
 		0, 0, 0, 0,
-		lastTuesday.Location())
+		time.Local)
 }
 
 func GetNextTuesday() time.Time {
@@ -27,5 +27,5 @@ func GetNextTuesday() time.Time {
 		nextTuesday.Month(),
 		nextTuesday.Day(),
 		0, 0, 0, 0,
-		nextTuesday.Location())
+		time.Local)
 }

@@ -143,8 +143,8 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 			"MakePickerStruct": MakePickerStruct,
 			"GetTimesheetTimes": func(date time.Time) [][]string {
 				var intervals [][]string
-				start := time.Date(date.Year(), date.Month(), date.Day(), 7, 0, 0, 0, date.Location())
-				end := time.Date(date.Year(), date.Month(), date.Day()+1, 4, 45, 0, 0, date.Location())
+				start := time.Date(date.Year(), date.Month(), date.Day(), 7, 0, 0, 0, time.Local)
+				end := time.Date(date.Year(), date.Month(), date.Day()+1, 4, 45, 0, 0, time.Local)
 				current := start
 
 				for !current.After(end) {
@@ -154,7 +154,7 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 
 					display := fmt.Sprintf("%s-%02s-%s", hour, minute, period)
 					readable := current.Format("3:04 PM")
-					full := current.Format("2006-01-02T15:04:05Z")
+					full := current.Format("2006-01-02T15:04:05-07:00")
 
 					intervals = append(intervals, []string{display, readable, full})
 					current = current.Add(15 * time.Minute)

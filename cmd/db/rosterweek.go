@@ -81,7 +81,8 @@ func (rw RosterWeek) MarshalBSON() ([]byte, error) {
 		Alias: (*Alias)(&rw),
 	}
 	year, month, day := aux.StartDate.Date()
-	aux.StartDate = time.Date(year, month, day, 0, 0, 0, 0, aux.StartDate.Location())
+	startDateLocal := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
+	aux.StartDate = startDateLocal.UTC()
 	return bson.Marshal(aux)
 }
 
@@ -95,7 +96,7 @@ func (rw *RosterWeek) UnmarshalBSON(data []byte) error {
 	if err := bson.Unmarshal(data, aux); err != nil {
 		return err
 	}
-	aux.StartDate = aux.StartDate.In(time.Now().Location())
+	aux.StartDate = aux.StartDate.In(time.Local)
 	return nil
 }
 
@@ -118,7 +119,7 @@ func (d *Database) SaveRosterWeek(w RosterWeek) error {
 func (d *Database) LoadRosterWeek(startDate time.Time) *RosterWeek {
 	var rosterWeek RosterWeek
 	log.Printf("Loading week starting: %v", startDate)
-	filter := bson.M{"startDate": startDate}
+	filter := bson.M{"startDate": startDate.UTC()}
 	collection := d.DB.Collection("rosters")
 	err := collection.FindOne(d.Context, filter).Decode(&rosterWeek)
 	if err == nil {

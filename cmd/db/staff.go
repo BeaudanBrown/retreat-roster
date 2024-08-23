@@ -148,10 +148,14 @@ func (s StaffMember) MarshalBSON() ([]byte, error) {
 	}{
 		Alias: (*Alias)(&s),
 	}
+	// Marshall as UTC
 	year, month, day := aux.Config.RosterStartDate.Date()
-	aux.Config.RosterStartDate = time.Date(year, month, day, 0, 0, 0, 0, aux.Config.RosterStartDate.Location())
+	rosterStartDateLocal := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
+	aux.Config.RosterStartDate = rosterStartDateLocal.UTC()
+
 	year, month, day = aux.Config.TimesheetStartDate.Date()
-	aux.Config.TimesheetStartDate = time.Date(year, month, day, 0, 0, 0, 0, aux.Config.TimesheetStartDate.Location())
+	timesheetStartDateLocal := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
+	aux.Config.TimesheetStartDate = timesheetStartDateLocal.UTC()
 	return bson.Marshal(aux)
 }
 
@@ -167,8 +171,9 @@ func (s *StaffMember) UnmarshalBSON(data []byte) error {
 		return err
 	}
 
-	s.Config.RosterStartDate = s.Config.RosterStartDate.In(time.Now().Location())
-	s.Config.TimesheetStartDate = s.Config.TimesheetStartDate.In(time.Now().Location())
+	// Unmarshal in this locale
+	s.Config.RosterStartDate = s.Config.RosterStartDate.In(time.Local)
+	s.Config.TimesheetStartDate = s.Config.TimesheetStartDate.In(time.Local)
 
 	return nil
 }

@@ -37,7 +37,15 @@ func (s TimesheetEntry) MarshalBSON() ([]byte, error) {
 		Alias: (*Alias)(&s),
 	}
 	year, month, day := aux.StartDate.Date()
-	aux.StartDate = time.Date(year, month, day, 0, 0, 0, 0, aux.StartDate.Location())
+	// Marshall as UTC
+	startDateLocal := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
+	aux.StartDate = startDateLocal.UTC()
+
+	aux.ShiftStart = s.ShiftStart.UTC()
+	aux.ShiftEnd = s.ShiftEnd.UTC()
+	aux.BreakStart = s.BreakStart.UTC()
+	aux.BreakEnd = s.BreakEnd.UTC()
+
 	return bson.Marshal(aux)
 }
 
@@ -53,11 +61,11 @@ func (s *TimesheetEntry) UnmarshalBSON(data []byte) error {
 		return err
 	}
 
-	s.StartDate = s.StartDate.In(time.Now().Location())
-	s.ShiftStart = s.ShiftStart.In(time.Now().Location())
-	s.ShiftEnd = s.ShiftEnd.In(time.Now().Location())
-	s.BreakStart = s.BreakStart.In(time.Now().Location())
-	s.BreakEnd = s.BreakEnd.In(time.Now().Location())
+	s.StartDate = s.StartDate.In(time.Local)
+	s.ShiftStart = s.ShiftStart.In(time.Local)
+	s.ShiftEnd = s.ShiftEnd.In(time.Local)
+	s.BreakStart = s.BreakStart.In(time.Local)
+	s.BreakEnd = s.BreakEnd.In(time.Local)
 	return nil
 }
 
@@ -216,12 +224,12 @@ func (d *Database) SaveAllTimesheetEntries(entries []*TimesheetEntry) error {
 func (d *Database) GetStaffTimesheetWeek(staffID uuid.UUID, startDate time.Time) *[]*TimesheetEntry {
 	collection := d.DB.Collection("timesheets")
 	year, month, day := startDate.Date()
-	weekStart := time.Date(year, month, day, 0, 0, 0, 0, time.Now().Location())
+	weekStart := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
 	weekEnd := weekStart.AddDate(0, 0, 7)
 	filter := bson.M{
 		"startDate": bson.M{
-			"$gte": weekStart,
-			"$lt":  weekEnd,
+			"$gte": weekStart.UTC(),
+			"$lt":  weekEnd.UTC(),
 		},
 		// TODO: Fucked up the bson name
 		"days": staffID,
@@ -244,12 +252,12 @@ func (d *Database) GetStaffTimesheetWeek(staffID uuid.UUID, startDate time.Time)
 func (d *Database) GetTimesheetWeek(startDate time.Time) *[]*TimesheetEntry {
 	collection := d.DB.Collection("timesheets")
 	year, month, day := startDate.Date()
-	weekStart := time.Date(year, month, day, 0, 0, 0, 0, time.Now().Location())
+	weekStart := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
 	weekEnd := weekStart.AddDate(0, 0, 7)
 	filter := bson.M{
 		"startDate": bson.M{
-			"$gte": weekStart,
-			"$lt":  weekEnd,
+			"$gte": weekStart.UTC(),
+			"$lt":  weekEnd.UTC(),
 		},
 	}
 
@@ -301,7 +309,7 @@ func DisableTimesheet(timesheetDate time.Time, isAdmin bool) bool {
 		now.Month(),
 		now.Day()+1,
 		0, 0, 0, 0,
-		now.Location())
+		time.Local)
 	if now.Hour() < 8 {
 		// early morning shift date is the day before
 		tomorrow = tomorrow.AddDate(0, 0, -1)
@@ -310,25 +318,4 @@ func DisableTimesheet(timesheetDate time.Time, isAdmin bool) bool {
 		return false
 	}
 	return !isAdmin
-}
-
-func (d *Database) CreateTimesheetEntry(startDate time.Time, staffID uuid.UUID) (*TimesheetEntry, error) {
-	year, month, day := startDate.Date()
-	dateOnly := time.Date(year, month, day, 0, 0, 0, 0, time.Now().Location())
-	start := LastWholeHour()
-	end := NextWholeHour()
-	newEntry := TimesheetEntry{
-		ID:          uuid.New(),
-		StaffID:     staffID,
-		StartDate:   dateOnly,
-		ShiftStart:  start,
-		ShiftEnd:    end,
-		ShiftLength: end.Sub(start).Hours(),
-	}
-	collection := d.DB.Collection("timesheets")
-	_, err := collection.InsertOne(d.Context, newEntry)
-	if err != nil {
-		return nil, err
-	}
-	return &newEntry, nil
 }

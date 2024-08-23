@@ -1,9 +1,12 @@
 .devenv/
 .direnv/
 .git/
-cmd
-data
-serverdata
+tmp/
+patches/
+cmd/
+data/
+serverdata/
+
 docker-compose.yml
 flake.lock
 flake.nix

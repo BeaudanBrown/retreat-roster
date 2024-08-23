@@ -310,7 +310,7 @@ type TimesheetEditModalData struct {
 
 func MakeEmptyTimesheetEntry(startDate time.Time, staffID uuid.UUID) db.TimesheetEntry {
 	year, month, day := startDate.Date()
-	dateOnly := time.Date(year, month, day, 0, 0, 0, 0, time.Now().Location())
+	dateOnly := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
 	start := db.LastWholeHour()
 	end := db.NextWholeHour()
 	newEntry := db.TimesheetEntry{
