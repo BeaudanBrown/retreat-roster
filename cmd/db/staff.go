@@ -156,6 +156,32 @@ func (s StaffMember) MarshalBSON() ([]byte, error) {
 	year, month, day = aux.Config.TimesheetStartDate.Date()
 	timesheetStartDateLocal := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
 	aux.Config.TimesheetStartDate = timesheetStartDateLocal.UTC()
+
+	utcRequests := []LeaveRequest{}
+	for _, leaveReq := range s.LeaveRequests {
+		year, month, day = leaveReq.StartDate.Date()
+		leaveStartDateLocal := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
+		utcStart := leaveStartDateLocal.UTC()
+
+		year, month, day = leaveReq.EndDate.Date()
+		leaveEndDateLocal := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
+		utcEnd := leaveEndDateLocal.UTC()
+
+		year, month, day = leaveReq.CreationDate.Date()
+		leaveCreationDateLocal := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
+		utcCreation := leaveCreationDateLocal.UTC()
+
+		utcReq := LeaveRequest{
+			ID:           leaveReq.ID,
+			StartDate:    CustomDate{&utcStart},
+			EndDate:      CustomDate{&utcEnd},
+			Reason:       leaveReq.Reason,
+			CreationDate: CustomDate{&utcCreation},
+		}
+		utcRequests = append(utcRequests, utcReq)
+	}
+	aux.LeaveRequests = utcRequests
+
 	return bson.Marshal(aux)
 }
 
@@ -172,6 +198,21 @@ func (s *StaffMember) UnmarshalBSON(data []byte) error {
 	}
 
 	// Unmarshal in this locale
+	localRequests := []LeaveRequest{}
+	for _, leaveReq := range s.LeaveRequests {
+		localStart := leaveReq.StartDate.In(time.Local)
+		localEnd := leaveReq.EndDate.In(time.Local)
+		localCreation := leaveReq.CreationDate.In(time.Local)
+		localReq := LeaveRequest{
+			ID:           leaveReq.ID,
+			StartDate:    CustomDate{&localStart},
+			EndDate:      CustomDate{&localEnd},
+			Reason:       leaveReq.Reason,
+			CreationDate: CustomDate{&localCreation},
+		}
+		localRequests = append(localRequests, localReq)
+	}
+	s.LeaveRequests = localRequests
 	s.Config.RosterStartDate = s.Config.RosterStartDate.In(time.Local)
 	s.Config.TimesheetStartDate = s.Config.TimesheetStartDate.In(time.Local)
 
