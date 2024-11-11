@@ -164,23 +164,10 @@ func (d *Database) SortTimesheetEntries(entries []*TimesheetEntry) []*TimesheetE
 	sort.Slice(copiedEntries, func(i, j int) bool {
 		entry1 := copiedEntries[i]
 		entry2 := copiedEntries[j]
-		if entry1.ShiftType == entry2.ShiftType {
-			staff1 := d.GetStaffByID(entry1.StaffID)
-			staff2 := d.GetStaffByID(entry2.StaffID)
-			if staff1 == nil || staff2 == nil {
-				return false
-			}
-			name1 := staff1.FirstName
-			if staff1.NickName != "" {
-				name1 = staff1.NickName
-			}
-			name2 := staff2.FirstName
-			if staff2.NickName != "" {
-				name2 = staff2.NickName
-			}
-			return name1 < name2
+		if entry1.ShiftStart.Equal(entry2.ShiftStart) {
+			return entry1.ShiftEnd.Before(entry2.ShiftEnd)
 		}
-		return entry1.ShiftType > entry2.ShiftType
+		return entry1.ShiftStart.Before(entry2.ShiftStart)
 	})
 	return copiedEntries
 }
