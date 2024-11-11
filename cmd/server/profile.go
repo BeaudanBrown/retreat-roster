@@ -62,6 +62,20 @@ func MakePickerStruct(name string, label string, id uuid.UUID, date time.Time, t
 	}
 }
 
+type LeaveReqListData struct {
+	StaffMember      db.StaffMember
+	ShowLeaveSuccess bool
+	ShowLeaveError   bool
+}
+
+func MakeLeaveReqStruct(staffMember db.StaffMember, showLeaveSuccess bool, showLeaveError bool) LeaveReqListData {
+	return LeaveReqListData{
+		StaffMember:      staffMember,
+		ShowLeaveSuccess: showLeaveSuccess,
+		ShowLeaveError:   showLeaveError,
+	}
+}
+
 func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
 	editStaff := s.GetSessionUser(w, r)
 	if editStaff == nil {
@@ -132,20 +146,18 @@ func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
 	if staff == nil {
 		return
 	}
-	data := ProfileData{
-		AdminRights: staff.IsAdmin,
-		RosterLive:  s.LoadRosterWeek(staff.Config.RosterStartDate).IsLive,
-	}
-	if reqBody.StartDate.After(*reqBody.EndDate.Time) {
-		data.ShowLeaveError = true
+	showLeaveError := false
+	showLeaveSuccess := false
+	if !reqBody.EndDate.After(*reqBody.StartDate.Time) {
+		showLeaveError = true
 	} else {
-		data.ShowLeaveSuccess = true
+		showLeaveSuccess = true
 		staff.LeaveRequests = append(staff.LeaveRequests, reqBody)
 		s.SaveStaffMember(*staff)
 	}
+	data := MakeLeaveReqStruct(*staff, showLeaveSuccess, showLeaveError)
 	data.StaffMember = *staff
-	// TODO: Maybe won't need to reload the datepicker if I just swap the leave list
-	// s.renderTemplate(w, "profile", data)
+	s.renderTemplate(w, "leaveReqForm", data)
 }
 
 type ModifyProfileBody struct {

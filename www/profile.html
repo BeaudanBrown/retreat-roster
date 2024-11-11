@@ -1,14 +1,6 @@
 {{ define "profile" }}
 {{ $staffID := .ID }}
 <div id="profileBody" class="px-3 w-full max-w-screen-md grid box-border">
-	<script>
-		document.addEventListener("DOMContentLoaded", function() {
-			document.getElementById('leaveForm').addEventListener('htmx:afterRequest', function(event) {
-				window.location.reload();
-			});
-		});
-	</script>
-
 	<h1 class="text-white">Update Your Profile</h1>
 	<form class="flex flex-col items-center justify-center"
 				hx-ext='json-enc' hx-post="/modifyProfile" hx-swap="outerHTML" hx-target="#profileBody">
@@ -27,78 +19,8 @@
 		{{end}}
 	</form>
 
-	<h1 class="mt-2 text-white">Request Leave</h1>
-	<form class="flex flex-col items-center justify-center"
-		id="leaveForm" hx-ext='json-enc' hx-post="/submitLeave" hx-swap="none">
-		<div class="w-full">
-			<label for="reason" class="block mb-2 text-sm font-medium text-white">Reason for leave</label>
-			<input type="text" id="reason" name="reason" class="inputAll" required />
-		</div>
+  {{ template "leaveReqForm" (MakeLeaveReqStruct .StaffMember .ShowLeaveSuccess .ShowLeaveError) }}
 
-		<div date-rangepicker datepicker-format="dd/mm/yyyy" class="flex items-center justify-center">
-			<div class="relative">
-				<div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
-						 <svg class="w-4 h-4 text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-							<path d="M20 4a2 2 0 0 0-2-2h-2V1a1 1 0 0 0-2 0v1h-3V1a1 1 0 0 0-2 0v1H6V1a1 1 0 0 0-2 0v1H2a2 2 0 0 0-2 2v2h20V4ZM0 18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8H0v10Zm5-8h10a1 1 0 0 1 0 2H5a1 1 0 0 1 0-2Z"/>
-						</svg>
-				</div>
-				<input required name="start-date" type="text" class="border text-sm rounded-lg block w-full ps-10 p-2.5 bg-gray-700 border-gray-600 placeholder-gray-400 text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Unavailable from" required>
-			</div>
-			<span class="mx-4 text-white">until</span>
-			<div class="relative">
-				<div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
-						 <svg class="w-4 h-4 text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
-							<path d="M20 4a2 2 0 0 0-2-2h-2V1a1 1 0 0 0-2 0v1h-3V1a1 1 0 0 0-2 0v1H6V1a1 1 0 0 0-2 0v1H2a2 2 0 0 0-2 2v2h20V4ZM0 18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8H0v10Zm5-8h10a1 1 0 0 1 0 2H5a1 1 0 0 1 0-2Z"/>
-						</svg>
-				</div>
-				<input required name="end-date" type="text" class="border text-sm rounded-lg block w-full ps-10 p-2.5 bg-gray-700 border-gray-600 placeholder-gray-400 text-white focus:ring-blue-500 focus:border-blue-500" placeholder="Available again" required>
-			</div>
-		</div>
-
-
-		<button class="mt-2 buttonStyle" type="submit">Submit Leave Request</button>
-		{{if .ShowLeaveSuccess }}
-		<div id="leave-success-message">Success!</div>
-		{{end}}
-		{{if .ShowLeaveError }}
-		<div id="leave-success-message">Invalid dates!</div>
-		{{end}}
-	</form>
-
-	<div class="w-full mt-2 relative overflow-x-auto shadow-md sm:rounded-lg">
-	<table class="w-full text-sm text-center text-gray-400">
-		<thead class="text-xs uppercase bg-gray-700 text-gray-400">
-			<tr>
-				<th>Created</th>
-				<th>Reason</th>
-				<th>Unavailable from</th>
-				<th>Available again</th>
-				<th>Delete</th>
-			</tr>
-		</thead>
-		<tbody>
-			{{ range .LeaveRequests }}
-			<tr class="odd:bg-gray-900 even:bg-gray-800 border-gray-700">
-				<td>{{ .CreationDate.Format "02/01/06" }}</td>
-				<td>{{ .Reason }}</td>
-				<td>{{ .StartDate.Format "02/01/06" }}</td>
-				<td>{{ .EndDate.Format "02/01/06" }}</td>
-				<td>
-					<button type="button"
-						class="buttonStyle actionBtn"
-						hx-ext="json-enc"
-						hx-post="/deleteLeaveReq"
-						hx-vals='js:{"id":"{{ .ID }}", "staffID": "{{ $staffID }}", "page":"profile"}'
-						hx-swap="outerHTML"
-						hx-target="#profileBody">
-						Delete
-					</button>
-				</td>
-			</tr>
-			{{ end }}
-		</tbody>
-	</table>
-	</div>
 	<div class="flex align-center justify-center m-2">
 		<button class="buttonStyle"
 			hx-ext='json-enc'
