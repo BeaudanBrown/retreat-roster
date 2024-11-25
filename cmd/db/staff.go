@@ -242,7 +242,7 @@ func (d *Database) RefreshStaffConfig(staffMember StaffMember) StaffMember {
 	if time.Now().Sub(staffMember.Config.LastVisit) > CONFIG_REFRESH_TIME {
 		// Reset staff config
 		staffMember.Config.TimesheetStartDate = utils.GetLastTuesday()
-		staffMember.Config.RosterStartDate = utils.GetNextTuesday()
+		staffMember.Config.RosterStartDate = utils.GetLastTuesday()
 	}
 	staffMember.Config.LastVisit = time.Now()
 	collection := d.DB.Collection("staff")
@@ -436,7 +436,7 @@ func (d *Database) CreateStaffMember(googleId string, token uuid.UUID) error {
 		Config: StaffConfig{
 			LastVisit:          time.Now(),
 			TimesheetStartDate: utils.GetLastTuesday(),
-			RosterStartDate:    utils.GetNextTuesday(),
+			RosterStartDate:    utils.GetLastTuesday(),
 		},
 	}
 	err := d.SaveStaffMember(*staffMember)
