@@ -7,7 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"roster/cmd/db"
+	"roster/cmd/models"
+	"roster/cmd/utils"
 
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
@@ -21,11 +22,11 @@ type ProfileIndexData struct {
 	CacheBust   string
 	RosterLive  bool
 	AdminRights bool
-	db.StaffMember
+	models.StaffMember
 }
 
 type ProfileData struct {
-	db.StaffMember
+	models.StaffMember
 	AdminRights       bool
 	RosterLive        bool
 	ShowUpdateSuccess bool
@@ -34,7 +35,7 @@ type ProfileData struct {
 	ShowLeaveError    bool
 }
 
-func MakeProfileStruct(rosterLive bool, staffMember db.StaffMember, adminRights bool) ProfileData {
+func MakeProfileStruct(rosterLive bool, staffMember models.StaffMember, adminRights bool) ProfileData {
 	return ProfileData{
 		StaffMember: staffMember,
 		AdminRights: adminRights,
@@ -63,12 +64,12 @@ func MakePickerStruct(name string, label string, id uuid.UUID, date time.Time, t
 }
 
 type LeaveReqListData struct {
-	StaffMember      db.StaffMember
+	StaffMember      models.StaffMember
 	ShowLeaveSuccess bool
 	ShowLeaveError   bool
 }
 
-func MakeLeaveReqStruct(staffMember db.StaffMember, showLeaveSuccess bool, showLeaveError bool) LeaveReqListData {
+func MakeLeaveReqStruct(staffMember models.StaffMember, showLeaveSuccess bool, showLeaveError bool) LeaveReqListData {
 	return LeaveReqListData{
 		StaffMember:      staffMember,
 		ShowLeaveSuccess: showLeaveSuccess,
@@ -93,12 +94,13 @@ func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
-			staff := s.GetStaffByID(editStaffId)
-			if staff != nil {
-				editStaff = staff
-			} else {
+			staff, err := s.Repos.Staff.GetStaffByID(editStaffId)
+			if err != nil {
+				utils.PrintError(err, "HandleProfileIndex: Failed to get staff by ID")
 				w.WriteHeader(http.StatusNotFound)
 				return
+			} else {
+				editStaff = staff
 			}
 		}
 	} else {
@@ -106,14 +108,21 @@ func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(editStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleProfileIndex: Failed to load roster week")
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
 	data := ProfileIndexData{
 		CacheBust:   s.CacheBust,
 		StaffMember: *editStaff,
 		AdminRights: adminRights,
-		RosterLive:  s.LoadRosterWeek(editStaff.Config.RosterStartDate).IsLive,
+		RosterLive:  rosterWeek.IsLive,
 	}
 
-	err := s.Templates.ExecuteTemplate(w, "profileIndex", data)
+	err = s.Templates.ExecuteTemplate(w, "profileIndex", data)
 	if err != nil {
 		log.Fatalf("Error executing template: %v", err)
 		return
@@ -125,23 +134,29 @@ func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
 	if staff == nil {
 		return
 	}
+	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(staff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleProfile: Failed to load roster week")
+		return
+	}
+
 	data := ProfileData{
 		AdminRights: staff.IsAdmin,
 		StaffMember: *staff,
-		RosterLive:  s.LoadRosterWeek(staff.Config.RosterStartDate).IsLive,
+		RosterLive:  rosterWeek.IsLive,
 	}
 	s.renderTemplate(w, "profile", data)
 }
 
 func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
 	log.Println("Submit leave request")
-	var reqBody db.LeaveRequest
+	var reqBody models.LeaveRequest
 	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
 		return
 	}
 	reqBody.ID = uuid.New()
 	now := time.Now()
-	reqBody.CreationDate = db.CustomDate{Time: &now}
+	reqBody.CreationDate = models.CustomDate{Time: &now}
 	staff := s.GetSessionUser(w, r)
 	if staff == nil {
 		return
@@ -153,7 +168,7 @@ func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
 	} else {
 		showLeaveSuccess = true
 		staff.LeaveRequests = append(staff.LeaveRequests, reqBody)
-		s.SaveStaffMember(*staff)
+		s.Repos.Staff.SaveStaffMember(*staff)
 	}
 	data := MakeLeaveReqStruct(*staff, showLeaveSuccess, showLeaveError)
 	data.StaffMember = *staff
@@ -193,7 +208,7 @@ type ModifyProfileBody struct {
 	MonLate      string `json:"Monday-late-avail"`
 }
 
-func (s *Server) ApplyModifyProfileBody(reqBody ModifyProfileBody, staffMember db.StaffMember) db.StaffMember {
+func (s *Server) ApplyModifyProfileBody(reqBody ModifyProfileBody, staffMember models.StaffMember) models.StaffMember {
 	staffMember.NickName = reqBody.NickName
 	staffMember.FirstName = reqBody.FirstName
 	staffMember.LastName = reqBody.LastName
@@ -204,7 +219,7 @@ func (s *Server) ApplyModifyProfileBody(reqBody ModifyProfileBody, staffMember d
 	// This can fail but not from me
 	staffMember.IdealShifts, _ = strconv.Atoi(reqBody.IdealShifts)
 
-	staffMember.Availability = []db.DayAvailability{
+	staffMember.Availability = []models.DayAvailability{
 		{
 			Name:  "Tuesday",
 			Early: reqBody.TuesEarly == "on",
@@ -263,8 +278,8 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	staff := s.GetStaffByID(staffID)
-	if staff == nil {
+	staff, err := s.Repos.Staff.GetStaffByID(staffID)
+	if err != nil {
 		return
 	}
 	activeStaff := s.GetSessionUser(w, r)
@@ -277,13 +292,18 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	updatedStaff := s.ApplyModifyProfileBody(reqBody, *staff)
+	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(staff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleModifyProfile: Failed to load roster week")
+		return
+	}
 	data := ProfileData{
 		AdminRights:       activeStaff.IsAdmin,
 		StaffMember:       updatedStaff,
-		RosterLive:        s.LoadRosterWeek(staff.Config.RosterStartDate).IsLive,
+		RosterLive:        rosterWeek.IsLive,
 		ShowUpdateSuccess: true,
 	}
-	s.SaveStaffMember(updatedStaff)
+	s.Repos.Staff.SaveStaffMember(updatedStaff)
 	s.renderTemplate(w, "profile", data)
 }
 
@@ -316,23 +336,31 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	staffMember := s.GetStaffByID(staffID)
-	if staffMember == nil {
-		log.Printf("No staff found with id %v", staffID)
-		week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
-		s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleDeleteLeaveReq: Failed to load roster week")
 		return
 	}
 
-	s.DeleteLeaveReqByID(*staffMember, leaveID)
+	staffMember, err := s.Repos.Staff.GetStaffByID(staffID)
+	if err != nil {
+		utils.PrintError(err, "HandleDeleteLeaveReq: Failed to load staff member")
+		s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *rosterWeek))
+		return
+	}
+
+	err = s.Repos.Staff.DeleteLeaveReqByID(*staffMember, leaveID)
+	if err != nil {
+		utils.PrintError(err, "HandleDeleteLeaveReq: Failed delete leave request")
+		return
+	}
 	if reqBody.Page == "root" {
-		week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
-		s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+		s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *rosterWeek))
 	} else {
 		data := ProfileData{
 			StaffMember: *thisStaff,
 			AdminRights: thisStaff.IsAdmin,
-			RosterLive:  s.LoadRosterWeek(thisStaff.Config.RosterStartDate).IsLive,
+			RosterLive:  rosterWeek.IsLive,
 		}
 		s.renderTemplate(w, "profile", data)
 	}
@@ -362,7 +390,11 @@ func (s *Server) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	selfDelete := thisStaff.ID == accID
 
-	rosterWeek := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleDeleteAccount: Failed to load roster week")
+		return
+	}
 
 	for _, day := range rosterWeek.Days {
 		for _, row := range day.Rows {
@@ -385,7 +417,7 @@ func (s *Server) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.SaveRosterWeek(*rosterWeek)
+	s.Repos.RosterWeek.SaveRosterWeek(rosterWeek)
 	if selfDelete {
 		s.HandleGoogleLogout(w, r)
 	} else {
@@ -395,12 +427,12 @@ func (s *Server) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 }
 
 type LeaveReqData struct {
-	db.LeaveRequest
+	models.LeaveRequest
 	StaffID   uuid.UUID
 	StaffName string
 }
 
-func GetSortedLeaveReqs(allStaff []*db.StaffMember) []LeaveReqData {
+func GetSortedLeaveReqs(allStaff []*models.StaffMember) []LeaveReqData {
 	reqs := []LeaveReqData{}
 	for _, staffMember := range allStaff {
 		for _, req := range staffMember.LeaveRequests {

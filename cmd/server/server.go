@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"roster/cmd/db"
+	"roster/cmd/models"
+	"roster/cmd/repository"
 
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -24,9 +26,15 @@ type Server struct {
 	CacheBust string
 	Templates *template.Template
 	db.Database
+	Repos Repositories
 }
 
-func (s *Server) renderTemplate(w http.ResponseWriter, templateName string, data interface{}) {
+type Repositories struct {
+	Staff repository.StaffRepository
+	RosterWeek repository.RosterWeekRepository
+}
+
+func (s *Server) renderTemplate(w http.ResponseWriter, templateName string, data any) {
 	err := s.Templates.ExecuteTemplate(w, templateName, data)
 	if err != nil {
 		log.Printf("Error executing template: %v\n", err)
@@ -71,8 +79,8 @@ func (s *Server) VerifySession(handler http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		staffMember := s.GetStaffByToken(*sessionToken)
-		if staffMember == nil {
+		staffMember, err := s.Repos.Staff.GetStaffByToken(*sessionToken)
+		if err != nil {
 			log.Println("Invalid session")
 			http.Redirect(w, r, "/landing", http.StatusSeeOther)
 			return
@@ -89,11 +97,7 @@ func (s *Server) VerifySession(handler http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (s *Server) isValidSession(token uuid.UUID) bool {
-	return s.GetStaffByToken(token) != nil
-}
-
-func ReadAndUnmarshal(w http.ResponseWriter, r *http.Request, reqBody interface{}) error {
+func ReadAndUnmarshal(w http.ResponseWriter, r *http.Request, reqBody any) error {
 	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Printf("Error reading body: %v", err)
@@ -116,12 +120,14 @@ func ReadAndUnmarshal(w http.ResponseWriter, r *http.Request, reqBody interface{
 func LoadServerState(d *mongo.Database, context context.Context) (*Server, error) {
 	var serverState Server
 	var err error
+	staffRepo := repository.NewMongoStaffRepository(context, d)
+	rosterWeekRepo := repository.NewMongoRosterWeekRepository(context, d)
 	serverState = Server{
 		CacheBust: fmt.Sprintf("%v", time.Now().UnixNano()),
 		Templates: template.New("").Funcs(template.FuncMap{
 			"MakeHeaderStruct":         MakeHeaderStruct,
 			"MakeDayStruct":            MakeDayStruct,
-			"GetHighlightCol":          db.GetHighlightCol,
+			"GetHighlightCol":          models.GetHighlightCol,
 			"MakeProfileStruct":        MakeProfileStruct,
 			"MemberIsAssigned":         MemberIsAssigned,
 			"MakeTimesheetEntryStruct": MakeTimesheetEntryStruct,
@@ -168,6 +174,10 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 			DB:      d,
 			Context: context,
 		},
+		Repos: Repositories{
+			Staff: staffRepo,
+			RosterWeek: rosterWeekRepo,
+		},
 	}
 	serverState.Templates, err = serverState.Templates.ParseGlob("./www/*.html")
 	if err != nil {
@@ -176,18 +186,22 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 	return &serverState, nil
 }
 
-func (s *Server) GetSessionUser(w http.ResponseWriter, r *http.Request) *db.StaffMember {
+func (s *Server) GetSessionUser(w http.ResponseWriter, r *http.Request) *models.StaffMember {
 	sessionToken, ok := r.Context().Value(SESSION_KEY).(uuid.UUID)
 	if !ok {
 		log.Printf("No session for using")
 		return nil
 	}
-	staff := s.GetStaffByToken(sessionToken)
-	if staff == nil {
+	staff, err := s.Repos.Staff.GetStaffByToken(sessionToken)
+	if err != nil {
 		log.Printf("Error retrieving session user")
 		return nil
 	}
-	refreshedStaff := s.RefreshStaffConfig(*staff)
+	refreshedStaff, err := s.Repos.Staff.RefreshStaffConfig(*staff)
+	if err != nil {
+		log.Printf("Error retrieving session user")
+		return nil
+	}
 	return &refreshedStaff
 }
 
