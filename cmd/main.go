@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 
-	"roster/cmd/migrate"
 	"roster/cmd/server"
 
 	"github.com/joho/godotenv"
@@ -37,16 +36,6 @@ func main() {
 	s, err := server.LoadServerState(db, ctx)
 	if err != nil {
 		log.Fatalf("Error loading server state: %v", err)
-	}
-
-	err = migrate.MigrateV4(s)
-	if err != nil {
-		log.Printf("Error migrating to V4: %v", err)
-	}
-
-	err = migrate.MigrateV5(s)
-	if err != nil {
-		log.Printf("Error migrating to V5: %v", err)
 	}
 
 	http.HandleFunc("/", s.VerifySession(s.HandleIndex))

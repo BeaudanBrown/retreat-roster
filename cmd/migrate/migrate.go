@@ -2,26 +2,12 @@ package migrate
 
 import (
 	"log"
-	"roster/cmd/db"
 	"roster/cmd/server"
-	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-type OldData struct {
-	StartDate          time.Time          `json:"startDate"`
-	TimesheetStartDate time.Time          `json:"timesheetStartDate"`
-	Staff              *[]*db.StaffMember `json:"staff"`
-	Days               []*db.RosterDay    `json:"days"`
-	IsLive             bool               `json:"isLive"`
-	HideByIdeal        bool               `json:"hideByIdeal"`
-	HideByPrefs        bool               `json:"hideByPrefs"`
-	HideByLeave        bool               `json:"hideByLeave"`
-	ApprovalMode       bool               `json:"approvalMode"`
-}
 
 const STATE_FILE = "./data/state.json"
 
@@ -78,101 +64,5 @@ func SaveVersion(s *server.Server, v Version) error {
 		return err
 	}
 	log.Println("Saved version")
-	return nil
-}
-
-func MigrateV5(s *server.Server) error {
-	version := LoadVersion(s)
-	log.Printf("Version: %v", version.Version)
-	if version == nil || (version.Version != 4) {
-		log.Println("No v5 migration required")
-		return nil
-	}
-	allWeeks := s.LoadAllRosterWeeks()
-	for _, week := range allWeeks {
-		// Migrate to using timezone
-		week.StartDate = week.StartDate.Add(time.Hour * -10)
-	}
-	s.SaveAllRosterWeeks(allWeeks)
-	version.Version = 5
-	SaveVersion(s, *version)
-	log.Println("V5 migration complete")
-	return nil
-}
-
-func MigrateV4(s *server.Server) error {
-	version := LoadVersion(s)
-	log.Printf("Version: %v", version.Version)
-	if version == nil || (version.Version != 3) {
-		log.Println("No v4 migration required")
-		return nil
-	}
-	allEntries := s.GetAllTimesheetEntries()
-	if allEntries == nil {
-		log.Println("No entries to migrate")
-		return nil
-	}
-	for _, entry := range *allEntries {
-		// Migrate to using timezone
-		entry.ShiftStart = entry.ShiftStart.Add(time.Hour * -10)
-		entry.ShiftEnd = entry.ShiftEnd.Add(time.Hour * -10)
-		entry.BreakStart = entry.BreakStart.Add(time.Hour * -10)
-		entry.BreakEnd = entry.BreakEnd.Add(time.Hour * -10)
-	}
-	s.SaveAllTimesheetEntries(*allEntries)
-	version.Version = 4
-	SaveVersion(s, *version)
-	log.Println("V4 migration complete")
-	return nil
-}
-
-func MigrateV3(s *server.Server) error {
-	version := LoadVersion(s)
-	log.Printf("Version: %v", version.Version)
-	if version == nil || (version.Version != 2 && version.Version != 0) {
-		log.Println("No v3 migration required")
-		return nil
-	}
-	allEntries := s.GetAllTimesheetEntries()
-	if allEntries == nil {
-		log.Println("No entries to migrate")
-		return nil
-	}
-	for _, entry := range *allEntries {
-		log.Printf("Shift before: %v", entry.ShiftType)
-		if entry.ShiftType != db.Bar {
-			entry.ShiftType = entry.ShiftType - 1
-			log.Printf("Shift after: %v", entry.ShiftType)
-		}
-	}
-	s.SaveAllTimesheetEntries(*allEntries)
-	version.Version = 3
-	SaveVersion(s, *version)
-	log.Println("V3 migration complete")
-	return nil
-}
-
-func MigrateV2(s *server.Server) error {
-	version := LoadVersion(s)
-	if version == nil || version.Version != 1 {
-		log.Println("No v2 migration required")
-		return nil
-	}
-	allEntries := s.GetAllTimesheetEntries()
-	if allEntries == nil {
-		log.Println("No entries to migrate")
-		return nil
-	}
-	for _, entry := range *allEntries {
-		log.Printf("Shift before: %v", entry.ShiftType)
-		if entry.ShiftType != db.Bar {
-			entry.ShiftType = entry.ShiftType + 1
-			log.Printf("Shift after: %v", entry.ShiftType)
-		}
-	}
-	s.SaveAllTimesheetEntries(*allEntries)
-	version.Version = version.Version + 1
-	SaveVersion(s, *version)
-	log.Println("V2 migration complete")
 	return nil
 }
