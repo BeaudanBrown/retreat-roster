@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"roster/cmd/db"
+	"roster/cmd/models"
 	"roster/cmd/utils"
 
 	"github.com/google/uuid"
@@ -24,33 +25,44 @@ import (
 
 type RootStruct struct {
 	*Server
-	ActiveStaff db.StaffMember
-	db.RosterWeek
-	Staff []*db.StaffMember
+	ActiveStaff models.StaffMember
+	models.RosterWeek
+	Staff []*models.StaffMember
 }
 
-func (s *Server) MakeRootStruct(activeStaff db.StaffMember, week db.RosterWeek) RootStruct {
+func (s *Server) MakeRootStruct(activeStaff models.StaffMember, week models.RosterWeek) RootStruct {
+	allStaff, err := s.Repos.Staff.LoadAllStaff()
+	if err != nil {
+		utils.PrintError(err, "MakeRootStruct: Failed to load all staff")
+		allStaff = []*models.StaffMember{}
+	}
+
 	return RootStruct{
 		s,
 		activeStaff,
 		week,
-		s.LoadAllStaff(),
+		allStaff,
 	}
 }
 
 type DayStruct struct {
-	db.RosterDay
-	Staff       []*db.StaffMember
+	models.RosterDay
+	Staff       []*models.StaffMember
 	Date        time.Time
 	IsLive      bool
-	ActiveStaff db.StaffMember
+	ActiveStaff models.StaffMember
 }
 
-func MakeDayStruct(isLive bool, day db.RosterDay, s *Server, activeStaff db.StaffMember) DayStruct {
+func MakeDayStruct(isLive bool, day models.RosterDay, s *Server, activeStaff models.StaffMember) DayStruct {
 	date := activeStaff.Config.RosterStartDate.AddDate(0, 0, day.Offset)
+	allStaff, err := s.Repos.Staff.LoadAllStaff()
+	if err != nil {
+		utils.PrintError(err, "MakeRootStruct: Failed to load all staff")
+		allStaff = []*models.StaffMember{}
+	}
 	return DayStruct{
 		day,
-		s.LoadAllStaff(),
+		allStaff,
 		date,
 		isLive,
 		activeStaff,
@@ -72,7 +84,10 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("roster Start Date: %v", thisStaff.Config.RosterStartDate)
-	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleGoogleCallback: Error creating staff member")
+	}
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
@@ -156,21 +171,25 @@ func (s *Server) HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 	})
 
-	staffMember := s.GetStaffByGoogleID(userInfo.ID)
-	if staffMember == nil {
+	staffMember, err := s.Repos.Staff.GetStaffByGoogleID(userInfo.ID)
+	if err != nil {
+		utils.PrintError(err, "HandleGoogleCallback: Failed to get staff by google id")
+		http.Redirect(w, r, "/landing", http.StatusSeeOther)
+		return
+	} else if staffMember == nil {
 		log.Printf("Creating new staff member")
-		err := s.CreateStaffMember(userInfo.ID, sessionToken)
+		err := s.Repos.Staff.CreateStaffMember(userInfo.ID, sessionToken)
 		if err != nil {
-			log.Printf("Error creating staff member: %v", err)
+			utils.PrintError(err, "HandleGoogleCallback: Error creating staff member")
 			http.Redirect(w, r, "/landing", http.StatusSeeOther)
 			return
 		}
 		http.Redirect(w, r, "/newAccount", http.StatusSeeOther)
 	} else {
 		log.Printf("Updating staff token ID")
-		err := s.UpdateStaffToken(staffMember, sessionToken)
+		err := s.Repos.Staff.UpdateStaffToken(staffMember, sessionToken)
 		if err != nil {
-			log.Printf("Error logging in with google: %v", err)
+			utils.PrintError(err, "HandleGoogleCallback: Error logging in with google")
 		}
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
@@ -196,7 +215,7 @@ func (s *Server) HandleCreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	updatedStaff := s.ApplyModifyProfileBody(reqBody, *thisStaff)
-	if err := s.SaveStaffMember(updatedStaff); err != nil {
+	if err := s.Repos.Staff.SaveStaffMember(updatedStaff); err != nil {
 		log.Printf("Error creating staff member: %v", err)
 		http.Redirect(w, r, "/landing", http.StatusSeeOther)
 		return
@@ -251,7 +270,11 @@ func (s *Server) HandleModifyDescriptionSlot(w http.ResponseWriter, r *http.Requ
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleModifyDescriptionSlot: Failed to get roster week")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+	}
 	slot := week.GetSlotByID(slotID)
 	if slot == nil {
 		log.Printf("Invalid slotID: %v", err)
@@ -260,7 +283,7 @@ func (s *Server) HandleModifyDescriptionSlot(w http.ResponseWriter, r *http.Requ
 	}
 
 	slot.Description = descVal
-	s.SaveRosterWeek(*week)
+	s.Repos.RosterWeek.SaveRosterWeek(week)
 }
 
 func (s *Server) HandleModifyTimeSlot(w http.ResponseWriter, r *http.Request) {
@@ -282,7 +305,12 @@ func (s *Server) HandleModifyTimeSlot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("Modify %v timeslot id: %v", slotID, timeVal)
-	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleModifyTimeSlot: Failed to load roster week")
+		return
+	}
+
 	slot := week.GetSlotByID(slotID)
 	if slot == nil {
 		log.Printf("Invalid slotID: %v", err)
@@ -291,7 +319,7 @@ func (s *Server) HandleModifyTimeSlot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slot.StartTime = timeVal
-	s.SaveRosterWeek(*week)
+	s.Repos.RosterWeek.SaveRosterWeek(week)
 }
 
 func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
@@ -313,7 +341,11 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleModifySlot: Failed to load roster week")
+		return
+	}
 	slot := week.GetSlotByID(slotID)
 	if slot == nil {
 		log.Printf("Invalid slotID: %v", err)
@@ -327,8 +359,10 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
 		slot.StaffString = nil
 	} else {
 		log.Printf("Modify %v slot id: %v, staffid: %v", slotID, slotID, staffID)
-		member := s.GetStaffByID(staffID)
-		if member != nil {
+		member, err := s.Repos.Staff.GetStaffByID(staffID)
+		if err != nil {
+				utils.PrintError(err, "HandleModifySlot: failed to get staff by ID")
+		} else {
 			slot.AssignedStaff = &member.ID
 			if member.NickName != "" {
 				slot.StaffString = &member.NickName
@@ -338,7 +372,7 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.SaveRosterWeek(*week)
+	s.Repos.RosterWeek.SaveRosterWeek(week)
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
@@ -360,17 +394,23 @@ func (s *Server) HandleToggleKitchen(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	staffMember := s.GetStaffByID(accID)
-	if staffMember != nil {
+	staffMember, err := s.Repos.Staff.GetStaffByID(accID)
+	if err != nil {
+			utils.PrintError(err, "HandleToggleKitchen: failed to get staff by ID")
+	} else {
 		staffMember.IsKitchen = !staffMember.IsKitchen
-		s.SaveStaffMember(*staffMember)
+		s.Repos.Staff.SaveStaffMember(*staffMember)
 	}
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {
 		log.Println("Couldn't find staff")
 		return
 	}
-	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleToggleKitchen: Failed to load roster week")
+		return
+	}
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
@@ -389,16 +429,22 @@ func (s *Server) HandleToggleAdmin(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	staffMember := s.GetStaffByID(accID)
-	if staffMember != nil {
+	staffMember, err := s.Repos.Staff.GetStaffByID(accID)
+	if err != nil {
+			utils.PrintError(err, "HandleToggleAdmin: failed to get staff by ID")
+	} else {
 		staffMember.IsAdmin = !staffMember.IsAdmin
-		s.SaveStaffMember(*staffMember)
+		s.Repos.Staff.SaveStaffMember(*staffMember)
 	}
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {
 		return
 	}
-	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleToggleAdmin: Failed to load roster week")
+		return
+	}
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
@@ -417,16 +463,22 @@ func (s *Server) HandleToggleHidden(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	staffMember := s.GetStaffByID(accID)
-	if staffMember != nil {
+	staffMember, err := s.Repos.Staff.GetStaffByID(accID)
+	if err != nil {
+			utils.PrintError(err, "HandleToggleHidden: failed to get staff by ID")
+	} else {
 		staffMember.IsHidden = !staffMember.IsHidden
-		s.SaveStaffMember(*staffMember)
+		s.Repos.Staff.SaveStaffMember(*staffMember)
 	}
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {
 		return
 	}
-	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleToggleHidden: Failed to load roster week")
+		return
+	}
 	for _, day := range week.Days {
 		for _, row := range day.Rows {
 			if row.Amelia.AssignedStaff != nil && *row.Amelia.AssignedStaff == accID {
@@ -448,7 +500,7 @@ func (s *Server) HandleToggleHidden(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.SaveRosterWeek(*week)
+	s.Repos.RosterWeek.SaveRosterWeek(week)
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
@@ -458,8 +510,12 @@ func (s *Server) HandleToggleHideByIdeal(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	thisStaff.Config.HideByIdeal = !thisStaff.Config.HideByIdeal
-	s.SaveStaffMember(*thisStaff)
-	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	s.Repos.Staff.SaveStaffMember(*thisStaff)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleToggleHideByIdeal: Failed to load roster week")
+		return
+	}
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
@@ -469,8 +525,12 @@ func (s *Server) HandleToggleHideByPreferences(w http.ResponseWriter, r *http.Re
 		return
 	}
 	thisStaff.Config.HideByPrefs = !thisStaff.Config.HideByPrefs
-	s.SaveStaffMember(*thisStaff)
-	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	s.Repos.Staff.SaveStaffMember(*thisStaff)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleToggleHideByPreferences: Failed to load roster week")
+		return
+	}
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
@@ -480,8 +540,12 @@ func (s *Server) HandleToggleHideByLeave(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	thisStaff.Config.HideByLeave = !thisStaff.Config.HideByLeave
-	s.SaveStaffMember(*thisStaff)
-	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	s.Repos.Staff.SaveStaffMember(*thisStaff)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleToggleHideByLeave: Failed to load roster week")
+		return
+	}
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
@@ -490,9 +554,13 @@ func (s *Server) HandleToggleLive(w http.ResponseWriter, r *http.Request) {
 	if thisStaff == nil {
 		return
 	}
-	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleToggleLive: Failed to load roster week")
+		return
+	}
 	week.IsLive = !week.IsLive
-	s.SaveRosterWeek(*week)
+	s.Repos.RosterWeek.SaveRosterWeek(week)
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
@@ -515,7 +583,11 @@ func (s *Server) HandleToggleAmelia(w http.ResponseWriter, r *http.Request) {
 	if thisStaff == nil {
 		return
 	}
-	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleToggleAmelia: Failed to load roster week")
+		return
+	}
 	day := week.GetDayByID(dayID)
 	if day == nil {
 		log.Printf("Invalid dayID: %v", err)
@@ -523,7 +595,7 @@ func (s *Server) HandleToggleAmelia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	day.AmeliaOpen = !day.AmeliaOpen
-	s.SaveRosterWeek(*week)
+	s.Repos.RosterWeek.SaveRosterWeek(week)
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
@@ -546,9 +618,9 @@ func (s *Server) HandleToggleClosed(w http.ResponseWriter, r *http.Request) {
 	if thisStaff == nil {
 		return
 	}
-	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
-	if week == nil {
-		log.Printf("Invalid dayID: %v", err)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleToggleClosed: Failed to load roster week")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -559,7 +631,7 @@ func (s *Server) HandleToggleClosed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	day.IsClosed = !day.IsClosed
-	s.SaveRosterWeek(*week)
+	s.Repos.RosterWeek.SaveRosterWeek(week)
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
@@ -572,13 +644,18 @@ func (s *Server) HandleAddTrial(w http.ResponseWriter, r *http.Request) {
 	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
 		return
 	}
-	s.CreateTrial(reqBody.Name)
+	s.Repos.Staff.CreateTrial(reqBody.Name)
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {
 		// TODO: Handle error, also loading the roster week below
 		return
 	}
-	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleAddTrial: Failed to load roster week")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
@@ -603,8 +680,13 @@ func (s *Server) HandleShiftWindow(w http.ResponseWriter, r *http.Request) {
 	default:
 		thisStaff.Config.RosterStartDate = utils.GetNextTuesday()
 	}
-	s.SaveStaffMember(*thisStaff)
-	week := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	s.Repos.Staff.SaveStaffMember(*thisStaff)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleShiftWindow: Failed to load roster week")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
@@ -630,24 +712,30 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newDay, isLive := s.ChangeDayRowCount(thisStaff.Config.RosterStartDate, dayID, reqBody.Action)
+	newDay, isLive, err := s.Repos.RosterWeek.ChangeDayRowCount(thisStaff.Config.RosterStartDate, dayID, reqBody.Action)
+	if err != nil {
+		utils.PrintError(err, "HandleModifyRows: Failed to change day row count")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	s.renderTemplate(w, "rosterDay", MakeDayStruct(isLive, *newDay, s, *thisStaff))
 }
 
-func duplicateRosterWeek(src db.RosterWeek, newWeek db.RosterWeek) db.RosterWeek {
-	newDays := []*db.RosterDay{}
+func duplicateRosterWeek(src models.RosterWeek, newWeek models.RosterWeek) models.RosterWeek {
+	newDays := []*models.RosterDay{}
 	for _, day := range src.Days {
-		newDay := db.RosterDay{
+		newDay := models.RosterDay{
 			ID:         uuid.New(),
 			DayName:    day.DayName,
 			Colour:     day.Colour,
 			Offset:     day.Offset,
 			IsClosed:   day.IsClosed,
 			AmeliaOpen: day.AmeliaOpen,
-			Rows:       []*db.Row{},
+			Rows:       []*models.Row{},
 		}
 		for _, row := range day.Rows {
-			newRow := &db.Row{
+			newRow := &models.Row{
 				ID:     uuid.New(),
 				Amelia: duplicateSlot(row.Amelia),
 				Early:  duplicateSlot(row.Early),
@@ -663,7 +751,7 @@ func duplicateRosterWeek(src db.RosterWeek, newWeek db.RosterWeek) db.RosterWeek
 	return newWeek
 }
 
-func duplicateSlot(src db.Slot) db.Slot {
+func duplicateSlot(src models.Slot) models.Slot {
 	var newAssignedStaff *uuid.UUID
 	if src.AssignedStaff != nil {
 		newStaffID := *src.AssignedStaff
@@ -676,7 +764,7 @@ func duplicateSlot(src db.Slot) db.Slot {
 		newStaffString = &newString
 	}
 
-	return db.Slot{
+	return models.Slot{
 		ID:            uuid.New(),
 		StartTime:     src.StartTime,
 		AssignedStaff: newAssignedStaff,
@@ -803,7 +891,7 @@ func AddEntryToPaydata(entry db.TimesheetEntry, thisDate time.Time, day DayIdx, 
 	return payData
 }
 
-func (s *Server) getSessionUserAndEntries(w http.ResponseWriter, r *http.Request) (*db.StaffMember, *[]*db.TimesheetEntry, bool) {
+func (s *Server) getSessionUserAndEntries(w http.ResponseWriter, r *http.Request) (*models.StaffMember, *[]*db.TimesheetEntry, bool) {
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {
 		log.Println("Couldn't find session user")
@@ -819,7 +907,7 @@ func (s *Server) getSessionUserAndEntries(w http.ResponseWriter, r *http.Request
 	return thisStaff, entries, true
 }
 
-func writeRecordsToCSV(staffData map[uuid.UUID]StaffPayData, allStaff []*db.StaffMember, writer *csv.Writer, reportType string) {
+func writeRecordsToCSV(staffData map[uuid.UUID]StaffPayData, allStaff []*models.StaffMember, writer *csv.Writer, reportType string) {
 	header := []string{
 		"Employee",
 		"Tues Ord", "Tues 7-12", "Tues 12+",
@@ -835,7 +923,7 @@ func writeRecordsToCSV(staffData map[uuid.UUID]StaffPayData, allStaff []*db.Staf
 	}
 	reportRows := [][]string{}
 	for staffID, payData := range staffData {
-		staffMember := db.GetStaffFromList(staffID, allStaff)
+		staffMember := models.GetStaffFromList(staffID, allStaff)
 		if staffMember == nil {
 			log.Printf("Missing staffID")
 			continue
@@ -875,7 +963,7 @@ func writeRecordsToCSV(staffData map[uuid.UUID]StaffPayData, allStaff []*db.Staf
 	writer.Flush()
 }
 
-func processEntries(thisStaff db.StaffMember, entries []*db.TimesheetEntry, allStaff []*db.StaffMember) map[uuid.UUID]StaffPayData {
+func processEntries(thisStaff models.StaffMember, entries []*db.TimesheetEntry, allStaff []*models.StaffMember) map[uuid.UUID]StaffPayData {
 	staffData := map[uuid.UUID]StaffPayData{}
 	for day := Tuesday; day <= 6; day++ {
 		thisDate := thisStaff.Config.TimesheetStartDate.AddDate(0, 0, int(day))
@@ -883,7 +971,7 @@ func processEntries(thisStaff db.StaffMember, entries []*db.TimesheetEntry, allS
 			if !entry.Approved {
 				continue
 			}
-			staffMember := db.GetStaffFromList(entry.StaffID, allStaff)
+			staffMember := models.GetStaffFromList(entry.StaffID, allStaff)
 			if staffMember == nil || staffMember.IsTrial {
 				log.Printf("Missing staffmember")
 				continue
@@ -906,7 +994,11 @@ func (s *Server) HandleExportKitchenReport(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	allStaff := s.LoadAllStaff()
+	allStaff, err := s.Repos.Staff.LoadAllStaff()
+	if err != nil {
+		utils.PrintError(err, "HandleExportKitchenReport: Failed to load all staff")
+		allStaff = []*models.StaffMember{}
+	}
 	staffData := processEntries(*thisStaff, *entries, allStaff)
 
 	var fileBuffer bytes.Buffer
@@ -937,7 +1029,11 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	allStaff := s.LoadAllStaff()
+	allStaff, err := s.Repos.Staff.LoadAllStaff()
+	if err != nil {
+		utils.PrintError(err, "HandleExportKitchenReport: Failed to load all staff")
+		allStaff = []*models.StaffMember{}
+	}
 	staffData := processEntries(*thisStaff, *entries, allStaff)
 
 	var fileBuffer bytes.Buffer
@@ -1139,22 +1235,23 @@ func (s *Server) HandleImportRosterWeek(w http.ResponseWriter, r *http.Request) 
 	}
 	log.Println("Importing")
 	lastWeekDate := thisStaff.Config.RosterStartDate.AddDate(0, 0, -7)
-	lastWeek := s.LoadRosterWeek(lastWeekDate)
-	if lastWeek == nil {
-		log.Println("No last week to duplicate")
+	lastWeek, err := s.Repos.RosterWeek.LoadRosterWeek(lastWeekDate)
+	if err != nil {
+		utils.PrintError(err, "HandleImportRosterWeek: Couldn't load last week")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	thisWeek := s.LoadRosterWeek(thisStaff.Config.RosterStartDate)
-	if thisWeek == nil {
-		thisWeek = &db.RosterWeek{
+	thisWeek, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	if err != nil {
+		utils.PrintError(err, "HandleImportRosterWeek: Couldn't load this week")
+		thisWeek = &models.RosterWeek{
 			ID:        uuid.New(),
 			StartDate: thisStaff.Config.RosterStartDate,
 		}
 	}
 	newWeek := duplicateRosterWeek(*lastWeek, *thisWeek)
 	thisWeek = &newWeek
-	s.SaveRosterWeek(*thisWeek)
+	s.Repos.RosterWeek.SaveRosterWeek(thisWeek)
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *thisWeek))
 }
 

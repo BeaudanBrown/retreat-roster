@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"roster/cmd/db"
+	"roster/cmd/models"
 	"roster/cmd/utils"
 
 	"github.com/google/uuid"
@@ -26,15 +27,15 @@ const SUN_PAY_MULT = 1.75
 
 type TimesheetData struct {
 	Entries         []*db.TimesheetEntry
-	StaffMember     db.StaffMember
+	StaffMember     models.StaffMember
 	DayNames        []string
-	AllStaff        []*db.StaffMember
+	AllStaff        []*models.StaffMember
 	StaffPaySummary StaffPaySummary
 	RosterLive      bool
 	CacheBust       string
 }
 
-func (s *Server) MakeTimesheetStruct(activeStaff db.StaffMember) TimesheetData {
+func (s *Server) MakeTimesheetStruct(activeStaff models.StaffMember) TimesheetData {
 	entries := s.GetTimesheetWeek(activeStaff.Config.TimesheetStartDate)
 	if entries == nil {
 		log.Printf("Failed to load timesheet week when making struct")
@@ -43,12 +44,18 @@ func (s *Server) MakeTimesheetStruct(activeStaff db.StaffMember) TimesheetData {
 	//TODO: this can be optimised
 	staffPayData := s.GetPayWeekForStaff(activeStaff.ID, activeStaff.Config.TimesheetStartDate)
 	paySummary := s.GetPaySummary(staffPayData)
+	//TODO: Handle errors for LoadAllStaff better
+	allStaff, err := s.Repos.Staff.LoadAllStaff()
+	if err != nil {
+		log.Printf("Error loading all staff")
+		allStaff = []*models.StaffMember{}
+	}
 
 	return TimesheetData{
 		Entries:         *entries,
 		StaffMember:     activeStaff,
 		DayNames:        []string{"Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Monday"},
-		AllStaff:        s.LoadAllStaff(),
+		AllStaff:        allStaff,
 		StaffPaySummary: paySummary,
 		CacheBust:       s.CacheBust,
 	}
@@ -95,7 +102,7 @@ func (s *Server) HandleShiftTimesheetWindow(w http.ResponseWriter, r *http.Reque
 	default:
 		thisStaff.Config.TimesheetStartDate = utils.GetLastTuesday()
 	}
-	s.SaveStaffMember(*thisStaff)
+	s.Repos.Staff.SaveStaffMember(*thisStaff)
 	s.RenderTimesheetTemplate(w, r)
 }
 
@@ -133,7 +140,7 @@ func (s *Server) HandleDeleteTimesheetEntry(w http.ResponseWriter, r *http.Reque
 type AddTimesheetEntryBody struct {
 	StaffID   string        `json:"staffID"`
 	DayIdx    int           `json:"dayIdx"`
-	StartDate db.CustomDate `json:"startDate"`
+	StartDate models.CustomDate `json:"startDate"`
 	AdminView bool          `json:"adminView"`
 }
 
@@ -154,18 +161,23 @@ func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	newEntry := MakeEmptyTimesheetEntry(*reqBody.StartDate.Time, staffID)
-	data := MakeTimesheetEditModalStruct(newEntry, thisStaff.ID, s.LoadAllStaff(), thisStaff.IsAdmin, thisStaff.IsKitchen)
+	allStaff, err := s.Repos.Staff.LoadAllStaff()
+	if err != nil {
+		log.Printf("Error loading all staff")
+		allStaff = []*models.StaffMember{}
+	}
+	data := MakeTimesheetEditModalStruct(newEntry, thisStaff.ID, allStaff, thisStaff.IsAdmin, thisStaff.IsKitchen)
 	s.renderTemplate(w, "timesheetEditModal", data)
 }
 
 type ModifyTimesheetEntryBody struct {
 	StaffID    string        `json:"staffID"`
 	EntryID    string        `json:"entryID"`
-	StartDate  db.CustomDate `json:"startDate"`
-	ShiftStart db.CustomDate `json:"shiftStart"`
-	ShiftEnd   db.CustomDate `json:"shiftEnd"`
-	BreakStart db.CustomDate `json:"breakStart"`
-	BreakEnd   db.CustomDate `json:"breakEnd"`
+	StartDate  models.CustomDate `json:"startDate"`
+	ShiftStart models.CustomDate `json:"shiftStart"`
+	ShiftEnd   models.CustomDate `json:"shiftEnd"`
+	BreakStart models.CustomDate `json:"breakStart"`
+	BreakEnd   models.CustomDate `json:"breakEnd"`
 	Approved   bool          `json:"approved"`
 	ShiftType  string        `json:"shiftType"`
 	AdminView  bool          `json:"adminView"`
@@ -238,7 +250,7 @@ func (s *Server) HandleToggleShowAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	thisStaff.Config.ShowAll = !thisStaff.Config.ShowAll
-	s.SaveStaffMember(*thisStaff)
+	s.Repos.Staff.SaveStaffMember(*thisStaff)
 	s.RenderTimesheetTemplate(w, r)
 }
 
@@ -248,7 +260,7 @@ func (s *Server) HandleToggleHideApproved(w http.ResponseWriter, r *http.Request
 		return
 	}
 	thisStaff.Config.HideApproved = !thisStaff.Config.HideApproved
-	s.SaveStaffMember(*thisStaff)
+	s.Repos.Staff.SaveStaffMember(*thisStaff)
 	s.RenderTimesheetTemplate(w, r)
 }
 
@@ -281,16 +293,16 @@ func (s *Server) HandleToggleApproved(w http.ResponseWriter, r *http.Request) {
 
 type TimesheetEntryData struct {
 	db.TimesheetEntry
-	ActiveStaff db.StaffMember
-	EntryStaff  db.StaffMember
+	ActiveStaff models.StaffMember
+	EntryStaff  models.StaffMember
 	ShowAll     bool
 }
 
-func MakeTimesheetEntryStruct(entry db.TimesheetEntry, activeStaff db.StaffMember, allStaff []*db.StaffMember, showAll bool) TimesheetEntryData {
-	entryStaff := db.GetStaffFromList(entry.StaffID, allStaff)
+func MakeTimesheetEntryStruct(entry db.TimesheetEntry, activeStaff models.StaffMember, allStaff []*models.StaffMember, showAll bool) TimesheetEntryData {
+	entryStaff := models.GetStaffFromList(entry.StaffID, allStaff)
 	if entryStaff == nil {
 		// TODO: This is not ideal
-		entryStaff = &db.StaffMember{}
+		entryStaff = &models.StaffMember{}
 	}
 	return TimesheetEntryData{
 		TimesheetEntry: entry,
@@ -303,7 +315,7 @@ func MakeTimesheetEntryStruct(entry db.TimesheetEntry, activeStaff db.StaffMembe
 type TimesheetEditModalData struct {
 	db.TimesheetEntry
 	ThisStaffID uuid.UUID
-	AllStaff    []*db.StaffMember
+	AllStaff    []*models.StaffMember
 	IsAdmin     bool
 	IsKitchen   bool
 }
@@ -324,7 +336,7 @@ func MakeEmptyTimesheetEntry(startDate time.Time, staffID uuid.UUID) db.Timeshee
 	return newEntry
 }
 
-func MakeTimesheetEditModalStruct(entry db.TimesheetEntry, thisStaffID uuid.UUID, allStaff []*db.StaffMember, isAdmin bool, isKitchen bool) TimesheetEditModalData {
+func MakeTimesheetEditModalStruct(entry db.TimesheetEntry, thisStaffID uuid.UUID, allStaff []*models.StaffMember, isAdmin bool, isKitchen bool) TimesheetEditModalData {
 	return TimesheetEditModalData{
 		TimesheetEntry: entry,
 		ThisStaffID:    thisStaffID,
@@ -359,6 +371,11 @@ func (s *Server) HandleGetTimesheetEditModal(w http.ResponseWriter, r *http.Requ
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	data := MakeTimesheetEditModalStruct(*entry, thisStaff.ID, s.LoadAllStaff(), thisStaff.IsAdmin, thisStaff.IsKitchen)
+	allStaff, err := s.Repos.Staff.LoadAllStaff()
+	if err != nil {
+		log.Printf("Error loading all staff")
+		allStaff = []*models.StaffMember{}
+	}
+	data := MakeTimesheetEditModalStruct(*entry, thisStaff.ID, allStaff, thisStaff.IsAdmin, thisStaff.IsKitchen)
 	s.renderTemplate(w, "timesheetEditModal", data)
 }
