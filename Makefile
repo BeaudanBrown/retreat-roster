@@ -30,6 +30,10 @@ docker-push: build
 	docker tag retreat-roster docker.beaudan.me/retreat-roster
 	docker push docker.beaudan.me/retreat-roster:latest
 
+refresh-db:
+	mv ./.devenv/state/mongodb ./.devenv/state/mongodb.bak
+	rsync -r --progress --exclude "diagnostic.data" retreat:~/roster/db_bak/ ./.devenv/state/mongodb
+
 .PHONY: clean
 
 clean:
