@@ -2,6 +2,9 @@ package utils
 
 import (
 	"time"
+	"log"
+
+	"github.com/pkg/errors"
 )
 
 func GetLastTuesday() time.Time {
@@ -28,4 +31,9 @@ func GetNextTuesday() time.Time {
 		nextTuesday.Day(),
 		0, 0, 0, 0,
 		time.Local)
+}
+
+func PrintError(err error, msg string) {
+	wrappedErr := errors.Wrap(err, msg)
+	log.Printf("%+v", wrappedErr)
 }
