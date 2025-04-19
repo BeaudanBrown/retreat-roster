@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"roster/cmd/server"
+	"roster/cmd/utils"
 
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -16,7 +17,7 @@ import (
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Printf("No .env file found")
+		utils.PrintError(err, "No .env file found")
 	}
 	ctx := context.TODO()
 

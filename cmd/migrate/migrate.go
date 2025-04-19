@@ -1,8 +1,8 @@
 package migrate
 
 import (
-	"log"
 	"roster/cmd/server"
+	"roster/cmd/utils"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -22,10 +22,10 @@ func LoadVersion(s *server.Server) *Version {
 	err := versionCollection.FindOne(s.Context, bson.M{"id": "version"}).Decode(&version)
 	if err != nil {
 		if err != mongo.ErrNoDocuments {
-			log.Printf("Error reading version: %v", err)
+			utils.PrintError(err, "Error reading version")
 			return nil
 		}
-		log.Printf("Creating new version")
+		utils.PrintLog("Creating new version")
 		version = Version{
 			ID:      "version",
 			Version: 1,
@@ -35,17 +35,17 @@ func LoadVersion(s *server.Server) *Version {
 		// Fix up borked databases
 		_, err := versionCollection.DeleteMany(s.Context, bson.M{})
 		if err != nil {
-			log.Printf("Error deleting versions: %v", err)
+			utils.PrintError(err, "Error deleting versions")
 			return nil
 		}
-		log.Printf("Fixing old version")
+		utils.PrintLog("Fixing old version")
 		version = Version{
 			ID:      "version",
 			Version: 2,
 		}
 		_, err = versionCollection.InsertOne(s.Context, version)
 		if err != nil {
-			log.Printf("Error inserting new version: %v", err)
+			utils.PrintError(err, "Error inserting new version")
 			return nil
 		}
 	}
@@ -53,16 +53,16 @@ func LoadVersion(s *server.Server) *Version {
 }
 
 func SaveVersion(s *server.Server, v Version) error {
-	log.Printf("saving version: %v", v.ID)
+	utils.PrintLog("Saving version: %v", v.ID)
 	collection := s.DB.Collection("version")
 	filter := bson.M{"id": v.ID}
 	update := bson.M{"$set": v}
 	opts := options.Update().SetUpsert(true)
 	_, err := collection.UpdateOne(s.Context, filter, update, opts)
 	if err != nil {
-		log.Println("Failed to save version")
+		utils.PrintError(err, "Failed to save version")
 		return err
 	}
-	log.Println("Saved version")
+	utils.PrintLog("Saved version")
 	return nil
 }

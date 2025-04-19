@@ -1,17 +1,19 @@
 package server
 
 import (
-	"log"
 	"math"
+
 	"net/http"
 	"time"
 
-	"roster/cmd/db"
 	"roster/cmd/models"
+	"roster/cmd/repository"
 	"roster/cmd/utils"
 
 	"github.com/google/uuid"
 )
+
+type TimesheetEntry = models.TimesheetEntry
 
 const LEVEL_2_PAY = 24.98
 const LEVEL_3_PAY = 25.8
@@ -26,7 +28,7 @@ const SAT_PAY_MULT = 1.5
 const SUN_PAY_MULT = 1.75
 
 type TimesheetData struct {
-	Entries         []*db.TimesheetEntry
+	Entries         []*models.TimesheetEntry
 	StaffMember     models.StaffMember
 	DayNames        []string
 	AllStaff        []*models.StaffMember
@@ -36,9 +38,11 @@ type TimesheetData struct {
 }
 
 func (s *Server) MakeTimesheetStruct(activeStaff models.StaffMember) TimesheetData {
-	entries := s.GetTimesheetWeek(activeStaff.Config.TimesheetStartDate)
-	if entries == nil {
-		log.Printf("Failed to load timesheet week when making struct")
+	entries, err := s.Repos.Timesheet.GetTimesheetWeek(activeStaff.Config.TimesheetStartDate)
+	if err != nil {
+		utils.PrintError(err, "Failed to load timesheet week")
+		emptyEntries := []*repository.TimesheetEntry{}
+		entries = &emptyEntries
 	}
 
 	//TODO: this can be optimised
@@ -47,7 +51,7 @@ func (s *Server) MakeTimesheetStruct(activeStaff models.StaffMember) TimesheetDa
 	//TODO: Handle errors for LoadAllStaff better
 	allStaff, err := s.Repos.Staff.LoadAllStaff()
 	if err != nil {
-		log.Printf("Error loading all staff")
+		utils.PrintError(err, "Error loading all staff")
 		allStaff = []*models.StaffMember{}
 	}
 
@@ -113,7 +117,6 @@ type DeleteTimesheetEntryBody struct {
 }
 
 func (s *Server) HandleDeleteTimesheetEntry(w http.ResponseWriter, r *http.Request) {
-	log.Println("Delete timesheet entry")
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {
 		return
@@ -124,13 +127,13 @@ func (s *Server) HandleDeleteTimesheetEntry(w http.ResponseWriter, r *http.Reque
 	}
 	entryID, err := uuid.Parse(reqBody.EntryID)
 	if err != nil {
-		log.Printf("Invalid entryID: %v", err)
+		utils.PrintError(err, "Invalid entryID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	err = s.DeleteTimesheetEntry(entryID)
+	err = s.Repos.Timesheet.DeleteTimesheetEntry(entryID)
 	if err != nil {
-		log.Printf("Error deleting timesheet entry: %v", err)
+		utils.PrintError(err, "Error deleting timesheet entry")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -138,21 +141,21 @@ func (s *Server) HandleDeleteTimesheetEntry(w http.ResponseWriter, r *http.Reque
 }
 
 type AddTimesheetEntryBody struct {
-	StaffID   string        `json:"staffID"`
-	DayIdx    int           `json:"dayIdx"`
+	StaffID   string            `json:"staffID"`
+	DayIdx    int               `json:"dayIdx"`
 	StartDate models.CustomDate `json:"startDate"`
-	AdminView bool          `json:"adminView"`
+	AdminView bool              `json:"adminView"`
 }
 
 func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request) {
 	var reqBody AddTimesheetEntryBody
 	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
-		log.Printf("Error parsing body: %v", err)
+		utils.PrintError(err, "Error parsing body")
 		return
 	}
 	staffID, err := uuid.Parse(reqBody.StaffID)
 	if err != nil {
-		log.Printf("Invalid staffID: %v", err)
+		utils.PrintError(err, "Invalid staffID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -163,7 +166,7 @@ func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request)
 	newEntry := MakeEmptyTimesheetEntry(*reqBody.StartDate.Time, staffID)
 	allStaff, err := s.Repos.Staff.LoadAllStaff()
 	if err != nil {
-		log.Printf("Error loading all staff")
+		utils.PrintError(err, "Error loading all staff")
 		allStaff = []*models.StaffMember{}
 	}
 	data := MakeTimesheetEditModalStruct(newEntry, thisStaff.ID, allStaff, thisStaff.IsAdmin, thisStaff.IsKitchen)
@@ -171,40 +174,41 @@ func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request)
 }
 
 type ModifyTimesheetEntryBody struct {
-	StaffID    string        `json:"staffID"`
-	EntryID    string        `json:"entryID"`
+	StaffID    string            `json:"staffID"`
+	EntryID    string            `json:"entryID"`
 	StartDate  models.CustomDate `json:"startDate"`
 	ShiftStart models.CustomDate `json:"shiftStart"`
 	ShiftEnd   models.CustomDate `json:"shiftEnd"`
 	BreakStart models.CustomDate `json:"breakStart"`
 	BreakEnd   models.CustomDate `json:"breakEnd"`
-	Approved   bool          `json:"approved"`
-	ShiftType  string        `json:"shiftType"`
-	AdminView  bool          `json:"adminView"`
-	HasBreak   string        `json:"hasBreak"`
+	Approved   bool              `json:"approved"`
+	ShiftType  string            `json:"shiftType"`
+	AdminView  bool              `json:"adminView"`
+	HasBreak   string            `json:"hasBreak"`
 }
 
 func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Request) {
 	var reqBody ModifyTimesheetEntryBody
 	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
-		log.Printf("Error parsing body: %v", err)
+		utils.PrintError(err, "Error parsing body")
 		return
 	}
 	entryID, err := uuid.Parse(reqBody.EntryID)
 	if err != nil {
-		log.Printf("Invalid entryID: %v", err)
+		utils.PrintError(err, "Invalid entryID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	staffID, err := uuid.Parse(reqBody.StaffID)
 	if err != nil {
-		log.Printf("Invalid staffID: %v", err)
+		utils.PrintError(err, "Invalid staffID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	entry := s.GetTimesheetEntryByID(entryID)
-	if entry == nil {
-		newEntry := db.TimesheetEntry{
+	entry, err := s.Repos.Timesheet.GetTimesheetEntryByID(entryID)
+	if err != nil {
+		utils.PrintError(err, "Failed to get timesheet entry")
+		newEntry := TimesheetEntry{
 			ID:        entryID,
 			StartDate: *reqBody.StartDate.Time,
 		}
@@ -212,7 +216,7 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
 	}
 	entry.StaffID = staffID
 	entry.Approved = reqBody.Approved
-	entry.ShiftType = db.StringToShiftType(reqBody.ShiftType)
+	entry.ShiftType = models.StringToShiftType(reqBody.ShiftType)
 	if reqBody.BreakStart.Time != nil {
 		entry.BreakStart = *reqBody.BreakStart.Time
 	}
@@ -222,7 +226,6 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
 
 	if reqBody.HasBreak == "on" {
 		entry.HasBreak = true
-		log.Println("Had break")
 		if entry.BreakStart.After(entry.BreakEnd) {
 			newBreakEnd := entry.BreakEnd.AddDate(0, 0, 1)
 			entry.BreakEnd = newBreakEnd
@@ -239,7 +242,7 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
 		entry.ShiftEnd = entry.ShiftEnd.AddDate(0, 0, 1)
 	}
 	entry.ShiftLength = math.Round((entry.ShiftEnd.Sub(entry.ShiftStart).Hours()-entry.BreakLength)*100) / 100
-	s.SaveTimesheetEntry(*entry)
+	s.Repos.Timesheet.SaveTimesheetEntry(*entry)
 
 	s.RenderTimesheetTemplate(w, r)
 }
@@ -275,30 +278,30 @@ func (s *Server) HandleToggleApproved(w http.ResponseWriter, r *http.Request) {
 	}
 	entryID, err := uuid.Parse(reqBody.EntryID)
 	if err != nil {
-		log.Printf("Invalid entryID: %v", err)
+		utils.PrintError(err, "Invalid entryID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	entry := s.GetTimesheetEntryByID(entryID)
-	if entry == nil {
-		log.Println("Couldn't find entry to modify")
+	entry, err := s.Repos.Timesheet.GetTimesheetEntryByID(entryID)
+	if err != nil {
+		utils.PrintError(err, "Couldn't find entry to modify")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	entry.Approved = !entry.Approved
-	s.SaveTimesheetEntry(*entry)
+	s.Repos.Timesheet.SaveTimesheetEntry(*entry)
 
 	s.RenderTimesheetTemplate(w, r)
 }
 
 type TimesheetEntryData struct {
-	db.TimesheetEntry
+	TimesheetEntry
 	ActiveStaff models.StaffMember
 	EntryStaff  models.StaffMember
 	ShowAll     bool
 }
 
-func MakeTimesheetEntryStruct(entry db.TimesheetEntry, activeStaff models.StaffMember, allStaff []*models.StaffMember, showAll bool) TimesheetEntryData {
+func MakeTimesheetEntryStruct(entry TimesheetEntry, activeStaff models.StaffMember, allStaff []*models.StaffMember, showAll bool) TimesheetEntryData {
 	entryStaff := models.GetStaffFromList(entry.StaffID, allStaff)
 	if entryStaff == nil {
 		// TODO: This is not ideal
@@ -313,19 +316,19 @@ func MakeTimesheetEntryStruct(entry db.TimesheetEntry, activeStaff models.StaffM
 }
 
 type TimesheetEditModalData struct {
-	db.TimesheetEntry
+	TimesheetEntry
 	ThisStaffID uuid.UUID
 	AllStaff    []*models.StaffMember
 	IsAdmin     bool
 	IsKitchen   bool
 }
 
-func MakeEmptyTimesheetEntry(startDate time.Time, staffID uuid.UUID) db.TimesheetEntry {
+func MakeEmptyTimesheetEntry(startDate time.Time, staffID uuid.UUID) TimesheetEntry {
 	year, month, day := startDate.Date()
 	dateOnly := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
-	start := db.LastWholeHour()
-	end := db.NextWholeHour()
-	newEntry := db.TimesheetEntry{
+	start := utils.LastWholeHour()
+	end := utils.NextWholeHour()
+	newEntry := TimesheetEntry{
 		ID:          uuid.New(),
 		StaffID:     staffID,
 		StartDate:   dateOnly,
@@ -336,7 +339,7 @@ func MakeEmptyTimesheetEntry(startDate time.Time, staffID uuid.UUID) db.Timeshee
 	return newEntry
 }
 
-func MakeTimesheetEditModalStruct(entry db.TimesheetEntry, thisStaffID uuid.UUID, allStaff []*models.StaffMember, isAdmin bool, isKitchen bool) TimesheetEditModalData {
+func MakeTimesheetEditModalStruct(entry TimesheetEntry, thisStaffID uuid.UUID, allStaff []*models.StaffMember, isAdmin bool, isKitchen bool) TimesheetEditModalData {
 	return TimesheetEditModalData{
 		TimesheetEntry: entry,
 		ThisStaffID:    thisStaffID,
@@ -361,19 +364,19 @@ func (s *Server) HandleGetTimesheetEditModal(w http.ResponseWriter, r *http.Requ
 	}
 	entryID, err := uuid.Parse(reqBody.EntryID)
 	if err != nil {
-		log.Printf("Invalid entryID: %v", err)
+		utils.PrintError(err, "Invalid entryID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	entry := s.GetTimesheetEntryByID(entryID)
-	if entry == nil {
-		log.Println("Couldn't find entry to modify")
+	entry, err := s.Repos.Timesheet.GetTimesheetEntryByID(entryID)
+	if err != nil {
+		utils.PrintError(err, "Couldn't find entry to modify")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	allStaff, err := s.Repos.Staff.LoadAllStaff()
 	if err != nil {
-		log.Printf("Error loading all staff")
+		utils.PrintError(err, "Error loading all staff")
 		allStaff = []*models.StaffMember{}
 	}
 	data := MakeTimesheetEditModalStruct(*entry, thisStaff.ID, allStaff, thisStaff.IsAdmin, thisStaff.IsKitchen)

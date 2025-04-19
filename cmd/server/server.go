@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"log"
 	"math"
 	"net/http"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"roster/cmd/db"
 	"roster/cmd/models"
 	"roster/cmd/repository"
+	"roster/cmd/utils"
 
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -30,14 +30,15 @@ type Server struct {
 }
 
 type Repositories struct {
-	Staff repository.StaffRepository
+	Staff      repository.StaffRepository
 	RosterWeek repository.RosterWeekRepository
+	Timesheet  repository.TimesheetRepository
 }
 
 func (s *Server) renderTemplate(w http.ResponseWriter, templateName string, data any) {
 	err := s.Templates.ExecuteTemplate(w, templateName, data)
 	if err != nil {
-		log.Printf("Error executing template: %v\n", err)
+		utils.PrintError(err, "Error executing template")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -56,23 +57,22 @@ func (s *Server) VerifyAdmin(handler http.HandlerFunc) http.HandlerFunc {
 func GetTokenFromCookies(r *http.Request) *uuid.UUID {
 	cookie, err := r.Cookie("session_token")
 	if err != nil {
-		log.Printf("Error getting session_token: %v", err)
+		utils.PrintError(err, "Error getting session_token")
 		return nil
 	}
 	sessionTokenStr := cookie.Value
 
 	sessionToken, err := uuid.Parse(sessionTokenStr)
 	if err != nil {
-		log.Printf("Error parsing session token: %v", err)
+		utils.PrintError(err, "Error parsing session token")
 		return nil
 	}
-	log.Printf("Retrieved token: %v", sessionToken)
+	utils.PrintLog("Retrieved token: %v", sessionToken)
 	return &sessionToken
 }
 
 func (s *Server) VerifySession(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("Verify")
 		sessionToken := GetTokenFromCookies(r)
 		if sessionToken == nil {
 			http.Redirect(w, r, "/landing", http.StatusSeeOther)
@@ -81,12 +81,12 @@ func (s *Server) VerifySession(handler http.HandlerFunc) http.HandlerFunc {
 
 		staffMember, err := s.Repos.Staff.GetStaffByToken(*sessionToken)
 		if err != nil {
-			log.Println("Invalid session")
+			utils.PrintError(err, "Invalid session")
 			http.Redirect(w, r, "/landing", http.StatusSeeOther)
 			return
 		}
 		if staffMember.FirstName == "" && r.URL.String() != "/newAccount" && r.URL.String() != "/createAccount" {
-			log.Println("Account not created yet")
+			utils.PrintLog("Account not created yet")
 			http.Redirect(w, r, "/newAccount", http.StatusSeeOther)
 			return
 		}
@@ -100,7 +100,7 @@ func (s *Server) VerifySession(handler http.HandlerFunc) http.HandlerFunc {
 func ReadAndUnmarshal(w http.ResponseWriter, r *http.Request, reqBody any) error {
 	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		log.Printf("Error reading body: %v", err)
+		utils.PrintError(err, "Error reading body")
 		w.WriteHeader(http.StatusBadRequest)
 		return err
 	}
@@ -108,8 +108,7 @@ func ReadAndUnmarshal(w http.ResponseWriter, r *http.Request, reqBody any) error
 
 	err = json.Unmarshal(bytes, reqBody)
 	if err != nil {
-		log.Printf("json: %v", string(bytes))
-		log.Printf("Error parsing json: %v", err)
+		utils.PrintError(err, "Error parsing json")
 		w.WriteHeader(http.StatusBadRequest)
 		return err
 	}
@@ -122,6 +121,7 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 	var err error
 	staffRepo := repository.NewMongoStaffRepository(context, d)
 	rosterWeekRepo := repository.NewMongoRosterWeekRepository(context, d)
+	timesheetRepo := repository.NewMongoTimesheetRepository(context, d)
 	serverState = Server{
 		CacheBust: fmt.Sprintf("%v", time.Now().UnixNano()),
 		Templates: template.New("").Funcs(template.FuncMap{
@@ -132,19 +132,19 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 			"MemberIsAssigned":         MemberIsAssigned,
 			"MakeTimesheetEntryStruct": MakeTimesheetEntryStruct,
 			"GetSortedLeaveReqs":       GetSortedLeaveReqs,
-			"GetAllShiftTypes":         db.GetAllShiftTypes,
-			"DisableTimesheet":         db.DisableTimesheet,
+			"GetAllShiftTypes":         models.GetAllShiftTypes,
+			"DisableTimesheet":         models.DisableTimesheet,
 			"addDays": func(t time.Time, days int) time.Time {
 				return t.AddDate(0, 0, days)
 			},
 			"roundFloat": func(val float64) float64 {
 				return math.Round(val*100) / 100
 			},
-			"IsKichenShift": func(shiftType db.ShiftType) bool {
-				return shiftType == db.Kitchen
+			"IsKichenShift": func(shiftType models.ShiftType) bool {
+				return shiftType == models.Kitchen
 			},
-			"AdminShiftTypeStart": func() db.ShiftType {
-				return db.DayManager
+			"AdminShiftTypeStart": func() models.ShiftType {
+				return models.DayManager
 			},
 			"MakePickerStruct":   MakePickerStruct,
 			"MakeLeaveReqStruct": MakeLeaveReqStruct,
@@ -175,8 +175,9 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 			Context: context,
 		},
 		Repos: Repositories{
-			Staff: staffRepo,
+			Staff:      staffRepo,
 			RosterWeek: rosterWeekRepo,
+			Timesheet:  timesheetRepo,
 		},
 	}
 	serverState.Templates, err = serverState.Templates.ParseGlob("./www/*.html")
@@ -189,17 +190,17 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 func (s *Server) GetSessionUser(w http.ResponseWriter, r *http.Request) *models.StaffMember {
 	sessionToken, ok := r.Context().Value(SESSION_KEY).(uuid.UUID)
 	if !ok {
-		log.Printf("No session for using")
+		utils.PrintLog("No session for user")
 		return nil
 	}
 	staff, err := s.Repos.Staff.GetStaffByToken(sessionToken)
 	if err != nil {
-		log.Printf("Error retrieving session user")
+		utils.PrintError(err, "Error retrieving session user")
 		return nil
 	}
 	refreshedStaff, err := s.Repos.Staff.RefreshStaffConfig(*staff)
 	if err != nil {
-		log.Printf("Error retrieving session user")
+		utils.PrintError(err, "Error refreshing staff config")
 		return nil
 	}
 	return &refreshedStaff
