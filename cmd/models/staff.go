@@ -2,7 +2,7 @@ package models
 
 import (
 	"encoding/json"
-	"log"
+	"roster/cmd/utils"
 	"time"
 
 	"github.com/google/uuid"
@@ -245,7 +245,7 @@ func (cd *CustomDate) UnmarshalJSON(input []byte) error {
 			parseErr = err
 		}
 	}
-	log.Printf("Invalid time in CustomDate: %v", parseErr)
+	utils.PrintError(parseErr, "Invalid time in CustomDate")
 	cd.Time = nil
 	return nil
 }

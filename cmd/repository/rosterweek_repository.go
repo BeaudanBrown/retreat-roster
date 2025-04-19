@@ -3,10 +3,10 @@ package repository
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"roster/cmd/models"
+	"roster/cmd/utils"
 
 	"github.com/google/uuid"
 
@@ -48,7 +48,7 @@ func (r *MongoRosterWeekRepository) SaveRosterWeek(week *models.RosterWeek) erro
 	if err != nil {
 		return fmt.Errorf("failed to save roster week (id: %v): %w", week.ID, err)
 	}
-	log.Printf("Saved roster week (id: %v)", week.ID)
+	utils.PrintLog("Saved roster week (id: %v)", week.ID)
 	return nil
 }
 
@@ -65,13 +65,12 @@ func (r *MongoRosterWeekRepository) SaveAllRosterWeeks(weeks []*models.RosterWee
 	if err != nil {
 		return fmt.Errorf("failed to bulk save roster weeks: %w", err)
 	}
-	log.Printf("Bulk saved roster weeks: %d modified, %d upserted", results.ModifiedCount, results.UpsertedCount)
+	utils.PrintLog("Bulk saved roster weeks: %d modified, %d upserted", results.ModifiedCount, results.UpsertedCount)
 	return nil
 }
 
 // LoadAllRosterWeeks returns all roster weeks from the database.
 func (r *MongoRosterWeekRepository) LoadAllRosterWeeks() ([]*models.RosterWeek, error) {
-	log.Printf("Loading all rosters")
 	cursor, err := r.collection.Find(r.ctx, bson.M{})
 	if err != nil {
 		return nil, fmt.Errorf("error executing query for all roster weeks: %w", err)
@@ -82,7 +81,7 @@ func (r *MongoRosterWeekRepository) LoadAllRosterWeeks() ([]*models.RosterWeek, 
 	for cursor.Next(r.ctx) {
 		var week models.RosterWeek
 		if err := cursor.Decode(&week); err != nil {
-			log.Printf("error decoding roster week: %v", err)
+			utils.PrintError(err, "Error decoding roster week")
 			continue
 		}
 		weeks = append(weeks, &week)
@@ -95,12 +94,10 @@ func (r *MongoRosterWeekRepository) LoadAllRosterWeeks() ([]*models.RosterWeek, 
 func (r *MongoRosterWeekRepository) LoadRosterWeek(startDate time.Time) (*models.RosterWeek, error) {
 	// Ensure the time is converted to UTC for comparing with stored ISO dates.
 	filter := bson.M{"startDate": startDate.UTC()}
-	log.Printf("LoadRosterWeek Start date: %v", startDate)
-	log.Printf("LoadRosterWeek UTC: %v", startDate.UTC())
 	var rosterWeek models.RosterWeek
 	err := r.collection.FindOne(r.ctx, filter).Decode(&rosterWeek)
 	if err == mongo.ErrNoDocuments {
-		log.Printf("Roster week not found for date: %v. Creating new...", startDate)
+		utils.PrintError(err, "Creating new roster week")
 		newWeek := newRosterWeek(startDate)
 		if saveErr := r.SaveRosterWeek(&newWeek); saveErr != nil {
 			return nil, fmt.Errorf("failed to save new roster week: %w", saveErr)
@@ -108,9 +105,6 @@ func (r *MongoRosterWeekRepository) LoadRosterWeek(startDate time.Time) (*models
 		return &newWeek, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("error loading roster week: %w", err)
-	}
-	for _, row := range rosterWeek.Days[0].Rows {
-		log.Printf("Loaded: %v", row.Early.StaffString)
 	}
 	return &rosterWeek, nil
 }

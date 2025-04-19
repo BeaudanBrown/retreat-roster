@@ -4,10 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"slices"
 	"sort"
 	"time"
-	"slices"
 
 	"roster/cmd/models"
 	"roster/cmd/utils"
@@ -86,7 +85,7 @@ func (repo *MongoStaffRepository) LoadAllStaff() ([]*models.StaffMember, error) 
 	for cursor.Next(repo.ctx) {
 		var s models.StaffMember
 		if err := cursor.Decode(&s); err != nil {
-			log.Printf("LoadAllStaff: error decoding staff member: %v", err)
+			utils.PrintError(err, "Error decoding staff member")
 			continue
 		}
 		// Only include valid records.
@@ -282,4 +281,3 @@ func emptyAvailability() []models.DayAvailability {
 		},
 	}
 }
-

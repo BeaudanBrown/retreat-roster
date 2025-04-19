@@ -1,7 +1,6 @@
 package server
 
 import (
-	"log"
 	"net/http"
 	"sort"
 	"strconv"
@@ -90,13 +89,13 @@ func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
 		if editStaffIdParam != "" {
 			editStaffId, err := uuid.Parse(editStaffIdParam)
 			if err != nil {
-				log.Printf("Invalid UUID: %v", err)
+				utils.PrintError(err, "Invalid UUID")
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
 			staff, err := s.Repos.Staff.GetStaffByID(editStaffId)
 			if err != nil {
-				utils.PrintError(err, "HandleProfileIndex: Failed to get staff by ID")
+				utils.PrintError(err, "Failed to get staff by ID")
 				w.WriteHeader(http.StatusNotFound)
 				return
 			} else {
@@ -110,7 +109,7 @@ func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
 
 	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(editStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleProfileIndex: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -124,7 +123,7 @@ func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
 
 	err = s.Templates.ExecuteTemplate(w, "profileIndex", data)
 	if err != nil {
-		log.Fatalf("Error executing template: %v", err)
+		utils.PrintError(err, "Error executing template")
 		return
 	}
 }
@@ -136,7 +135,7 @@ func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(staff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleProfile: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
 
@@ -149,7 +148,6 @@ func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
-	log.Println("Submit leave request")
 	var reqBody models.LeaveRequest
 	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
 		return
@@ -267,14 +265,13 @@ func (s *Server) ApplyModifyProfileBody(reqBody ModifyProfileBody, staffMember m
 }
 
 func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
-	log.Println("Modify profile")
 	var reqBody ModifyProfileBody
 	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
 		return
 	}
 	staffID, err := uuid.Parse(reqBody.ID)
 	if err != nil {
-		log.Printf("Invalid staffID: %v", err)
+		utils.PrintError(err, "Invalid staffID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -287,14 +284,14 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if activeStaff.ID != staff.ID && !activeStaff.IsAdmin {
-		log.Printf("Insufficient privilledges: %v", err)
+		utils.PrintError(err, "Insufficient privilledges")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	updatedStaff := s.ApplyModifyProfileBody(reqBody, *staff)
 	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(staff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleModifyProfile: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
 	data := ProfileData{
@@ -314,20 +311,19 @@ type DeleteLeaveBody struct {
 }
 
 func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
-	log.Println("Delete leave request")
 	var reqBody DeleteLeaveBody
 	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
 		return
 	}
 	leaveID, err := uuid.Parse(reqBody.ID)
 	if err != nil {
-		log.Printf("Invalid leaveID: %v", err)
+		utils.PrintError(err, "Invalid leaveID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	staffID, err := uuid.Parse(reqBody.StaffID)
 	if err != nil {
-		log.Printf("Invalid staffID: %v", err)
+		utils.PrintError(err, "Invalid staffID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -338,20 +334,20 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
 
 	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleDeleteLeaveReq: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
 
 	staffMember, err := s.Repos.Staff.GetStaffByID(staffID)
 	if err != nil {
-		utils.PrintError(err, "HandleDeleteLeaveReq: Failed to load staff member")
+		utils.PrintError(err, "Failed to load staff member")
 		s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *rosterWeek))
 		return
 	}
 
 	err = s.Repos.Staff.DeleteLeaveReqByID(*staffMember, leaveID)
 	if err != nil {
-		utils.PrintError(err, "HandleDeleteLeaveReq: Failed delete leave request")
+		utils.PrintError(err, "Failed delete leave request")
 		return
 	}
 	if reqBody.Page == "root" {
@@ -378,7 +374,7 @@ func (s *Server) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 	accID, err := uuid.Parse(reqBody.ID)
 	thisStaff := s.GetSessionUser(w, r)
 	if err != nil || thisStaff == nil {
-		log.Printf("Invalid accID: %v", err)
+		utils.PrintError(err, "Invalid accID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -386,13 +382,14 @@ func (s *Server) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 	filter := bson.M{"id": accID}
 	_, err = collection.DeleteOne(s.Context, filter)
 	if err != nil {
-		log.Fatalf("Failed to delete document: %v", err)
+		utils.PrintError(err, "Failed to delete document")
+		return
 	}
 	selfDelete := thisStaff.ID == accID
 
 	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleDeleteAccount: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
 

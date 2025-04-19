@@ -6,7 +6,6 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"sort"
@@ -14,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"roster/cmd/db"
 	"roster/cmd/models"
+	"roster/cmd/repository"
 	"roster/cmd/utils"
 
 	"github.com/google/uuid"
@@ -33,7 +32,7 @@ type RootStruct struct {
 func (s *Server) MakeRootStruct(activeStaff models.StaffMember, week models.RosterWeek) RootStruct {
 	allStaff, err := s.Repos.Staff.LoadAllStaff()
 	if err != nil {
-		utils.PrintError(err, "MakeRootStruct: Failed to load all staff")
+		utils.PrintError(err, "Failed to load all staff")
 		allStaff = []*models.StaffMember{}
 	}
 
@@ -57,7 +56,7 @@ func MakeDayStruct(isLive bool, day models.RosterDay, s *Server, activeStaff mod
 	date := activeStaff.Config.RosterStartDate.AddDate(0, 0, day.Offset)
 	allStaff, err := s.Repos.Staff.LoadAllStaff()
 	if err != nil {
-		utils.PrintError(err, "MakeRootStruct: Failed to load all staff")
+		utils.PrintError(err, "Failed to load all staff")
 		allStaff = []*models.StaffMember{}
 	}
 	return DayStruct{
@@ -80,13 +79,13 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {
 		s.HandleGoogleLogout(w, r)
-		log.Printf("Couldn't find staff member")
+		utils.PrintLog("Couldn't find staff member")
 		return
 	}
-	log.Printf("roster Start Date: %v", thisStaff.Config.RosterStartDate)
+	utils.PrintLog("roster Start Date: %v", thisStaff.Config.RosterStartDate)
 	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleGoogleCallback: Error creating staff member")
+		utils.PrintError(err, "Error creating staff member")
 	}
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
@@ -173,50 +172,44 @@ func (s *Server) HandleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 
 	staffMember, err := s.Repos.Staff.GetStaffByGoogleID(userInfo.ID)
 	if err != nil {
-		utils.PrintError(err, "HandleGoogleCallback: Failed to get staff by google id")
+		utils.PrintError(err, "Failed to get staff by google id")
 		http.Redirect(w, r, "/landing", http.StatusSeeOther)
 		return
 	} else if staffMember == nil {
-		log.Printf("Creating new staff member")
+		utils.PrintLog("Creating new staff member")
 		err := s.Repos.Staff.CreateStaffMember(userInfo.ID, sessionToken)
 		if err != nil {
-			utils.PrintError(err, "HandleGoogleCallback: Error creating staff member")
+			utils.PrintError(err, "Error creating staff member")
 			http.Redirect(w, r, "/landing", http.StatusSeeOther)
 			return
 		}
 		http.Redirect(w, r, "/newAccount", http.StatusSeeOther)
 	} else {
-		log.Printf("Updating staff token ID")
+		utils.PrintLog("Updating staff token ID")
 		err := s.Repos.Staff.UpdateStaffToken(staffMember, sessionToken)
 		if err != nil {
-			utils.PrintError(err, "HandleGoogleCallback: Error logging in with google")
+			utils.PrintError(err, "Error logging in with google")
 		}
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
 }
 
 func (s *Server) HandleCreateAccount(w http.ResponseWriter, r *http.Request) {
-	sessionToken := GetTokenFromCookies(r)
-	if sessionToken == nil {
-		log.Printf("No token for new account")
-		http.Redirect(w, r, "/landing", http.StatusSeeOther)
-		return
-	}
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {
-		log.Printf("No database entry for new account")
+		utils.PrintLog("No database entry for new account")
 		http.Redirect(w, r, "/landing", http.StatusSeeOther)
 		return
 	}
 	var reqBody ModifyProfileBody
 	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
-		log.Printf("Error parsing create account body: %v", err)
+		utils.PrintError(err, "Error parsing create account body")
 		http.Redirect(w, r, "/landing", http.StatusSeeOther)
 		return
 	}
 	updatedStaff := s.ApplyModifyProfileBody(reqBody, *thisStaff)
 	if err := s.Repos.Staff.SaveStaffMember(updatedStaff); err != nil {
-		log.Printf("Error creating staff member: %v", err)
+		utils.PrintError(err, "Error creating staff member")
 		http.Redirect(w, r, "/landing", http.StatusSeeOther)
 		return
 	}
@@ -227,18 +220,18 @@ func (s *Server) HandleCreateAccount(w http.ResponseWriter, r *http.Request) {
 func (s *Server) HandleNewAccount(w http.ResponseWriter, r *http.Request) {
 	sessionToken := GetTokenFromCookies(r)
 	if sessionToken == nil {
-		log.Printf("No token for new account")
+		utils.PrintLog("No token for new account")
 		http.Redirect(w, r, "/landing", http.StatusSeeOther)
 		return
 	}
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {
-		log.Printf("No database entry for new account")
+		utils.PrintLog("No database entry for new account")
 		http.Redirect(w, r, "/landing", http.StatusSeeOther)
 		return
 	}
 	if thisStaff.FirstName != "" {
-		log.Printf("Account is already initialised")
+		utils.PrintLog("Account is already initialised")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
@@ -258,7 +251,7 @@ func (s *Server) HandleModifyDescriptionSlot(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		log.Printf("Error parsing form: %v", err)
+		utils.PrintError(err, "Error parsing form")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -266,18 +259,18 @@ func (s *Server) HandleModifyDescriptionSlot(w http.ResponseWriter, r *http.Requ
 	descVal := r.FormValue("descVal")
 	slotID, err := uuid.Parse(slotIDStr)
 	if err != nil {
-		log.Printf("Invalid SlotID: %v", err)
+		utils.PrintError(err, "Invalid SlotID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleModifyDescriptionSlot: Failed to get roster week")
+		utils.PrintError(err, "Failed to get roster week")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
 	slot := week.GetSlotByID(slotID)
 	if slot == nil {
-		log.Printf("Invalid slotID: %v", err)
+		utils.PrintError(err, "Invalid slotID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -292,7 +285,7 @@ func (s *Server) HandleModifyTimeSlot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		log.Printf("Error parsing form: %v", err)
+		utils.PrintError(err, "Error parsing form")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -300,20 +293,20 @@ func (s *Server) HandleModifyTimeSlot(w http.ResponseWriter, r *http.Request) {
 	timeVal := r.FormValue("timeVal")
 	slotID, err := uuid.Parse(slotIDStr)
 	if err != nil {
-		log.Printf("Invalid SlotID: %v", err)
+		utils.PrintError(err, "Invalid SlotID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	log.Printf("Modify %v timeslot id: %v", slotID, timeVal)
+	utils.PrintLog("Modify %v timeslot id: %v", slotID, timeVal)
 	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleModifyTimeSlot: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
 
 	slot := week.GetSlotByID(slotID)
 	if slot == nil {
-		log.Printf("Invalid slotID: %v", err)
+		utils.PrintError(err, "Invalid slotID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -324,7 +317,7 @@ func (s *Server) HandleModifyTimeSlot(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		log.Printf("Error parsing form: %v", err)
+		utils.PrintError(err, "Error parsing form")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -337,18 +330,18 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
 	staffIDStr := r.FormValue("staffID")
 	slotID, err := uuid.Parse(slotIDStr)
 	if err != nil {
-		log.Printf("Invalid SlotID: %v", err)
+		utils.PrintError(err, "Invalid SlotID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleModifySlot: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
 	slot := week.GetSlotByID(slotID)
 	if slot == nil {
-		log.Printf("Invalid slotID: %v", err)
+		utils.PrintError(err, "Invalid slotID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -358,10 +351,10 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
 		slot.AssignedStaff = nil
 		slot.StaffString = nil
 	} else {
-		log.Printf("Modify %v slot id: %v, staffid: %v", slotID, slotID, staffID)
+		utils.PrintLog("Modify %v slot id: %v, staffid: %v", slotID, slotID, staffID)
 		member, err := s.Repos.Staff.GetStaffByID(staffID)
 		if err != nil {
-				utils.PrintError(err, "HandleModifySlot: failed to get staff by ID")
+			utils.PrintError(err, "failed to get staff by ID")
 		} else {
 			slot.AssignedStaff = &member.ID
 			if member.NickName != "" {
@@ -382,33 +375,32 @@ type ToggleKitchenBody struct {
 }
 
 func (s *Server) HandleToggleKitchen(w http.ResponseWriter, r *http.Request) {
-	log.Println("Toggle kitchen")
 	var reqBody ToggleKitchenBody
 	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
-		log.Println("Failed to load")
+		utils.PrintError(err, "Failed to unmarshal body")
 		return
 	}
 	accID, err := uuid.Parse(reqBody.ID)
 	if err != nil {
-		log.Printf("Invalid accID: %v", err)
+		utils.PrintError(err, "Invalid accID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	staffMember, err := s.Repos.Staff.GetStaffByID(accID)
 	if err != nil {
-			utils.PrintError(err, "HandleToggleKitchen: failed to get staff by ID")
+		utils.PrintError(err, "failed to get staff by ID")
 	} else {
 		staffMember.IsKitchen = !staffMember.IsKitchen
 		s.Repos.Staff.SaveStaffMember(*staffMember)
 	}
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {
-		log.Println("Couldn't find staff")
+		utils.PrintLog("Couldn't find staff")
 		return
 	}
 	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleToggleKitchen: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
@@ -425,13 +417,13 @@ func (s *Server) HandleToggleAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 	accID, err := uuid.Parse(reqBody.ID)
 	if err != nil {
-		log.Printf("Invalid accID: %v", err)
+		utils.PrintError(err, "Invalid accID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	staffMember, err := s.Repos.Staff.GetStaffByID(accID)
 	if err != nil {
-			utils.PrintError(err, "HandleToggleAdmin: failed to get staff by ID")
+		utils.PrintError(err, "failed to get staff by ID")
 	} else {
 		staffMember.IsAdmin = !staffMember.IsAdmin
 		s.Repos.Staff.SaveStaffMember(*staffMember)
@@ -442,7 +434,7 @@ func (s *Server) HandleToggleAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleToggleAdmin: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
@@ -459,13 +451,13 @@ func (s *Server) HandleToggleHidden(w http.ResponseWriter, r *http.Request) {
 	}
 	accID, err := uuid.Parse(reqBody.ID)
 	if err != nil {
-		log.Printf("Invalid accID: %v", err)
+		utils.PrintError(err, "Invalid accID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	staffMember, err := s.Repos.Staff.GetStaffByID(accID)
 	if err != nil {
-			utils.PrintError(err, "HandleToggleHidden: failed to get staff by ID")
+		utils.PrintError(err, "failed to get staff by ID")
 	} else {
 		staffMember.IsHidden = !staffMember.IsHidden
 		s.Repos.Staff.SaveStaffMember(*staffMember)
@@ -476,7 +468,7 @@ func (s *Server) HandleToggleHidden(w http.ResponseWriter, r *http.Request) {
 	}
 	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleToggleHidden: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
 	for _, day := range week.Days {
@@ -513,7 +505,7 @@ func (s *Server) HandleToggleHideByIdeal(w http.ResponseWriter, r *http.Request)
 	s.Repos.Staff.SaveStaffMember(*thisStaff)
 	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleToggleHideByIdeal: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
@@ -528,7 +520,7 @@ func (s *Server) HandleToggleHideByPreferences(w http.ResponseWriter, r *http.Re
 	s.Repos.Staff.SaveStaffMember(*thisStaff)
 	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleToggleHideByPreferences: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
@@ -543,7 +535,7 @@ func (s *Server) HandleToggleHideByLeave(w http.ResponseWriter, r *http.Request)
 	s.Repos.Staff.SaveStaffMember(*thisStaff)
 	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleToggleHideByLeave: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
@@ -556,7 +548,7 @@ func (s *Server) HandleToggleLive(w http.ResponseWriter, r *http.Request) {
 	}
 	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleToggleLive: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
 	week.IsLive = !week.IsLive
@@ -575,7 +567,7 @@ func (s *Server) HandleToggleAmelia(w http.ResponseWriter, r *http.Request) {
 	}
 	dayID, err := uuid.Parse(reqBody.DayID)
 	if err != nil {
-		log.Printf("Invalid dayID: %v", err)
+		utils.PrintError(err, "Invalid dayID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -585,12 +577,12 @@ func (s *Server) HandleToggleAmelia(w http.ResponseWriter, r *http.Request) {
 	}
 	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleToggleAmelia: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
 	day := week.GetDayByID(dayID)
 	if day == nil {
-		log.Printf("Invalid dayID: %v", err)
+		utils.PrintError(err, "Invalid dayID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -610,7 +602,7 @@ func (s *Server) HandleToggleClosed(w http.ResponseWriter, r *http.Request) {
 	}
 	dayID, err := uuid.Parse(reqBody.DayID)
 	if err != nil {
-		log.Printf("Invalid dayID: %v", err)
+		utils.PrintError(err, "Invalid dayID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -620,13 +612,13 @@ func (s *Server) HandleToggleClosed(w http.ResponseWriter, r *http.Request) {
 	}
 	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleToggleClosed: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	day := week.GetDayByID(dayID)
 	if day == nil {
-		log.Printf("Invalid dayID: %v", err)
+		utils.PrintError(err, "Invalid dayID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -652,7 +644,7 @@ func (s *Server) HandleAddTrial(w http.ResponseWriter, r *http.Request) {
 	}
 	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleAddTrial: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -683,7 +675,7 @@ func (s *Server) HandleShiftWindow(w http.ResponseWriter, r *http.Request) {
 	s.Repos.Staff.SaveStaffMember(*thisStaff)
 	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleShiftWindow: Failed to load roster week")
+		utils.PrintError(err, "Failed to load roster week")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -703,7 +695,7 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
 
 	dayID, err := uuid.Parse(reqBody.DayID)
 	if err != nil {
-		log.Printf("Invalid dayID: %v", err)
+		utils.PrintError(err, "Invalid dayID")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -714,7 +706,7 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
 
 	newDay, isLive, err := s.Repos.RosterWeek.ChangeDayRowCount(thisStaff.Config.RosterStartDate, dayID, reqBody.Action)
 	if err != nil {
-		utils.PrintError(err, "HandleModifyRows: Failed to change day row count")
+		utils.PrintError(err, "Failed to change day row count")
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -788,7 +780,7 @@ func maxTime(t1, t2 time.Time) time.Time {
 	return t2
 }
 
-func GetWorkFromEntry(windowStart time.Time, windowEnd time.Time, entry db.TimesheetEntry) float64 {
+func GetWorkFromEntry(windowStart time.Time, windowEnd time.Time, entry models.TimesheetEntry) float64 {
 	shiftStart := maxTime(windowStart, entry.ShiftStart)
 	shiftEnd := minTime(windowEnd, entry.ShiftEnd)
 	if shiftStart.After(shiftEnd) {
@@ -855,7 +847,7 @@ type DayBreakdown struct {
 	After12Hrs  float64
 }
 
-func ApplyEntryToLevel(dayBreakdown DayBreakdown, thisDate time.Time, entry db.TimesheetEntry) DayBreakdown {
+func ApplyEntryToLevel(dayBreakdown DayBreakdown, thisDate time.Time, entry models.TimesheetEntry) DayBreakdown {
 	ordinaryWindowStart := thisDate.Add(time.Duration(7) * time.Hour)
 	ordinaryWindowEnd := thisDate.Add(time.Duration(19) * time.Hour)
 	eveningWindowStart := ordinaryWindowEnd
@@ -869,38 +861,38 @@ func ApplyEntryToLevel(dayBreakdown DayBreakdown, thisDate time.Time, entry db.T
 	return dayBreakdown
 }
 
-func AddEntryToPaydata(entry db.TimesheetEntry, thisDate time.Time, day DayIdx, payData StaffPayData) StaffPayData {
-	if entry.ShiftType == db.Bar || entry.ShiftType == db.Deliveries || entry.ShiftType == db.Admin {
+func AddEntryToPaydata(entry models.TimesheetEntry, thisDate time.Time, day DayIdx, payData StaffPayData) StaffPayData {
+	if entry.ShiftType == models.Bar || entry.ShiftType == models.Deliveries || entry.ShiftType == models.Admin {
 		payData.Level2Hrs[day] = ApplyEntryToLevel(payData.Level2Hrs[day], thisDate, entry)
-	} else if entry.ShiftType == db.DayManager {
+	} else if entry.ShiftType == models.DayManager {
 		if day != Friday && day != Saturday && day != Sunday {
 			payData.Level3Hrs[day] = ApplyEntryToLevel(payData.Level3Hrs[day], thisDate, entry)
 		} else {
 			// day == Friday, Saturday or Sunday
 			payData.Level4Hrs[day] = ApplyEntryToLevel(payData.Level4Hrs[day], thisDate, entry)
 		}
-	} else if entry.ShiftType == db.NightManager {
+	} else if entry.ShiftType == models.NightManager {
 		payData.Level5Hrs[day] = ApplyEntryToLevel(payData.Level5Hrs[day], thisDate, entry)
-	} else if entry.ShiftType == db.AmeliaSupervisor {
+	} else if entry.ShiftType == models.AmeliaSupervisor {
 		payData.Level4Hrs[day] = ApplyEntryToLevel(payData.Level4Hrs[day], thisDate, entry)
-	} else if entry.ShiftType == db.GeneralManagement {
+	} else if entry.ShiftType == models.GeneralManagement {
 		payData.General[day] = ApplyEntryToLevel(payData.General[day], thisDate, entry)
-	} else if entry.ShiftType == db.Kitchen {
+	} else if entry.ShiftType == models.Kitchen {
 		payData.Kitchen[day] = ApplyEntryToLevel(payData.Kitchen[day], thisDate, entry)
 	}
 	return payData
 }
 
-func (s *Server) getSessionUserAndEntries(w http.ResponseWriter, r *http.Request) (*models.StaffMember, *[]*db.TimesheetEntry, bool) {
+func (s *Server) getSessionUserAndEntries(w http.ResponseWriter, r *http.Request) (*models.StaffMember, *[]*models.TimesheetEntry, bool) {
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {
-		log.Println("Couldn't find session user")
+		utils.PrintLog("Couldn't find session user")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return nil, nil, false
 	}
-	entries := s.GetTimesheetWeek(thisStaff.Config.TimesheetStartDate)
-	if entries == nil {
-		log.Println("No timesheet entries to export")
+	entries, err := s.Repos.Timesheet.GetTimesheetWeek(thisStaff.Config.TimesheetStartDate)
+	if err != nil {
+		utils.PrintError(err, "No timesheet entries to export")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return nil, nil, false
 	}
@@ -919,13 +911,13 @@ func writeRecordsToCSV(staffData map[uuid.UUID]StaffPayData, allStaff []*models.
 		"Mon Ord", "Mon 7-12", "Mon 12+",
 	}
 	if err := writer.Write(header); err != nil {
-		log.Printf("Error writing kitchen report header: %v", err)
+		utils.PrintError(err, "Error writing kitchen report header")
 	}
 	reportRows := [][]string{}
 	for staffID, payData := range staffData {
 		staffMember := models.GetStaffFromList(staffID, allStaff)
 		if staffMember == nil {
-			log.Printf("Missing staffID")
+			utils.PrintLog("Missing staffID")
 			continue
 		}
 		fullName := strings.TrimSpace(staffMember.LastName) + ", " + strings.TrimSpace(staffMember.FirstName)
@@ -957,13 +949,13 @@ func writeRecordsToCSV(staffData map[uuid.UUID]StaffPayData, allStaff []*models.
 	})
 	for _, row := range reportRows {
 		if err := writer.Write(row); err != nil {
-			log.Printf("Error writing record: %v", err)
+			utils.PrintError(err, "Error writing record")
 		}
 	}
 	writer.Flush()
 }
 
-func processEntries(thisStaff models.StaffMember, entries []*db.TimesheetEntry, allStaff []*models.StaffMember) map[uuid.UUID]StaffPayData {
+func processEntries(thisStaff models.StaffMember, entries []*models.TimesheetEntry, allStaff []*models.StaffMember) map[uuid.UUID]StaffPayData {
 	staffData := map[uuid.UUID]StaffPayData{}
 	for day := Tuesday; day <= 6; day++ {
 		thisDate := thisStaff.Config.TimesheetStartDate.AddDate(0, 0, int(day))
@@ -973,7 +965,7 @@ func processEntries(thisStaff models.StaffMember, entries []*db.TimesheetEntry, 
 			}
 			staffMember := models.GetStaffFromList(entry.StaffID, allStaff)
 			if staffMember == nil || staffMember.IsTrial {
-				log.Printf("Missing staffmember")
+				utils.PrintLog("Missing staffmember")
 				continue
 			}
 
@@ -996,7 +988,7 @@ func (s *Server) HandleExportKitchenReport(w http.ResponseWriter, r *http.Reques
 
 	allStaff, err := s.Repos.Staff.LoadAllStaff()
 	if err != nil {
-		utils.PrintError(err, "HandleExportKitchenReport: Failed to load all staff")
+		utils.PrintError(err, "Failed to load all staff")
 		allStaff = []*models.StaffMember{}
 	}
 	staffData := processEntries(*thisStaff, *entries, allStaff)
@@ -1006,7 +998,7 @@ func (s *Server) HandleExportKitchenReport(w http.ResponseWriter, r *http.Reques
 
 	writeRecordsToCSV(staffData, allStaff, writer, "kitchen")
 	if err := writer.Error(); err != nil {
-		log.Printf("Error creating kitchen report: %v", err)
+		utils.PrintError(err, "Error creating kitchen report")
 	}
 
 	// Set the appropriate headers
@@ -1031,7 +1023,7 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 
 	allStaff, err := s.Repos.Staff.LoadAllStaff()
 	if err != nil {
-		utils.PrintError(err, "HandleExportKitchenReport: Failed to load all staff")
+		utils.PrintError(err, "Failed to load all staff")
 		allStaff = []*models.StaffMember{}
 	}
 	staffData := processEntries(*thisStaff, *entries, allStaff)
@@ -1041,7 +1033,7 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 
 	writeRecordsToCSV(staffData, allStaff, writer, "evan")
 	if err := writer.Error(); err != nil {
-		log.Printf("Error creating evan report: %v", err)
+		utils.PrintError(err, "Error creating evan report")
 	}
 
 	// Set the appropriate headers
@@ -1103,13 +1095,13 @@ func BuildReportRecord(hours [7]DayBreakdown, name string) []string {
 func (s *Server) HandleExportWageReport(w http.ResponseWriter, r *http.Request) {
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {
-		log.Println("Couldn't find session user")
+		utils.PrintLog("Couldn't find session user")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	entries := s.GetTimesheetWeek(thisStaff.Config.TimesheetStartDate)
-	if entries == nil {
-		log.Println("No timesheet entries to export")
+	entries, err := s.Repos.Timesheet.GetTimesheetWeek(thisStaff.Config.TimesheetStartDate)
+	if err != nil {
+		utils.PrintError(err, "No timesheet entries to export")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
@@ -1128,15 +1120,15 @@ func (s *Server) HandleExportWageReport(w http.ResponseWriter, r *http.Request) 
 					continue
 				}
 				window := report[windowStart]
-				if entry.ShiftType == db.Bar {
+				if entry.ShiftType == models.Bar {
 					window.Staff += GetWorkFromEntry(windowStart, windowEnd, *entry)
-				} else if entry.ShiftType == db.DayManager || entry.ShiftType == db.NightManager {
+				} else if entry.ShiftType == models.DayManager || entry.ShiftType == models.NightManager {
 					window.Manager += GetWorkFromEntry(windowStart, windowEnd, *entry)
-				} else if entry.ShiftType == db.AmeliaSupervisor {
+				} else if entry.ShiftType == models.AmeliaSupervisor {
 					window.Amelia += GetWorkFromEntry(windowStart, windowEnd, *entry)
-				} else if entry.ShiftType == db.GeneralManagement {
+				} else if entry.ShiftType == models.GeneralManagement {
 					window.Salary += GetWorkFromEntry(windowStart, windowEnd, *entry)
-				} else if entry.ShiftType == db.Deliveries {
+				} else if entry.ShiftType == models.Deliveries {
 					window.Deliveries += GetWorkFromEntry(windowStart, windowEnd, *entry)
 				}
 				report[windowStart] = window
@@ -1233,17 +1225,16 @@ func (s *Server) HandleImportRosterWeek(w http.ResponseWriter, r *http.Request) 
 	if thisStaff == nil {
 		return
 	}
-	log.Println("Importing")
 	lastWeekDate := thisStaff.Config.RosterStartDate.AddDate(0, 0, -7)
 	lastWeek, err := s.Repos.RosterWeek.LoadRosterWeek(lastWeekDate)
 	if err != nil {
-		utils.PrintError(err, "HandleImportRosterWeek: Couldn't load last week")
+		utils.PrintError(err, "Couldn't load last week")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 	thisWeek, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
 	if err != nil {
-		utils.PrintError(err, "HandleImportRosterWeek: Couldn't load this week")
+		utils.PrintError(err, "Couldn't load this week")
 		thisWeek = &models.RosterWeek{
 			ID:        uuid.New(),
 			StartDate: thisStaff.Config.RosterStartDate,
@@ -1257,7 +1248,12 @@ func (s *Server) HandleImportRosterWeek(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) GetPayWeekForStaff(staffID uuid.UUID, startDate time.Time) StaffPayData {
 	payData := StaffPayData{}
-	entries := s.GetStaffTimesheetWeek(staffID, startDate)
+	entries, err := s.Repos.Timesheet.GetStaffTimesheetWeek(staffID, startDate)
+	if err != nil {
+		utils.PrintError(err, "Error getting timesheet entries")
+		emptyEntries := []*repository.TimesheetEntry{}
+		entries = &emptyEntries
+	}
 	for day := Tuesday; day <= 6; day++ {
 		thisDate := startDate.AddDate(0, 0, int(day))
 		for _, entry := range *entries {

@@ -1,8 +1,10 @@
 package utils
 
 import (
-	"time"
+	"fmt"
 	"log"
+	"runtime"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -33,7 +35,32 @@ func GetNextTuesday() time.Time {
 		time.Local)
 }
 
+func PrintLog(format string, args ...interface{}) {
+	pc, _, _, ok := runtime.Caller(1)
+	funcName := "unknown"
+	if ok {
+		funcName = runtime.FuncForPC(pc).Name()
+	}
+	msg := fmt.Sprintf(format, args...)
+	log.Printf("%v: %v", funcName, msg)
+}
+
 func PrintError(err error, msg string) {
-	wrappedErr := errors.Wrap(err, msg)
+	pc, _, _, ok := runtime.Caller(1)
+	funcName := "unknown"
+	if ok {
+		funcName = runtime.FuncForPC(pc).Name()
+	}
+	wrappedErr := errors.Wrap(err, funcName+": "+msg)
 	log.Printf("%+v", wrappedErr)
+}
+
+func LastWholeHour() time.Time {
+	t := time.Now()
+	return t.Truncate(time.Hour)
+}
+
+func NextWholeHour() time.Time {
+	t := time.Now()
+	return t.Truncate(time.Hour).Add(time.Hour)
 }
