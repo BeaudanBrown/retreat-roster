@@ -10,7 +10,6 @@ import (
 	"roster/cmd/utils"
 
 	"github.com/google/uuid"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 type ProfileIndexBody struct {
@@ -378,43 +377,14 @@ func (s *Server) HandleDeleteAccount(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	collection := s.DB.Collection("staff")
-	filter := bson.M{"id": accID}
-	_, err = collection.DeleteOne(s.Context, filter)
-	if err != nil {
-		utils.PrintError(err, "Failed to delete document")
+
+	if err := s.Repos.Staff.DeleteStaffByID(accID); err != nil {
+		utils.PrintError(err, "Failed to delete staff")
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	selfDelete := thisStaff.ID == accID
 
-	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
-	if err != nil {
-		utils.PrintError(err, "Failed to load roster week")
-		return
-	}
-
-	for _, day := range rosterWeek.Days {
-		for _, row := range day.Rows {
-			if row.Amelia.AssignedStaff != nil && *row.Amelia.AssignedStaff == accID {
-				row.Amelia.AssignedStaff = nil
-				row.Amelia.StaffString = nil
-			}
-			if row.Early.AssignedStaff != nil && *row.Early.AssignedStaff == accID {
-				row.Early.AssignedStaff = nil
-				row.Early.StaffString = nil
-			}
-			if row.Mid.AssignedStaff != nil && *row.Mid.AssignedStaff == accID {
-				row.Mid.AssignedStaff = nil
-				row.Mid.StaffString = nil
-			}
-			if row.Late.AssignedStaff != nil && *row.Late.AssignedStaff == accID {
-				row.Late.AssignedStaff = nil
-				row.Late.StaffString = nil
-			}
-		}
-	}
-
-	s.Repos.RosterWeek.SaveRosterWeek(rosterWeek)
 	if selfDelete {
 		s.HandleGoogleLogout(w, r)
 	} else {

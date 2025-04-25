@@ -31,6 +31,7 @@ type StaffRepository interface {
 	DeleteLeaveReqByID(staff models.StaffMember, leaveReqID uuid.UUID) error
 	GetStaffByLeaveReqID(leaveReqID uuid.UUID) (*models.StaffMember, error)
 	CreateTrial(trialName string) error
+	DeleteStaffByID(id uuid.UUID) error
 }
 
 const ConfigRefreshTime = time.Hour
@@ -75,7 +76,7 @@ func (repo *MongoStaffRepository) SaveStaffMembers(staffMembers []*models.StaffM
 }
 
 func (repo *MongoStaffRepository) LoadAllStaff() ([]*models.StaffMember, error) {
-	cursor, err := repo.collection.Find(repo.ctx, bson.M{})
+	cursor, err := repo.collection.Find(repo.ctx, bson.M{"isdeleted": bson.M{"$ne": true}})
 	if err != nil {
 		return nil, fmt.Errorf("LoadAllStaff: %w", err)
 	}
@@ -109,7 +110,7 @@ func (repo *MongoStaffRepository) LoadAllStaff() ([]*models.StaffMember, error) 
 }
 
 func (repo *MongoStaffRepository) GetStaffByGoogleID(googleID string) (*models.StaffMember, error) {
-	filter := bson.M{"googleid": googleID}
+	filter := bson.M{"googleid": googleID, "isdeleted": bson.M{"$ne": true}}
 	var s models.StaffMember
 	if err := repo.collection.FindOne(repo.ctx, filter).Decode(&s); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
@@ -121,7 +122,7 @@ func (repo *MongoStaffRepository) GetStaffByGoogleID(googleID string) (*models.S
 }
 
 func (repo *MongoStaffRepository) GetStaffByID(id uuid.UUID) (*models.StaffMember, error) {
-	filter := bson.M{"id": id}
+	filter := bson.M{"id": id, "isdeleted": bson.M{"$ne": true}}
 	var s models.StaffMember
 	if err := repo.collection.FindOne(repo.ctx, filter).Decode(&s); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
@@ -133,7 +134,7 @@ func (repo *MongoStaffRepository) GetStaffByID(id uuid.UUID) (*models.StaffMembe
 }
 
 func (repo *MongoStaffRepository) GetStaffByToken(token uuid.UUID) (*models.StaffMember, error) {
-	filter := bson.M{"tokens": bson.M{"$elemMatch": bson.M{"$eq": token}}}
+	filter := bson.M{"tokens": bson.M{"$elemMatch": bson.M{"$eq": token}}, "isdeleted": bson.M{"$ne": true}}
 	var s models.StaffMember
 	if err := repo.collection.FindOne(repo.ctx, filter).Decode(&s); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
@@ -211,6 +212,7 @@ func (repo *MongoStaffRepository) GetStaffByLeaveReqID(leaveReqID uuid.UUID) (*m
 		"leaveRequests": bson.M{
 			"$elemMatch": bson.M{"id": leaveReqID},
 		},
+		"isdeleted": bson.M{"$ne": true},
 	}
 	var s models.StaffMember
 	if err := repo.collection.FindOne(repo.ctx, filter).Decode(&s); err != nil {
@@ -232,6 +234,19 @@ func (repo *MongoStaffRepository) CreateTrial(trialName string) error {
 		IdealShifts:  7,
 	}
 	return repo.SaveStaffMember(newStaff)
+}
+
+func (repo *MongoStaffRepository) DeleteStaffByID(id uuid.UUID) error {
+	filter := bson.M{"id": id}
+	update := bson.M{"$set": bson.M{"isdeleted": true}}
+	res, err := repo.collection.UpdateOne(repo.ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("DeleteStaffByID: %w", err)
+	}
+	if res.MatchedCount == 0 {
+		return fmt.Errorf("DeleteStaffByID: no document found")
+	}
+	return nil
 }
 
 // emptyAvailability returns a default DayAvailability slice.
