@@ -35,7 +35,7 @@ func GetNextTuesday() time.Time {
 		time.Local)
 }
 
-func PrintLog(format string, args ...interface{}) {
+func PrintLog(format string, args ...any) {
 	pc, _, _, ok := runtime.Caller(1)
 	funcName := "unknown"
 	if ok {

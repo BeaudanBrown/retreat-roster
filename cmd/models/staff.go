@@ -30,6 +30,7 @@ type StaffMember struct {
 	Tokens        []uuid.UUID
 	LeaveRequests []LeaveRequest
 	Config        StaffConfig
+	IsDeleted     bool
 }
 
 // StaffConfig defines configuration data for staff.
@@ -143,81 +144,6 @@ func (s *StaffMember) UnmarshalBSON(data []byte) error {
 
 	return nil
 }
-
-// func (s StaffMember) MarshalBSON() ([]byte, error) {
-// 	type Alias StaffMember
-// 	aux := &struct {
-// 		*Alias `bson:",inline"`
-// 	}{
-// 		Alias: (*Alias)(&s),
-// 	}
-// 	// Marshall as UTC
-// 	rosterStartDateLocal := utils.ToLocal(aux.Config.RosterStartDate)
-// 	aux.Config.RosterStartDate = rosterStartDateLocal.UTC()
-
-// 	timesheetStartDateLocal := utils.ToLocal(aux.Config.TimesheetStartDate)
-// 	aux.Config.TimesheetStartDate = timesheetStartDateLocal.UTC()
-
-// 	utcRequests := []LeaveRequest{}
-// 	for _, leaveReq := range s.LeaveRequests {
-// 		leaveStartDateLocal := utils.ToLocal(*leaveReq.StartDate.Time)
-// 		utcStart := leaveStartDateLocal.UTC()
-
-// 		leaveEndDateLocal := utils.ToLocal(*leaveReq.EndDate.Time)
-// 		utcEnd := leaveEndDateLocal.UTC()
-
-// 		leaveCreationDateLocal := utils.ToLocal(*leaveReq.CreationDate.Time)
-// 		utcCreation := leaveCreationDateLocal.UTC()
-
-// 		utcReq := LeaveRequest{
-// 			ID:           leaveReq.ID,
-// 			StartDate:    CustomDate{&utcStart},
-// 			EndDate:      CustomDate{&utcEnd},
-// 			Reason:       leaveReq.Reason,
-// 			CreationDate: CustomDate{&utcCreation},
-// 		}
-// 		utcRequests = append(utcRequests, utcReq)
-// 	}
-// 	aux.LeaveRequests = utcRequests
-// 	log.Printf("%v: Staff member marshal start date: %v", aux.FirstName, aux.Config.RosterStartDate)
-
-// 	return bson.Marshal(aux)
-// }
-
-// func (s *StaffMember) UnmarshalBSON(data []byte) error {
-// 	type Alias StaffMember
-// 	aux := &struct {
-// 		*Alias `bson:",inline"`
-// 	}{
-// 		Alias: (*Alias)(s),
-// 	}
-
-// 	if err := bson.Unmarshal(data, aux); err != nil {
-// 		return err
-// 	}
-
-// 	// Unmarshal in this locale
-// 	localRequests := []LeaveRequest{}
-// 	for _, leaveReq := range s.LeaveRequests {
-// 		localStart := leaveReq.StartDate.In(time.Local)
-// 		localEnd := leaveReq.EndDate.In(time.Local)
-// 		localCreation := leaveReq.CreationDate.In(time.Local)
-// 		localReq := LeaveRequest{
-// 			ID:           leaveReq.ID,
-// 			StartDate:    CustomDate{&localStart},
-// 			EndDate:      CustomDate{&localEnd},
-// 			Reason:       leaveReq.Reason,
-// 			CreationDate: CustomDate{&localCreation},
-// 		}
-// 		localRequests = append(localRequests, localReq)
-// 	}
-// 	s.LeaveRequests = localRequests
-// 	s.Config.RosterStartDate = s.Config.RosterStartDate.In(time.Local)
-// 	s.Config.TimesheetStartDate = s.Config.TimesheetStartDate.In(time.Local)
-// 	// log.Printf("%v: Staff member unmarshal start date: %v", aux.FirstName, s.Config.RosterStartDate)
-
-// 	return nil
-// }
 
 // UnmarshalJSON implements custom JSON unmarshalling for CustomDate.
 func (cd *CustomDate) UnmarshalJSON(input []byte) error {

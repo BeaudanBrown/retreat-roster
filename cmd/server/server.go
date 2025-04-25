@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"time"
 
-	"roster/cmd/db"
 	"roster/cmd/models"
 	"roster/cmd/repository"
 	"roster/cmd/utils"
@@ -25,8 +24,7 @@ const DEV_MODE = false
 type Server struct {
 	CacheBust string
 	Templates *template.Template
-	db.Database
-	Repos Repositories
+	Repos     Repositories
 }
 
 type Repositories struct {
@@ -170,10 +168,6 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 				return intervals
 			},
 		}),
-		Database: db.Database{
-			DB:      d,
-			Context: context,
-		},
 		Repos: Repositories{
 			Staff:      staffRepo,
 			RosterWeek: rosterWeekRepo,
