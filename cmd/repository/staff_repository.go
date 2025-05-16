@@ -69,9 +69,11 @@ func (repo *MongoStaffRepository) SaveStaffMembers(staffMembers []*models.StaffM
 		modelsList[i] = mongo.NewUpdateOneModel().SetFilter(filter).SetUpdate(update).SetUpsert(true)
 	}
 	opts := options.BulkWrite().SetOrdered(false)
-	if _, err := repo.collection.BulkWrite(repo.ctx, modelsList, opts); err != nil {
+	results, err := repo.collection.BulkWrite(repo.ctx, modelsList, opts)
+	if err != nil {
 		return fmt.Errorf("SaveStaffMembers: %w", err)
 	}
+	utils.PrintLog("Bulk saved staff members: %d modified, %d upserted", results.ModifiedCount, results.UpsertedCount)
 	return nil
 }
 
@@ -137,9 +139,6 @@ func (repo *MongoStaffRepository) GetStaffByToken(token uuid.UUID) (*models.Staf
 	filter := bson.M{"tokens": bson.M{"$elemMatch": bson.M{"$eq": token}}, "isdeleted": bson.M{"$ne": true}}
 	var s models.StaffMember
 	if err := repo.collection.FindOne(repo.ctx, filter).Decode(&s); err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, nil
-		}
 		return nil, fmt.Errorf("GetStaffByToken: %w", err)
 	}
 	return &s, nil
@@ -148,8 +147,8 @@ func (repo *MongoStaffRepository) GetStaffByToken(token uuid.UUID) (*models.Staf
 func (repo *MongoStaffRepository) RefreshStaffConfig(staff models.StaffMember) (models.StaffMember, error) {
 	if time.Since(staff.Config.LastVisit) > ConfigRefreshTime {
 		// Use our central time helper to set start dates.
-		staff.Config.TimesheetStartDate = utils.GetLastTuesday()
-		staff.Config.RosterStartDate = utils.GetLastTuesday()
+		staff.Config.RosterDateOffset = utils.WeekOffsetFromDate(utils.GetLastTuesday())
+		staff.Config.TimesheetDateOffset = utils.WeekOffsetFromDate(utils.GetLastTuesday())
 	}
 	staff.Config.LastVisit = time.Now()
 	if err := repo.SaveStaffMember(staff); err != nil {
@@ -187,9 +186,9 @@ func (repo *MongoStaffRepository) CreateStaffMember(googleID string, token uuid.
 		Tokens:       []uuid.UUID{token},
 		Availability: emptyAvailability(),
 		Config: models.StaffConfig{
-			LastVisit:          time.Now(),
-			TimesheetStartDate: utils.GetLastTuesday(),
-			RosterStartDate:    utils.GetLastTuesday(),
+			LastVisit:           time.Now(),
+			TimesheetDateOffset: utils.WeekOffsetFromDate(utils.GetLastTuesday()),
+			RosterDateOffset:    utils.WeekOffsetFromDate(utils.GetLastTuesday()),
 		},
 	}
 	return repo.SaveStaffMember(newStaff)

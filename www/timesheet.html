@@ -5,6 +5,7 @@
 {{ $isAdmin := .StaffMember.IsAdmin }}
 {{ $showAll := and $config.ShowAll .StaffMember.IsAdmin }}
 {{ $hideApproved := and $config.HideApproved .StaffMember.IsAdmin }}
+{{ $startDate := WeekStartFromOffset $config.TimesheetDateOffset }}
 {{ $allStaff := .AllStaff }}
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html class="dark">
@@ -64,7 +65,7 @@
 		</div>
 		{{ end }}
 		<div class="flex flex-col items-center justify-center mt-2 w-full max-w-screen-lg">
-      <h3 class="text-white">Week {{$config.TimesheetStartDate.Format "02/01"}} - {{(addDays $config.TimesheetStartDate 6).Format "02/01"}}</h3>
+      <h3 class="text-white">Week {{$startDate.Format "02/01"}} - {{(addDays $startDate 6).Format "02/01"}}</h3>
 			<div class="flex">
 				<button class="shiftButtonL px-2 py-1.5"
 					hx-post='/shiftTimesheetWindow'
@@ -104,7 +105,7 @@
 					</thead>
 					<tbody>
 					{{ range $idx, $dayName := .DayNames }}
-						{{ $thisDate := addDays $config.TimesheetStartDate $idx }}
+						{{ $thisDate := addDays $startDate $idx }}
 						<tr class="w-full">
 							<th colspan="4" class="text-left text-xl font-bold whitespace-nowrap">
 								<div class="flex items-center justify-center">
@@ -119,7 +120,7 @@
 							</th>
 						</tr>
 						{{ range $entry := $entries }}
-							{{ if (eq $entry.StartDate $thisDate) }}
+							{{ if (eq $entry.DayOffset $idx) }}
 								{{ if $showAll }}
 									{{ if not (and .Approved $hideApproved)}}
 										{{ template "timesheetEntry" (MakeTimesheetEntryStruct $entry $staffMember $allStaff $showAll) }}

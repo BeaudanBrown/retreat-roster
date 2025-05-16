@@ -18,10 +18,10 @@ import (
 type TimesheetRepository interface {
 	SaveTimesheetEntry(e TimesheetEntry) error
 	GetTimesheetEntryByID(entryID uuid.UUID) (*models.TimesheetEntry, error)
-	GetAllTimesheetEntries() *[]*TimesheetEntry
+	GetAllTimesheetEntries() (*[]*TimesheetEntry, error)
 	SaveAllTimesheetEntries(entries []*TimesheetEntry) error
-	GetStaffTimesheetWeek(staffID uuid.UUID, startDate time.Time) (*[]*TimesheetEntry, error)
-	GetTimesheetWeek(startDate time.Time) (*[]*TimesheetEntry, error)
+	GetStaffTimesheetWeek(staffID uuid.UUID, weekOffset int) (*[]*TimesheetEntry, error)
+	GetTimesheetWeek(weekOffset int) (*[]*TimesheetEntry, error)
 	DeleteTimesheetEntry(entryID uuid.UUID) error
 }
 
@@ -60,10 +60,6 @@ func (repo *MongoTimesheetRepository) GetTimesheetEntryByID(entryID uuid.UUID) (
 	var timesheetEntry models.TimesheetEntry
 	err := repo.collection.FindOne(repo.ctx, filter).Decode(&timesheetEntry)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			utils.PrintError(err, "No timesheet entry with id")
-			return nil, err
-		}
 		utils.PrintError(err, "Error getting timesheet entry")
 		return nil, err
 	}
@@ -84,20 +80,20 @@ func SortTimesheetEntries(entries []*TimesheetEntry) []*TimesheetEntry {
 	return copiedEntries
 }
 
-func (repo *MongoTimesheetRepository) GetAllTimesheetEntries() *[]*TimesheetEntry {
+func (repo *MongoTimesheetRepository) GetAllTimesheetEntries() (*[]*TimesheetEntry, error) {
 	cursor, err := repo.collection.Find(repo.ctx, bson.M{})
 	if err != nil {
 		utils.PrintError(err, "Error executing query")
-		return nil
+		return nil, err
 	}
 	defer cursor.Close(repo.ctx)
 	var entries []*TimesheetEntry
 	if err = cursor.All(repo.ctx, &entries); err != nil {
 		utils.PrintError(err, "Error decoding timesheet entries")
-		return nil
+		return nil, err
 	}
 	entries = SortTimesheetEntries(entries)
-	return &entries
+	return &entries, nil
 }
 
 func (repo *MongoTimesheetRepository) SaveAllTimesheetEntries(entries []*TimesheetEntry) error {
@@ -118,9 +114,8 @@ func (repo *MongoTimesheetRepository) SaveAllTimesheetEntries(entries []*Timeshe
 	return nil
 }
 
-func (repo *MongoTimesheetRepository) GetStaffTimesheetWeek(staffID uuid.UUID, startDate time.Time) (*[]*TimesheetEntry, error) {
-	year, month, day := startDate.Date()
-	weekStart := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
+func (repo *MongoTimesheetRepository) GetStaffTimesheetWeek(staffID uuid.UUID, weekOffset int) (*[]*TimesheetEntry, error) {
+	weekStart := utils.WeekStartFromOffset(weekOffset)
 	weekEnd := weekStart.AddDate(0, 0, 7)
 	filter := bson.M{
 		"startDate": bson.M{
@@ -145,7 +140,8 @@ func (repo *MongoTimesheetRepository) GetStaffTimesheetWeek(staffID uuid.UUID, s
 	return &entries, nil
 }
 
-func (repo *MongoTimesheetRepository) GetTimesheetWeek(startDate time.Time) (*[]*TimesheetEntry, error) {
+func (repo *MongoTimesheetRepository) GetTimesheetWeek(weekOffset int) (*[]*TimesheetEntry, error) {
+	startDate := utils.WeekStartFromOffset(weekOffset)
 	year, month, day := startDate.Date()
 	weekStart := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
 	weekEnd := weekStart.AddDate(0, 0, 7)

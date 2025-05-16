@@ -53,7 +53,8 @@ type DayStruct struct {
 }
 
 func MakeDayStruct(isLive bool, day models.RosterDay, s *Server, activeStaff models.StaffMember) DayStruct {
-	date := activeStaff.Config.RosterStartDate.AddDate(0, 0, day.Offset)
+	offset := 7*activeStaff.Config.RosterDateOffset + day.Offset
+	date := utils.GetLastTuesday().AddDate(0, 0, offset)
 	allStaff, err := s.Repos.Staff.LoadAllStaff()
 	if err != nil {
 		utils.PrintError(err, "Failed to load all staff")
@@ -82,8 +83,7 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 		utils.PrintLog("Couldn't find staff member")
 		return
 	}
-	utils.PrintLog("roster Start Date: %v", thisStaff.Config.RosterStartDate)
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Error creating staff member")
 	}
@@ -263,7 +263,7 @@ func (s *Server) HandleModifyDescriptionSlot(w http.ResponseWriter, r *http.Requ
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to get roster week")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -298,7 +298,7 @@ func (s *Server) HandleModifyTimeSlot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	utils.PrintLog("Modify %v timeslot id: %v", slotID, timeVal)
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		return
@@ -334,7 +334,7 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		return
@@ -398,7 +398,7 @@ func (s *Server) HandleToggleKitchen(w http.ResponseWriter, r *http.Request) {
 		utils.PrintLog("Couldn't find staff")
 		return
 	}
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		return
@@ -432,7 +432,7 @@ func (s *Server) HandleToggleAdmin(w http.ResponseWriter, r *http.Request) {
 	if thisStaff == nil {
 		return
 	}
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		return
@@ -466,7 +466,7 @@ func (s *Server) HandleToggleHidden(w http.ResponseWriter, r *http.Request) {
 	if thisStaff == nil {
 		return
 	}
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		return
@@ -503,7 +503,7 @@ func (s *Server) HandleToggleHideByIdeal(w http.ResponseWriter, r *http.Request)
 	}
 	thisStaff.Config.HideByIdeal = !thisStaff.Config.HideByIdeal
 	s.Repos.Staff.SaveStaffMember(*thisStaff)
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		return
@@ -518,7 +518,7 @@ func (s *Server) HandleToggleHideByPreferences(w http.ResponseWriter, r *http.Re
 	}
 	thisStaff.Config.HideByPrefs = !thisStaff.Config.HideByPrefs
 	s.Repos.Staff.SaveStaffMember(*thisStaff)
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		return
@@ -533,7 +533,7 @@ func (s *Server) HandleToggleHideByLeave(w http.ResponseWriter, r *http.Request)
 	}
 	thisStaff.Config.HideByLeave = !thisStaff.Config.HideByLeave
 	s.Repos.Staff.SaveStaffMember(*thisStaff)
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		return
@@ -546,7 +546,7 @@ func (s *Server) HandleToggleLive(w http.ResponseWriter, r *http.Request) {
 	if thisStaff == nil {
 		return
 	}
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		return
@@ -575,7 +575,7 @@ func (s *Server) HandleToggleAmelia(w http.ResponseWriter, r *http.Request) {
 	if thisStaff == nil {
 		return
 	}
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		return
@@ -610,7 +610,7 @@ func (s *Server) HandleToggleClosed(w http.ResponseWriter, r *http.Request) {
 	if thisStaff == nil {
 		return
 	}
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		w.WriteHeader(http.StatusBadRequest)
@@ -642,7 +642,7 @@ func (s *Server) HandleAddTrial(w http.ResponseWriter, r *http.Request) {
 		// TODO: Handle error, also loading the roster week below
 		return
 	}
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		w.WriteHeader(http.StatusBadRequest)
@@ -666,14 +666,14 @@ func (s *Server) HandleShiftWindow(w http.ResponseWriter, r *http.Request) {
 	}
 	switch reqBody.Action {
 	case "+":
-		thisStaff.Config.RosterStartDate = thisStaff.Config.RosterStartDate.AddDate(0, 0, 7)
+		thisStaff.Config.RosterDateOffset = thisStaff.Config.RosterDateOffset + 1
 	case "-":
-		thisStaff.Config.RosterStartDate = thisStaff.Config.RosterStartDate.AddDate(0, 0, -7)
+		thisStaff.Config.RosterDateOffset = thisStaff.Config.RosterDateOffset - 1
 	default:
-		thisStaff.Config.RosterStartDate = utils.GetNextTuesday()
+		thisStaff.Config.RosterDateOffset = utils.WeekOffsetFromDate(utils.GetLastTuesday())
 	}
 	s.Repos.Staff.SaveStaffMember(*thisStaff)
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		w.WriteHeader(http.StatusBadRequest)
@@ -704,7 +704,7 @@ func (s *Server) HandleModifyRows(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newDay, isLive, err := s.Repos.RosterWeek.ChangeDayRowCount(thisStaff.Config.RosterStartDate, dayID, reqBody.Action)
+	newDay, isLive, err := s.Repos.RosterWeek.ChangeDayRowCount(thisStaff.Config.RosterDateOffset, dayID, reqBody.Action)
 	if err != nil {
 		utils.PrintError(err, "Failed to change day row count")
 		w.WriteHeader(http.StatusBadRequest)
@@ -890,7 +890,7 @@ func (s *Server) getSessionUserAndEntries(w http.ResponseWriter, r *http.Request
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return nil, nil, false
 	}
-	entries, err := s.Repos.Timesheet.GetTimesheetWeek(thisStaff.Config.TimesheetStartDate)
+	entries, err := s.Repos.Timesheet.GetTimesheetWeek(thisStaff.Config.TimesheetDateOffset)
 	if err != nil {
 		utils.PrintError(err, "No timesheet entries to export")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -958,7 +958,8 @@ func writeRecordsToCSV(staffData map[uuid.UUID]StaffPayData, allStaff []*models.
 func processEntries(thisStaff models.StaffMember, entries []*models.TimesheetEntry, allStaff []*models.StaffMember) map[uuid.UUID]StaffPayData {
 	staffData := map[uuid.UUID]StaffPayData{}
 	for day := Tuesday; day <= 6; day++ {
-		thisDate := thisStaff.Config.TimesheetStartDate.AddDate(0, 0, int(day))
+		thisOffset := thisStaff.Config.TimesheetDateOffset + int(day)
+		thisDate := utils.WeekStartFromOffset(thisOffset)
 		for _, entry := range entries {
 			if !entry.Approved {
 				continue
@@ -1003,7 +1004,7 @@ func (s *Server) HandleExportKitchenReport(w http.ResponseWriter, r *http.Reques
 
 	// Set the appropriate headers
 	w.Header().Set("Content-Type", "text/csv")
-	formattedDate := thisStaff.Config.TimesheetStartDate.Format("2006-01-02")
+	formattedDate := utils.WeekStartFromOffset(thisStaff.Config.TimesheetDateOffset).Format("2006-01-02")
 	reportFilename := "kitchen_staff_hrs_starting-" + formattedDate + ".csv"
 	w.Header().Set("Content-Disposition", "attachment;filename="+reportFilename)
 	w.Header().Set("Content-Length", strconv.Itoa(len(fileBuffer.Bytes())))
@@ -1038,7 +1039,7 @@ func (s *Server) HandleExportEvanReport(w http.ResponseWriter, r *http.Request) 
 
 	// Set the appropriate headers
 	w.Header().Set("Content-Type", "text/csv")
-	formattedDate := thisStaff.Config.TimesheetStartDate.Format("2006-01-02")
+	formattedDate := utils.WeekStartFromOffset(thisStaff.Config.TimesheetDateOffset).Format("2006-01-02")
 	reportFilename := "staff_hrs_starting-" + formattedDate + ".csv"
 	w.Header().Set("Content-Disposition", "attachment;filename="+reportFilename)
 	w.Header().Set("Content-Length", strconv.Itoa(len(fileBuffer.Bytes())))
@@ -1099,7 +1100,7 @@ func (s *Server) HandleExportWageReport(w http.ResponseWriter, r *http.Request) 
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	entries, err := s.Repos.Timesheet.GetTimesheetWeek(thisStaff.Config.TimesheetStartDate)
+	entries, err := s.Repos.Timesheet.GetTimesheetWeek(thisStaff.Config.TimesheetDateOffset)
 	if err != nil {
 		utils.PrintError(err, "No timesheet entries to export")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -1111,7 +1112,8 @@ func (s *Server) HandleExportWageReport(w http.ResponseWriter, r *http.Request) 
 
 	for i := 0; i <= 6; i++ {
 		report := map[time.Time]ShiftHours{}
-		thisDate := thisStaff.Config.TimesheetStartDate.AddDate(0, 0, i)
+		thisOffset := thisStaff.Config.TimesheetDateOffset + i
+		thisDate := utils.WeekStartFromOffset(thisOffset)
 		for i := 8; i <= 27; i++ {
 			windowStart := thisDate.Add(time.Duration(i) * time.Hour)
 			windowEnd := thisDate.Add(time.Duration(i+1) * time.Hour)
@@ -1156,7 +1158,7 @@ func (s *Server) HandleExportWageReport(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Set the appropriate headers
-	formattedDate := thisStaff.Config.TimesheetStartDate.Format("2006-01-02")
+	formattedDate := utils.WeekStartFromOffset(thisStaff.Config.TimesheetDateOffset).Format("2006-01-02")
 	reportFilename := "report-" + formattedDate + ".zip"
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", "attachment;filename="+reportFilename)
@@ -1225,19 +1227,18 @@ func (s *Server) HandleImportRosterWeek(w http.ResponseWriter, r *http.Request) 
 	if thisStaff == nil {
 		return
 	}
-	lastWeekDate := thisStaff.Config.RosterStartDate.AddDate(0, 0, -7)
-	lastWeek, err := s.Repos.RosterWeek.LoadRosterWeek(lastWeekDate)
+	lastWeek, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset - 7)
 	if err != nil {
 		utils.PrintError(err, "Couldn't load last week")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	thisWeek, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	thisWeek, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Couldn't load this week")
 		thisWeek = &models.RosterWeek{
-			ID:        uuid.New(),
-			StartDate: thisStaff.Config.RosterStartDate,
+			ID:         uuid.New(),
+			WeekOffset: thisStaff.Config.RosterDateOffset,
 		}
 	}
 	newWeek := duplicateRosterWeek(*lastWeek, *thisWeek)
@@ -1246,9 +1247,10 @@ func (s *Server) HandleImportRosterWeek(w http.ResponseWriter, r *http.Request) 
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *thisWeek))
 }
 
-func (s *Server) GetPayWeekForStaff(staffID uuid.UUID, startDate time.Time) StaffPayData {
+func (s *Server) GetPayWeekForStaff(staffID uuid.UUID, weekOffset int) StaffPayData {
 	payData := StaffPayData{}
-	entries, err := s.Repos.Timesheet.GetStaffTimesheetWeek(staffID, startDate)
+	entries, err := s.Repos.Timesheet.GetStaffTimesheetWeek(staffID, weekOffset)
+	startDate := utils.WeekStartFromOffset(weekOffset)
 	if err != nil {
 		utils.PrintError(err, "Error getting timesheet entries")
 		emptyEntries := []*repository.TimesheetEntry{}

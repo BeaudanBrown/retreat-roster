@@ -50,12 +50,13 @@ type PickerData struct {
 	Disabled bool
 }
 
-func MakePickerStruct(name string, label string, id uuid.UUID, date time.Time, time time.Time, disabled bool) PickerData {
+func MakePickerStruct(name string, label string, id uuid.UUID, weekOffset int, dayOffset int, time time.Time, disabled bool) PickerData {
+	startDate := utils.WeekStartFromOffset(weekOffset).AddDate(0, 0, dayOffset)
 	return PickerData{
 		Name:     name,
 		Label:    label,
 		ID:       id,
-		Date:     date,
+		Date:     startDate,
 		Time:     time,
 		Disabled: disabled,
 	}
@@ -106,7 +107,7 @@ func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(editStaff.Config.RosterStartDate)
+	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(editStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		w.WriteHeader(http.StatusNotFound)
@@ -132,7 +133,7 @@ func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
 	if staff == nil {
 		return
 	}
-	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(staff.Config.RosterStartDate)
+	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(staff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		return
@@ -288,7 +289,7 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	updatedStaff := s.ApplyModifyProfileBody(reqBody, *staff)
-	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(staff.Config.RosterStartDate)
+	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(staff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		return
@@ -331,7 +332,7 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterStartDate)
+	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load roster week")
 		return

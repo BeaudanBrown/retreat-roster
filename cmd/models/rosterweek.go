@@ -11,10 +11,11 @@ import (
 // Any custom JSON/BSON marshalling that is domain–specific is located here.
 
 type RosterWeek struct {
-	ID        uuid.UUID     `bson:"id"`
-	StartDate time.Time     `bson:"startDate"`
-	Days      []*RosterDay  `bson:"days"`
-	IsLive    bool          `bson:"isLive"`
+	ID         uuid.UUID    `bson:"id"`
+	StartDate  time.Time    `bson:"startDate"`
+	WeekOffset int          `bson:"weekOffset"`
+	Days       []*RosterDay `bson:"days"`
+	IsLive     bool         `bson:"isLive"`
 }
 
 type RosterDay struct {
