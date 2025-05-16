@@ -31,6 +31,7 @@ type Repositories struct {
 	Staff      repository.StaffRepository
 	RosterWeek repository.RosterWeekRepository
 	Timesheet  repository.TimesheetRepository
+	Config     repository.ConfigRepository
 }
 
 func (s *Server) renderTemplate(w http.ResponseWriter, templateName string, data any) {
@@ -120,6 +121,7 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 	staffRepo := repository.NewMongoStaffRepository(context, d)
 	rosterWeekRepo := repository.NewMongoRosterWeekRepository(context, d)
 	timesheetRepo := repository.NewMongoTimesheetRepository(context, d)
+	configRepo := repository.NewMongoConfigRepository(context, d)
 	serverState = Server{
 		CacheBust: fmt.Sprintf("%v", time.Now().UnixNano()),
 		Templates: template.New("").Funcs(template.FuncMap{
@@ -173,6 +175,7 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 			Staff:      staffRepo,
 			RosterWeek: rosterWeekRepo,
 			Timesheet:  timesheetRepo,
+			Config:     configRepo,
 		},
 	}
 	serverState.Templates, err = serverState.Templates.ParseGlob("./www/*.html")
