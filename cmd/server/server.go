@@ -132,6 +132,7 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 			"GetSortedLeaveReqs":       GetSortedLeaveReqs,
 			"GetAllShiftTypes":         models.GetAllShiftTypes,
 			"DisableTimesheet":         models.DisableTimesheet,
+			"WeekStartFromOffset":      utils.WeekStartFromOffset,
 			"addDays": func(t time.Time, days int) time.Time {
 				return t.AddDate(0, 0, days)
 			},

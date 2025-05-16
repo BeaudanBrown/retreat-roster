@@ -9,6 +9,25 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+type TimesheetEntry struct {
+	ID uuid.UUID
+	// TODO: Fucked up the name
+	StaffID    uuid.UUID `bson:"days"`
+	WeekOffset int       `bson:"weekOffset"`
+	DayOffset  int       `bson:"dayOffset"`
+
+	StartDate   time.Time `bson:"startDate"`
+	ShiftStart  time.Time `json:"shiftStart"`
+	ShiftEnd    time.Time `json:"shiftEnd"`
+	HasBreak    bool      `json:"hasBreak"`
+	BreakStart  time.Time `json:"breakStart"`
+	BreakEnd    time.Time `json:"breakEnd"`
+	BreakLength float64   `json:"breakLength"`
+	ShiftLength float64   `json:"shiftLength"`
+	Approved    bool      `json:"approved"`
+	ShiftType   ShiftType `json:"shiftType"`
+}
+
 type ApprovalStatus int
 
 const (
@@ -105,22 +124,6 @@ func StringToShiftType(typeStr string) ShiftType {
 		return Bar
 	}
 	return ShiftType(num)
-}
-
-type TimesheetEntry struct {
-	ID uuid.UUID
-	// TODO: Fucked up the name
-	StaffID     uuid.UUID `bson:"days"`
-	StartDate   time.Time `bson:"startDate"`
-	ShiftStart  time.Time `json:"shiftStart"`
-	ShiftEnd    time.Time `json:"shiftEnd"`
-	HasBreak    bool      `json:"hasBreak"`
-	BreakStart  time.Time `json:"breakStart"`
-	BreakEnd    time.Time `json:"breakEnd"`
-	BreakLength float64   `json:"breakLength"`
-	ShiftLength float64   `json:"shiftLength"`
-	Approved    bool      `json:"approved"`
-	ShiftType   ShiftType `json:"shiftType"`
 }
 
 func DisableTimesheet(timesheetDate time.Time, isAdmin bool) bool {

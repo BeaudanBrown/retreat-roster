@@ -38,7 +38,7 @@ type TimesheetData struct {
 }
 
 func (s *Server) MakeTimesheetStruct(activeStaff models.StaffMember) TimesheetData {
-	entries, err := s.Repos.Timesheet.GetTimesheetWeek(activeStaff.Config.TimesheetStartDate)
+	entries, err := s.Repos.Timesheet.GetTimesheetWeek(activeStaff.Config.TimesheetDateOffset)
 	if err != nil {
 		utils.PrintError(err, "Failed to load timesheet week")
 		emptyEntries := []*repository.TimesheetEntry{}
@@ -46,7 +46,7 @@ func (s *Server) MakeTimesheetStruct(activeStaff models.StaffMember) TimesheetDa
 	}
 
 	//TODO: this can be optimised
-	staffPayData := s.GetPayWeekForStaff(activeStaff.ID, activeStaff.Config.TimesheetStartDate)
+	staffPayData := s.GetPayWeekForStaff(activeStaff.ID, activeStaff.Config.TimesheetDateOffset)
 	paySummary := s.GetPaySummary(staffPayData)
 	//TODO: Handle errors for LoadAllStaff better
 	allStaff, err := s.Repos.Staff.LoadAllStaff()
@@ -100,11 +100,11 @@ func (s *Server) HandleShiftTimesheetWindow(w http.ResponseWriter, r *http.Reque
 	}
 	switch reqBody.Action {
 	case "+":
-		thisStaff.Config.TimesheetStartDate = thisStaff.Config.TimesheetStartDate.AddDate(0, 0, 7)
+		thisStaff.Config.TimesheetDateOffset = thisStaff.Config.TimesheetDateOffset + 1
 	case "-":
-		thisStaff.Config.TimesheetStartDate = thisStaff.Config.TimesheetStartDate.AddDate(0, 0, -7)
+		thisStaff.Config.TimesheetDateOffset = thisStaff.Config.TimesheetDateOffset - 1
 	default:
-		thisStaff.Config.TimesheetStartDate = utils.GetLastTuesday()
+		thisStaff.Config.TimesheetDateOffset = utils.WeekOffsetFromDate(utils.GetLastTuesday())
 	}
 	s.Repos.Staff.SaveStaffMember(*thisStaff)
 	s.RenderTimesheetTemplate(w, r)
@@ -209,8 +209,9 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		utils.PrintError(err, "Failed to get timesheet entry")
 		newEntry := TimesheetEntry{
-			ID:        entryID,
-			StartDate: *reqBody.StartDate.Time,
+			ID:         entryID,
+			WeekOffset: utils.WeekOffsetFromDate(*reqBody.StartDate.Time),
+			DayOffset:  int((reqBody.StartDate.Time.Weekday() - time.Tuesday + 7) % 7),
 		}
 		entry = &newEntry
 	}
@@ -324,14 +325,13 @@ type TimesheetEditModalData struct {
 }
 
 func MakeEmptyTimesheetEntry(startDate time.Time, staffID uuid.UUID) TimesheetEntry {
-	year, month, day := startDate.Date()
-	dateOnly := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
 	start := utils.LastWholeHour()
 	end := utils.NextWholeHour()
 	newEntry := TimesheetEntry{
 		ID:          uuid.New(),
 		StaffID:     staffID,
-		StartDate:   dateOnly,
+		WeekOffset:  utils.WeekOffsetFromDate(startDate),
+		DayOffset:   int((startDate.Weekday() - time.Tuesday + 7) % 7),
 		ShiftStart:  start,
 		ShiftEnd:    end,
 		ShiftLength: end.Sub(start).Hours(),

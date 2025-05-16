@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"roster/cmd/models"
 	"roster/cmd/utils"
@@ -20,8 +19,8 @@ type RosterWeekRepository interface {
 	SaveRosterWeek(week *models.RosterWeek) error
 	SaveAllRosterWeeks(weeks []*models.RosterWeek) error
 	LoadAllRosterWeeks() ([]*models.RosterWeek, error)
-	LoadRosterWeek(startDate time.Time) (*models.RosterWeek, error)
-	ChangeDayRowCount(startDate time.Time, dayID uuid.UUID, action string) (*models.RosterDay, bool, error)
+	LoadRosterWeek(weekOffset int) (*models.RosterWeek, error)
+	ChangeDayRowCount(weekOffset int, dayID uuid.UUID, action string) (*models.RosterDay, bool, error)
 }
 
 // MongoRosterWeekRepository is the MongoDB implementation of RosterWeekRepository.
@@ -89,16 +88,14 @@ func (r *MongoRosterWeekRepository) LoadAllRosterWeeks() ([]*models.RosterWeek, 
 	return weeks, nil
 }
 
-// LoadRosterWeek returns a roster week for the given startDate. If no document is found,
-// a new RosterWeek is created and saved.
-func (r *MongoRosterWeekRepository) LoadRosterWeek(startDate time.Time) (*models.RosterWeek, error) {
-	// Ensure the time is converted to UTC for comparing with stored ISO dates.
-	filter := bson.M{"startDate": startDate.UTC()}
+func (r *MongoRosterWeekRepository) LoadRosterWeek(weekOffset int) (*models.RosterWeek, error) {
+	filter := bson.M{"weekOffset": weekOffset}
+
 	var rosterWeek models.RosterWeek
 	err := r.collection.FindOne(r.ctx, filter).Decode(&rosterWeek)
 	if err == mongo.ErrNoDocuments {
 		utils.PrintError(err, "Creating new roster week")
-		newWeek := newRosterWeek(startDate)
+		newWeek := newRosterWeek(weekOffset)
 		if saveErr := r.SaveRosterWeek(&newWeek); saveErr != nil {
 			return nil, fmt.Errorf("failed to save new roster week: %w", saveErr)
 		}
@@ -111,8 +108,8 @@ func (r *MongoRosterWeekRepository) LoadRosterWeek(startDate time.Time) (*models
 
 // ChangeDayRowCount modifies the number of rows in a specific RosterDay.
 // Returns the affected day, the roster week's live status and an error if applicable.
-func (r *MongoRosterWeekRepository) ChangeDayRowCount(startDate time.Time, dayID uuid.UUID, action string) (*models.RosterDay, bool, error) {
-	week, err := r.LoadRosterWeek(startDate.UTC())
+func (r *MongoRosterWeekRepository) ChangeDayRowCount(weekOffset int, dayID uuid.UUID, action string) (*models.RosterDay, bool, error) {
+	week, err := r.LoadRosterWeek(weekOffset)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to load roster week for modifying row count: %w", err)
 	}
@@ -146,9 +143,8 @@ func (r *MongoRosterWeekRepository) ChangeDayRowCount(startDate time.Time, dayID
 // -- Helper functions for repository internal use --
 
 // newRosterWeek is a helper for creating a new RosterWeek from a startDate.
-func newRosterWeek(startDate time.Time) models.RosterWeek {
+func newRosterWeek(weekOffset int) models.RosterWeek {
 	// Convert the start date to local time then use it to generate days.
-	localDate := startDate.In(time.Local)
 	dayNames := []string{"Tues", "Wed", "Thurs", "Fri", "Sat", "Sun", "Mon"}
 	var days []*models.RosterDay
 
@@ -168,10 +164,10 @@ func newRosterWeek(startDate time.Time) models.RosterWeek {
 	}
 
 	return models.RosterWeek{
-		ID:        uuid.New(),
-		StartDate: localDate,
-		Days:      days,
-		IsLive:    false,
+		ID:         uuid.New(),
+		WeekOffset: weekOffset,
+		Days:       days,
+		IsLive:     false,
 	}
 }
 

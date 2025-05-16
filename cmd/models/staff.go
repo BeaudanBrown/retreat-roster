@@ -35,14 +35,14 @@ type StaffMember struct {
 
 // StaffConfig defines configuration data for staff.
 type StaffConfig struct {
-	LastVisit          time.Time
-	TimesheetStartDate time.Time
-	RosterStartDate    time.Time
-	HideByIdeal        bool
-	HideByPrefs        bool
-	HideByLeave        bool
-	HideApproved       bool
-	ShowAll            bool
+	LastVisit           time.Time
+	TimesheetDateOffset int
+	RosterDateOffset    int
+	HideByIdeal         bool
+	HideByPrefs         bool
+	HideByLeave         bool
+	HideApproved        bool
+	ShowAll             bool
 }
 
 // DayAvailability represents a staff member's availability on a given day.
@@ -75,17 +75,10 @@ func (s StaffMember) MarshalBSON() ([]byte, error) {
 		Alias: (*Alias)(&s),
 	}
 	// Marshall as UTC
-	year, month, day := aux.Config.RosterStartDate.Date()
-	rosterStartDateLocal := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
-	aux.Config.RosterStartDate = rosterStartDateLocal.UTC()
-
-	year, month, day = aux.Config.TimesheetStartDate.Date()
-	timesheetStartDateLocal := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
-	aux.Config.TimesheetStartDate = timesheetStartDateLocal.UTC()
 
 	utcRequests := []LeaveRequest{}
 	for _, leaveReq := range s.LeaveRequests {
-		year, month, day = leaveReq.StartDate.Date()
+		year, month, day := leaveReq.StartDate.Date()
 		leaveStartDateLocal := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
 		utcStart := leaveStartDateLocal.UTC()
 
@@ -139,8 +132,6 @@ func (s *StaffMember) UnmarshalBSON(data []byte) error {
 		localRequests = append(localRequests, localReq)
 	}
 	s.LeaveRequests = localRequests
-	s.Config.RosterStartDate = s.Config.RosterStartDate.In(time.Local)
-	s.Config.TimesheetStartDate = s.Config.TimesheetStartDate.In(time.Local)
 
 	return nil
 }

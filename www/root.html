@@ -3,7 +3,7 @@
 {{ $isLive := .IsLive }}
 {{ $activeStaff := .ActiveStaff }}
 {{ $config := $activeStaff.Config }}
-{{ $startDate := $config.RosterStartDate }}
+{{ $startDate := WeekStartFromOffset $config.RosterDateOffset }}
 {{ $server := .Server }}
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html lang="en">
@@ -82,7 +82,7 @@
 				{{ end }}
 			</div>
 			<div>
-				<h3 class="text-white">Week {{$config.RosterStartDate.Format "02/01"}} - {{(addDays $config.RosterStartDate 7).Format "02/01"}}</h3>
+				<h3 class="text-white">Week {{$startDate.Format "02/01"}} - {{(addDays $startDate 7).Format "02/01"}}</h3>
 			</div>
 			{{ if not .ActiveStaff.IsAdmin }}
 				<div id="roster-jpg">
