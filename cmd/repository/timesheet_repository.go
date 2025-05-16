@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"sort"
-	"time"
 
 	"roster/cmd/models"
 	"roster/cmd/utils"
@@ -115,13 +114,8 @@ func (repo *MongoTimesheetRepository) SaveAllTimesheetEntries(entries []*Timeshe
 }
 
 func (repo *MongoTimesheetRepository) GetStaffTimesheetWeek(staffID uuid.UUID, weekOffset int) (*[]*TimesheetEntry, error) {
-	weekStart := utils.WeekStartFromOffset(weekOffset)
-	weekEnd := weekStart.AddDate(0, 0, 7)
 	filter := bson.M{
-		"startDate": bson.M{
-			"$gte": weekStart.UTC(),
-			"$lt":  weekEnd.UTC(),
-		},
+		"weekOffset": weekOffset,
 		// TODO: Fucked up the bson name
 		"days": staffID,
 	}
@@ -141,16 +135,7 @@ func (repo *MongoTimesheetRepository) GetStaffTimesheetWeek(staffID uuid.UUID, w
 }
 
 func (repo *MongoTimesheetRepository) GetTimesheetWeek(weekOffset int) (*[]*TimesheetEntry, error) {
-	startDate := utils.WeekStartFromOffset(weekOffset)
-	year, month, day := startDate.Date()
-	weekStart := time.Date(year, month, day, 0, 0, 0, 0, time.Local)
-	weekEnd := weekStart.AddDate(0, 0, 7)
-	filter := bson.M{
-		"startDate": bson.M{
-			"$gte": weekStart.UTC(),
-			"$lt":  weekEnd.UTC(),
-		},
-	}
+	filter := bson.M{"weekOffset": weekOffset}
 
 	cursor, err := repo.collection.Find(repo.ctx, filter)
 	if err != nil {

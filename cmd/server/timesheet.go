@@ -4,7 +4,6 @@ import (
 	"math"
 
 	"net/http"
-	"time"
 
 	"roster/cmd/models"
 	"roster/cmd/repository"
@@ -141,10 +140,10 @@ func (s *Server) HandleDeleteTimesheetEntry(w http.ResponseWriter, r *http.Reque
 }
 
 type AddTimesheetEntryBody struct {
-	StaffID   string            `json:"staffID"`
-	DayIdx    int               `json:"dayIdx"`
-	StartDate models.CustomDate `json:"startDate"`
-	AdminView bool              `json:"adminView"`
+	StaffID    string `json:"staffID"`
+	WeekOffset int    `json:"weekOffset"`
+	DayOffset  int    `json:"dayOffset"`
+	AdminView  bool   `json:"adminView"`
 }
 
 func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request) {
@@ -163,7 +162,7 @@ func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request)
 	if thisStaff == nil {
 		return
 	}
-	newEntry := MakeEmptyTimesheetEntry(*reqBody.StartDate.Time, staffID)
+	newEntry := MakeEmptyTimesheetEntry(reqBody.WeekOffset, reqBody.DayOffset, staffID)
 	allStaff, err := s.Repos.Staff.LoadAllStaff()
 	if err != nil {
 		utils.PrintError(err, "Error loading all staff")
@@ -176,7 +175,8 @@ func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request)
 type ModifyTimesheetEntryBody struct {
 	StaffID    string            `json:"staffID"`
 	EntryID    string            `json:"entryID"`
-	StartDate  models.CustomDate `json:"startDate"`
+	WeekOffset int               `json:"weekOffset"`
+	DayOffset  int               `json:"dayOffset"`
 	ShiftStart models.CustomDate `json:"shiftStart"`
 	ShiftEnd   models.CustomDate `json:"shiftEnd"`
 	BreakStart models.CustomDate `json:"breakStart"`
@@ -210,8 +210,8 @@ func (s *Server) HandleModifyTimesheetEntry(w http.ResponseWriter, r *http.Reque
 		utils.PrintError(err, "Failed to get timesheet entry")
 		newEntry := TimesheetEntry{
 			ID:         entryID,
-			WeekOffset: utils.WeekOffsetFromDate(*reqBody.StartDate.Time),
-			DayOffset:  int((reqBody.StartDate.Time.Weekday() - time.Tuesday + 7) % 7),
+			WeekOffset: reqBody.WeekOffset,
+			DayOffset:  reqBody.DayOffset,
 		}
 		entry = &newEntry
 	}
@@ -324,14 +324,14 @@ type TimesheetEditModalData struct {
 	IsKitchen   bool
 }
 
-func MakeEmptyTimesheetEntry(startDate time.Time, staffID uuid.UUID) TimesheetEntry {
+func MakeEmptyTimesheetEntry(weekOffset int, dayOffset int, staffID uuid.UUID) TimesheetEntry {
 	start := utils.LastWholeHour()
 	end := utils.NextWholeHour()
 	newEntry := TimesheetEntry{
 		ID:          uuid.New(),
 		StaffID:     staffID,
-		WeekOffset:  utils.WeekOffsetFromDate(startDate),
-		DayOffset:   int((startDate.Weekday() - time.Tuesday + 7) % 7),
+		WeekOffset:  weekOffset,
+		DayOffset:   dayOffset,
 		ShiftStart:  start,
 		ShiftEnd:    end,
 		ShiftLength: end.Sub(start).Hours(),
