@@ -53,8 +53,7 @@ type DayStruct struct {
 }
 
 func MakeDayStruct(isLive bool, day models.RosterDay, s *Server, activeStaff models.StaffMember) DayStruct {
-	offset := 7*activeStaff.Config.RosterDateOffset + day.Offset
-	date := utils.GetLastTuesday().AddDate(0, 0, offset)
+	date := utils.WeekStartFromOffset(activeStaff.Config.RosterDateOffset).AddDate(0, 0, day.Offset)
 	allStaff, err := s.Repos.Staff.LoadAllStaff()
 	if err != nil {
 		utils.PrintError(err, "Failed to load all staff")

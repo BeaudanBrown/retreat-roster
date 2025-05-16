@@ -23,7 +23,7 @@ func WeekStartFromOffset(weekOffset int) time.Time {
 
 func WeekOffsetFromDate(t time.Time) int {
 	d := t.UTC().Sub(tuesdayEpoch)
-	off := int(d / week)
+	off := int(d/week) + 1
 	// If d is negative but not an exact multiple of 7 days,
 	// we need to subtract 1 to get the mathematical floor.
 	if d < 0 && d%week != 0 {
