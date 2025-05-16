@@ -1,12 +1,10 @@
 package migrate
 
 import (
+	"roster/cmd/models"
 	"roster/cmd/server"
 	"roster/cmd/utils"
-
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"time"
 )
 
 const STATE_FILE = "./data/state.json"
@@ -16,53 +14,56 @@ type Version struct {
 	Version int
 }
 
-func LoadVersion(s *server.Server) *Version {
-	versionCollection := s.DB.Collection("version")
-	var version Version
-	err := versionCollection.FindOne(s.Context, bson.M{"id": "version"}).Decode(&version)
-	if err != nil {
-		if err != mongo.ErrNoDocuments {
-			utils.PrintError(err, "Error reading version")
-			return nil
-		}
-		utils.PrintLog("Creating new version")
-		version = Version{
-			ID:      "version",
-			Version: 1,
-		}
-	}
-	if version.ID != "version" {
-		// Fix up borked databases
-		_, err := versionCollection.DeleteMany(s.Context, bson.M{})
+func DoMigration(v models.Version, s *server.Server) error {
+	if v.Version == 1 {
+		utils.PrintLog("Migrating to V2")
+		allWeeks, err := s.Repos.RosterWeek.LoadAllRosterWeeks()
 		if err != nil {
-			utils.PrintError(err, "Error deleting versions")
-			return nil
+			utils.PrintError(err, "Failed to load all roster weeks")
+			return err
 		}
-		utils.PrintLog("Fixing old version")
-		version = Version{
-			ID:      "version",
-			Version: 2,
+		for _, week := range allWeeks {
+			week.WeekOffset = utils.WeekOffsetFromDate(week.StartDate)
 		}
-		_, err = versionCollection.InsertOne(s.Context, version)
+		err = s.Repos.RosterWeek.SaveAllRosterWeeks(allWeeks)
 		if err != nil {
-			utils.PrintError(err, "Error inserting new version")
-			return nil
+			utils.PrintError(err, "Failed to save all weeks")
+			return err
 		}
-	}
-	return &version
-}
 
-func SaveVersion(s *server.Server, v Version) error {
-	utils.PrintLog("Saving version: %v", v.ID)
-	collection := s.DB.Collection("version")
-	filter := bson.M{"id": v.ID}
-	update := bson.M{"$set": v}
-	opts := options.Update().SetUpsert(true)
-	_, err := collection.UpdateOne(s.Context, filter, update, opts)
-	if err != nil {
-		utils.PrintError(err, "Failed to save version")
+		allStaff, err := s.Repos.Staff.LoadAllStaff()
+		if err != nil {
+			utils.PrintError(err, "Failed to load all staff")
+			return err
+		}
+		for _, staffMember := range allStaff {
+			staffMember.Config.RosterDateOffset = utils.WeekOffsetFromDate(utils.GetLastTuesday())
+			staffMember.Config.TimesheetDateOffset = utils.WeekOffsetFromDate(utils.GetLastTuesday())
+		}
+		err = s.Repos.Staff.SaveStaffMembers(allStaff)
+		if err != nil {
+			utils.PrintError(err, "Failed to save all staff")
+			return err
+		}
+
+		allTimesheets, err := s.Repos.Timesheet.GetAllTimesheetEntries()
+		if err != nil {
+			utils.PrintError(err, "Failed to load all timesheets")
+			return err
+		}
+		for _, timesheet := range *allTimesheets {
+			timesheet.WeekOffset = utils.WeekOffsetFromDate(timesheet.StartDate)
+			timesheet.DayOffset = int((timesheet.StartDate.Weekday() - time.Tuesday + 7) % 7)
+		}
+		err = s.Repos.Timesheet.SaveAllTimesheetEntries(*allTimesheets)
+		if err != nil {
+			utils.PrintError(err, "Failed to save all timesheets")
+			return err
+		}
+
+		v.Version = 2
+		err = s.Repos.Config.SaveVersion(v)
 		return err
 	}
-	utils.PrintLog("Saved version")
 	return nil
 }

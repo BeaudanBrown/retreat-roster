@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 
+	"roster/cmd/migrate"
 	"roster/cmd/server"
 	"roster/cmd/utils"
 
@@ -38,6 +39,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error loading server state: %v", err)
 	}
+
+	version, err := s.Repos.Config.LoadVersion()
+	if err != nil {
+		log.Fatalf("Error loading version: %v", err)
+	}
+	migrate.DoMigration(*version, s)
 
 	http.HandleFunc("/", s.VerifySession(s.HandleIndex))
 	http.HandleFunc("/landing", s.HandleLanding)
