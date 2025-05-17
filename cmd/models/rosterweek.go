@@ -161,21 +161,29 @@ func GetHighlightCol(defaultCol string, flag Highlight) string {
 
 func (week *RosterWeek) CheckFlags(allStaff []*StaffMember) RosterWeek {
 	staffMap := make(map[uuid.UUID]*StaffMember, len(allStaff))
+	shiftCounts := make(map[uuid.UUID][]int, len(allStaff))
+
 	for _, staff := range allStaff {
 		staffMap[staff.ID] = staff
-	}
-	shiftCounts := make(map[uuid.UUID][]int) // [staffID] => []int{day0_shifts, day1_shifts, ...}
-	for _, day := range week.Days {
-		shiftCounts = day.CountShifts(shiftCounts)
+		shiftCounts[staff.ID] = make([]int, 7)
 	}
 
-	weeklyShiftTotals := make(map[uuid.UUID]int)
+	for _, day := range week.Days {
+		if day != nil {
+			day.CountShifts(shiftCounts)
+		}
+	}
+
+	// Pre-calculate total weekly shifts for each staff member
+	weeklyShiftTotals := make(map[uuid.UUID]int, len(shiftCounts))
 	for staffID, dailyCounts := range shiftCounts {
 		weeklyShiftTotals[staffID] = SumArray(dailyCounts)
 	}
 
 	for i := range week.Days {
-		assignFlags(week.Days[i], week.StartDate.AddDate(0, 0, i), shiftCounts, weeklyShiftTotals, staffMap, i)
+		if week.Days[i] != nil {
+			assignFlags(week.Days[i], week.StartDate.AddDate(0, 0, i), shiftCounts, weeklyShiftTotals, staffMap, week.Days[i].Offset)
+		}
 	}
 
 	for i := 0; i < len(week.Days)-1; i++ {
@@ -189,18 +197,20 @@ func (week *RosterWeek) CheckFlags(allStaff []*StaffMember) RosterWeek {
 	return *week
 }
 
-func (day *RosterDay) CountShifts(shiftCounts map[uuid.UUID][]int) map[uuid.UUID][]int {
+func (day *RosterDay) CountShifts(shiftCounts map[uuid.UUID][]int) {
 	recordShifts := func(slot *Slot) {
-		if slot.AssignedStaff != nil {
+		if slot != nil && slot.AssignedStaff != nil {
 			staffID := *slot.AssignedStaff
-			if _, exists := shiftCounts[staffID]; !exists {
-				shiftCounts[staffID] = make([]int, 7)
+			if dailyCounts, ok := shiftCounts[staffID]; ok {
+				dailyCounts[day.Offset]++
 			}
-			shiftCounts[staffID][day.Offset]++
 		}
 	}
 
 	for _, row := range day.Rows {
+		if row == nil {
+			continue
+		}
 		if day.AmeliaOpen {
 			recordShifts(&row.Amelia)
 		}
@@ -208,8 +218,6 @@ func (day *RosterDay) CountShifts(shiftCounts map[uuid.UUID][]int) map[uuid.UUID
 		recordShifts(&row.Mid)
 		recordShifts(&row.Late)
 	}
-
-	return shiftCounts
 }
 
 func SumArray(arr []int) int {
