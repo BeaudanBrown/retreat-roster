@@ -1,7 +1,6 @@
 package models
 
 import (
-	"roster/cmd/utils"
 	"time"
 
 	"github.com/google/uuid"
@@ -171,8 +170,7 @@ func (week *RosterWeek) CheckFlags(allStaff []*StaffMember) RosterWeek {
 	}
 
 	for i := range week.Days {
-		newDay := assignFlags(week.Days[i], week.StartDate.AddDate(0, 0, i), shiftCounts, staffMap, i)
-		week.Days[i] = &newDay
+		assignFlags(week.Days[i], week.StartDate.AddDate(0, 0, i), shiftCounts, staffMap, i)
 	}
 
 	for i := 0; i < len(week.Days)-1; i++ {
@@ -216,10 +214,9 @@ func SumArray(arr []int) int {
 	return total
 }
 
-func assignFlags(day *RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int, staffMap map[uuid.UUID]*StaffMember, dayIdx int) RosterDay {
-	processSlot := func(row Row, slotStr string, dayIndex int) Highlight {
+func assignFlags(day *RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int, staffMap map[uuid.UUID]*StaffMember, dayIdx int) {
+	processSlot := func(row *Row, slotStr string, dayIndex int) Highlight {
 		slot := row.GetSlot(slotStr)
-		utils.PrintLog("Slot: %v", slot)
 		if slot.AssignedStaff == nil {
 			return None
 		}
@@ -251,16 +248,14 @@ func assignFlags(day *RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int
 
 	for _, row := range day.Rows {
 		if day.AmeliaOpen {
-			row.Amelia.Flag = processSlot(*row, "Amelia", dayIdx)
+			row.Amelia.Flag = processSlot(row, "Amelia", dayIdx)
 		} else {
 			row.Amelia.Flag = None
 		}
-		row.Early.Flag = processSlot(*row, "Early", dayIdx)
-		row.Mid.Flag = processSlot(*row, "Mid", dayIdx)
-		row.Late.Flag = processSlot(*row, "Late", dayIdx)
+		row.Early.Flag = processSlot(row, "Early", dayIdx)
+		row.Mid.Flag = processSlot(row, "Mid", dayIdx)
+		row.Late.Flag = processSlot(row, "Late", dayIdx)
 	}
-
-	return *day
 }
 
 func checkLateToEarly(day *RosterDay, nextDay *RosterDay) {
