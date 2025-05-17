@@ -1,6 +1,7 @@
 package models
 
 import (
+	"roster/cmd/utils"
 	"time"
 
 	"github.com/google/uuid"
@@ -157,4 +158,130 @@ func GetHighlightCol(defaultCol string, flag Highlight) string {
 		return "#D7A9A9"
 	}
 	return defaultCol
+}
+
+func (week *RosterWeek) CheckFlags(allStaff []*StaffMember) RosterWeek {
+	staffMap := make(map[uuid.UUID]*StaffMember, len(allStaff))
+	for _, staff := range allStaff {
+		staffMap[staff.ID] = staff
+	}
+	shiftCounts := make(map[uuid.UUID][]int)
+	for _, day := range week.Days {
+		shiftCounts = day.CountShifts(shiftCounts)
+	}
+
+	for i := range week.Days {
+		newDay := assignFlags(week.Days[i], week.StartDate.AddDate(0, 0, i), shiftCounts, staffMap, i)
+		week.Days[i] = &newDay
+	}
+
+	for i := 0; i < len(week.Days)-1; i++ {
+		currentDay := week.Days[i]
+		nextDay := week.Days[i+1]
+		if currentDay.IsClosed || nextDay.IsClosed {
+			continue
+		}
+		checkLateToEarly(currentDay, nextDay)
+	}
+	return *week
+}
+
+func (day *RosterDay) CountShifts(shiftCounts map[uuid.UUID][]int) map[uuid.UUID][]int {
+	recordShifts := func(slot *Slot) {
+		if slot.AssignedStaff != nil {
+			if _, exists := shiftCounts[*slot.AssignedStaff]; !exists {
+				shiftCounts[*slot.AssignedStaff] = make([]int, 7)
+			}
+			shiftCounts[*slot.AssignedStaff][day.Offset]++
+		}
+	}
+
+	for _, row := range day.Rows {
+		if day.AmeliaOpen {
+			recordShifts(&row.Amelia)
+		}
+		recordShifts(&row.Early)
+		recordShifts(&row.Mid)
+		recordShifts(&row.Late)
+	}
+
+	return shiftCounts
+}
+
+func SumArray(arr []int) int {
+	total := 0
+	for _, value := range arr {
+		total += value
+	}
+	return total
+}
+
+func assignFlags(day *RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int, staffMap map[uuid.UUID]*StaffMember, dayIdx int) RosterDay {
+	processSlot := func(row Row, slotStr string, dayIndex int) Highlight {
+		slot := row.GetSlot(slotStr)
+		utils.PrintLog("Slot: %v", slot)
+		if slot.AssignedStaff == nil {
+			return None
+		}
+		if shiftCounts[*slot.AssignedStaff][dayIndex] > 1 {
+			return Duplicate
+		}
+		if staff, ok := staffMap[*slot.AssignedStaff]; ok {
+			for _, req := range staff.LeaveRequests {
+				if !req.StartDate.After(date) && req.EndDate.After(date) {
+					return LeaveConflict
+				}
+			}
+			conflict := staff.GetConflict(slotStr, dayIndex)
+			if conflict != None {
+				return conflict
+			}
+			currentShifts := SumArray(shiftCounts[*slot.AssignedStaff])
+			if currentShifts == staff.IdealShifts {
+				//TODO: move this to a better place for viewing
+				// return IdealMet
+				return None
+			}
+			if currentShifts > staff.IdealShifts {
+				return IdealExceeded
+			}
+		}
+		return None
+	}
+
+	for _, row := range day.Rows {
+		if day.AmeliaOpen {
+			row.Amelia.Flag = processSlot(*row, "Amelia", dayIdx)
+		} else {
+			row.Amelia.Flag = None
+		}
+		row.Early.Flag = processSlot(*row, "Early", dayIdx)
+		row.Mid.Flag = processSlot(*row, "Mid", dayIdx)
+		row.Late.Flag = processSlot(*row, "Late", dayIdx)
+	}
+
+	return *day
+}
+
+func checkLateToEarly(day *RosterDay, nextDay *RosterDay) {
+	for _, row := range day.Rows {
+		if row.Late.Flag > LateToEarly {
+			// Don't overwrite more important flags
+			continue
+		}
+		staff := row.Late.AssignedStaff
+		if staff == nil {
+			continue
+		}
+		for _, row2 := range nextDay.Rows {
+			if row2.Early.Flag > LateToEarly {
+				// Don't overwrite more important flags
+				continue
+			}
+			if row2.Early.HasThisStaff(*staff) {
+				row2.Early.Flag = LateToEarly
+				row.Late.Flag = LateToEarly
+			}
+		}
+	}
 }

@@ -364,6 +364,16 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// TODO: Make the flags check here
+	allStaff, err := s.Repos.Staff.LoadAllStaff()
+	if err != nil {
+		utils.PrintError(err, "Failed to load all staff")
+		return
+	}
+
+	checkedWeek := week.CheckFlags(allStaff)
+	week = &checkedWeek
+
 	s.Repos.RosterWeek.SaveRosterWeek(week)
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
