@@ -40,3 +40,8 @@ refresh-db:
 clean:
 	@echo "Cleaning up..."
 	rm -rf $(DIST_FOLDER)/$(BINARY_NAME)
+  
+.PHONY: test
+test:
+	@echo "Running all Go tests..."
+	go test ./... -v
