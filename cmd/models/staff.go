@@ -25,7 +25,6 @@ type StaffMember struct {
 	ContactName   string
 	ContactPhone  string
 	IdealShifts   int
-	CurrentShifts int
 	Availability  []DayAvailability
 	Tokens        []uuid.UUID
 	LeaveRequests []LeaveRequest
@@ -197,6 +196,11 @@ func (staff *StaffMember) GetConflict(slot string, offset int) Highlight {
 		}
 	}
 	return None
+}
+
+func (staff *StaffMember) HasConflict(slot string, offset int) bool {
+	conflict := staff.GetConflict(slot, offset)
+	return conflict == PrefConflict || conflict == PrefRefuse
 }
 
 func (staff *StaffMember) IsAway(date time.Time) bool {

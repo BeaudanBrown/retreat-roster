@@ -301,3 +301,33 @@ func checkLateToEarly(day *RosterDay, nextDay *RosterDay) {
 		}
 	}
 }
+
+// CountShiftsForStaff returns the total number of shifts assigned to a specific staff member in this roster week.
+func (week *RosterWeek) CountShiftsForStaff(staffID uuid.UUID) int {
+	totalShifts := 0
+	for _, day := range week.Days {
+		if day == nil {
+			continue
+		}
+		for _, row := range day.Rows {
+			if row == nil {
+				continue
+			}
+			// Count Amelia shifts if the day has Amelia open
+			if day.AmeliaOpen && row.Amelia.AssignedStaff != nil && *row.Amelia.AssignedStaff == staffID {
+				totalShifts++
+			}
+			// Count Early, Mid, Late shifts
+			if row.Early.AssignedStaff != nil && *row.Early.AssignedStaff == staffID {
+				totalShifts++
+			}
+			if row.Mid.AssignedStaff != nil && *row.Mid.AssignedStaff == staffID {
+				totalShifts++
+			}
+			if row.Late.AssignedStaff != nil && *row.Late.AssignedStaff == staffID {
+				totalShifts++
+			}
+		}
+	}
+	return totalShifts
+}
