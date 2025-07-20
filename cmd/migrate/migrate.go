@@ -15,8 +15,11 @@ type Version struct {
 }
 
 func DoMigration(v models.Version, s *server.Server) error {
-	if v.Version == 1 {
-		utils.PrintLog("Migrating to V2")
+	utils.PrintLog("Version: %v", v.Version)
+	// utils.PrintLog("Offset: %v", utils.WeekOffsetFromDate(utils.TuesdayEpoch))
+	// utils.PrintLog("Offset: %v", utils.WeekOffsetFromDate(utils.TuesdayEpoch.AddDate(0, 0, 2887*7)))
+	if v.Version != 0 {
+		utils.PrintLog("Switching to boolean migration")
 		allWeeks, err := s.Repos.RosterWeek.LoadAllRosterWeeks()
 		if err != nil {
 			utils.PrintError(err, "Failed to load all roster weeks")
@@ -24,6 +27,7 @@ func DoMigration(v models.Version, s *server.Server) error {
 		}
 		for _, week := range allWeeks {
 			week.WeekOffset = utils.WeekOffsetFromDate(week.StartDate)
+			// utils.PrintLog("Date: %v, offset: %v", week.StartDate, utils.WeekOffsetFromDate(week.StartDate))
 		}
 		err = s.Repos.RosterWeek.SaveAllRosterWeeks(allWeeks)
 		if err != nil {
@@ -61,7 +65,7 @@ func DoMigration(v models.Version, s *server.Server) error {
 			return err
 		}
 
-		v.Version = 2
+		v.Version = 0
 		err = s.Repos.Config.SaveVersion(v)
 		return err
 	}
