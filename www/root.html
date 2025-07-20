@@ -245,7 +245,7 @@
 								<td>{{ .Phone }}</td>
 								<td>{{ .ContactName }}</td>
 								<td>{{ .ContactPhone }}</td>
-								<td>{{ .CurrentShifts }}</td>
+								<td>{{ CountShiftsForStaff .ID $ }}</td>
 								<td>{{ .IdealShifts }}</td>
 								<td>
 									<input type="checkbox" {{ if .IsHidden }}checked{{ end }}

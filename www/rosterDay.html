@@ -69,7 +69,7 @@
 					{{ if or
 					(or (.IsTrial) ($row.Amelia.HasThisStaff .ID))
 					(and
-					(or (not $hideByIdeal) (lt .CurrentShifts .IdealShifts))
+					(or (not $hideByIdeal) (not (index $.StaffAtLimit .ID)))
 					(or (not $hideByLeave) (not (.IsAway $date)))
 					)
 					}}
@@ -115,15 +115,15 @@
 					<option value=""></option>
 					{{ range $staff }}
 					{{ if not .IsHidden }}
-					{{ if or
-					(or (.IsTrial) ($row.Early.HasThisStaff .ID))
-					(and
-					(and
-					(or (not $hideByIdeal) (lt .CurrentShifts .IdealShifts))
-					(or (not $hideByLeave) (not (.IsAway $date)))
-					)
-					(or (not $hideByPrefs) (not (.HasConflict "Early" $offset)))
-					)
+            {{ if or
+              (or (.IsTrial) ($row.Early.HasThisStaff .ID))
+              (and
+                (and
+                  (or (not $hideByIdeal) (not (index $.StaffAtLimit .ID)))
+                  (or (not $hideByLeave) (not (.IsAway $date)))
+                )
+                (or (not $hideByPrefs) (not (.HasConflict "Early" $offset)))
+              )
 					}}
 					<option class="drop-opt" value="{{.ID}}" {{if $row.Early.HasThisStaff .ID}}selected{{end}}>
 						{{if .NickName}}
@@ -168,7 +168,7 @@
 							{{ if or
 								(or (.IsTrial) ($row.Mid.HasThisStaff .ID))
 								(and
-									(and (or (not $hideByIdeal) (lt .CurrentShifts .IdealShifts))
+									(and (or (not $hideByIdeal) (not (index $.StaffAtLimit .ID)))
 										(or (not $hideByLeave) (not (.IsAway $date))))
 									(or (not $hideByPrefs) (not (.HasConflict "Mid" $offset))))
 							}}
@@ -209,7 +209,7 @@
 					(or (.IsTrial) ($row.Late.HasThisStaff .ID))
 					(and
 					(and
-					(or (not $hideByIdeal) (lt .CurrentShifts .IdealShifts))
+					(or (not $hideByIdeal) (not (index $.StaffAtLimit .ID)))
 					(or (not $hideByLeave) (not (.IsAway $date)))
 					)
 					(or (not $hideByPrefs) (not (.HasConflict "Late" $offset)))
