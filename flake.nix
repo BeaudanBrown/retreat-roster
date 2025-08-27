@@ -52,7 +52,7 @@
             };
 
             processes = {
-              server.exec = "air";
+              server.exec = "${pkgs.air}/bin/air";
               tailwind.exec = "tailwindcss -i ./www/input.css -o ./www/app.css --watch=always";
             };
 
