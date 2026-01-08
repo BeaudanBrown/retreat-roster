@@ -2,9 +2,8 @@
 {{ $staffMember := .StaffMember }}
 {{ $config := .StaffMember.Config }}
 {{ $entries := .Entries }}
-{{ $isAdmin := .StaffMember.IsAdmin }}
-{{ $showAll := and $config.ShowAll .StaffMember.IsAdmin }}
-{{ $hideApproved := and $config.HideApproved .StaffMember.IsAdmin }}
+{{ $showAll := and $config.ShowAll .StaffMember.IsManagerRole }}
+{{ $hideApproved := and $config.HideApproved .StaffMember.IsManagerRole }}
 {{ $startDate := WeekStartFromOffset $config.TimesheetDateOffset }}
 {{ $allStaff := .AllStaff }}
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
@@ -34,8 +33,8 @@
 				});
 			});
 		</script>
-		{{ template "header" (MakeHeaderStruct $staffMember.IsAdmin .RosterLive) }}
-		{{ if $staffMember.IsAdmin }}
+		{{ template "header" (MakeHeaderStruct $staffMember.IsManagerRole .RosterLive) }}
+		{{ if $staffMember.IsManagerRole }}
 		<div class="flex items-center justify-center space-x-2">
 			<form action="/exportKitchenReport" method="get">
 					<button class="buttonStyle" type="submit">Kitchen report</button>
@@ -110,7 +109,7 @@
 							<th colspan="4" class="text-left text-xl font-bold whitespace-nowrap">
 								<div class="flex items-center justify-center">
 									<button class="buttonGreen w-full rounded-lg text-xl m-2 px-2"
-                    {{if (DisableTimesheet $thisDate $staffMember.IsAdmin)}}disabled{{end}}
+                    {{if (DisableTimesheet $thisDate $staffMember.IsManagerRole)}}disabled{{end}}
 										hx-post='/addTimesheetEntry' hx-ext='json-enc'
 										hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "dayOffset":{{$idx}}, "weekOffset":{{$config.TimesheetDateOffset}}}'
 										hx-swap='outerHTML' hx-target='#new-{{$dayName}}-modalDiv'>

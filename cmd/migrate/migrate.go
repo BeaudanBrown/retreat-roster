@@ -4,6 +4,7 @@ import (
 	"roster/cmd/models"
 	"roster/cmd/server"
 	"roster/cmd/utils"
+	"slices"
 	"time"
 )
 
@@ -47,6 +48,32 @@ func DoMigration(v models.Version, s *server.Server) error {
 		err = s.Repos.Staff.SaveStaffMembers(allStaff)
 		if err != nil {
 			utils.PrintError(err, "Failed to save all staff")
+			return err
+		}
+
+		// Role migration: default Staff, legacy IsAdmin -> Manager, selected emails -> Admin
+		adminEmails := []string{
+			"admin1@example.com",
+			"admin2@example.com",
+			// TODO: fill in real admin emails
+		}
+		allStaff, err = s.Repos.Staff.LoadAllStaff()
+		if err != nil {
+			utils.PrintError(err, "Failed to reload all staff for role migration")
+			return err
+		}
+		for _, staffMember := range allStaff {
+			// default
+			staffMember.Role = models.Staff
+			if staffMember.IsAdmin {
+				staffMember.Role = models.Manager
+			}
+			if slices.Contains(adminEmails, staffMember.Email) {
+				staffMember.Role = models.AdminRole
+			}
+		}
+		if err := s.Repos.Staff.SaveStaffMembers(allStaff); err != nil {
+			utils.PrintError(err, "Failed to save staff roles during migration")
 			return err
 		}
 

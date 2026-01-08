@@ -1,6 +1,6 @@
 {{ define "timesheetEntry" }}
 {{ $activeStaff := .ActiveStaff }}
-{{ $showAll := and .ShowAll .ActiveStaff.IsAdmin }}
+{{ $showAll := and .ShowAll .ActiveStaff.IsManagerRole }}
 {{ $isThisStaff := eq .EntryStaff.ID .StaffID }}
 {{ $canEdit := and (not .Approved) (or $showAll $isThisStaff) }}
 {{ $id := .ID }}
@@ -33,7 +33,7 @@
 	</td>
 	<td>
 		<div class="flex mx-2 flex-col items-center justify-center">
-			{{ if .ActiveStaff.IsAdmin }}
+			{{ if .ActiveStaff.IsManagerRole }}
 				<button class="buttonStyle w-full"
 					hx-post="/toggleApproved"
 					hx-ext="json-enc"

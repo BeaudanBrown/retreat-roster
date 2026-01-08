@@ -52,10 +52,10 @@
 				console.error('initFlowbite is not available.');
 			}
 	</script>
-		{{ template "header" (MakeHeaderStruct .ActiveStaff.IsAdmin .IsLive) }}
+		{{ template "header" (MakeHeaderStruct .ActiveStaff.IsManagerRole .IsLive) }}
 		<div class="flex flex-col max-w-[60rem] justify-center items-center w-full m-wi">
 			<div class="buttons">
-				{{ if .ActiveStaff.IsAdmin }}
+				{{ if .ActiveStaff.IsManagerRole }}
 						<button class="buttonStyle"
 							hx-get="/toggleLive"
 							hx-target="#roster"
@@ -69,7 +69,7 @@
 					<button class="shiftButtonM px-2 py-1.5" hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"0"}' hx-swap='outerHTML' hx-target='#roster'>This week</button>
 					<button class="shiftButtonR px-2 py-1.5" hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"+"}' hx-swap='outerHTML' hx-target='#roster'>+</button>
 				</div>
-				{{ if .ActiveStaff.IsAdmin }}
+				{{ if .ActiveStaff.IsManagerRole }}
 					<div>
 						<button class="buttonStyle"
 							hx-get='/importRosterWeek'
@@ -84,7 +84,7 @@
 			<div>
 				<h3 class="text-white">Week {{$startDate.Format "02/01"}} - {{(addDays $startDate 7).Format "02/01"}}</h3>
 			</div>
-			{{ if not .ActiveStaff.IsAdmin }}
+			{{ if not .ActiveStaff.IsManagerRole }}
 				<div id="roster-jpg">
 					{{if $isLive }}
 						{{ range .Days }}
@@ -226,7 +226,7 @@
 								<th>Current Shifts</th>
 								<th>Ideal Shifts</th>
 								<th>Hidden</th>
-								<th>Admin</th>
+								<th>Role</th>
 								<th>Edit</th>
 								<th>Kitchen</th>
 								<th>Delete</th>
@@ -256,15 +256,23 @@
 										hx-vals='{"id": "{{ .ID }}"}'
 										hx-swap='outerHTML'>
 								</td>
-								<td>
-									<input type="checkbox" {{ if .IsAdmin }}checked{{ end }}
-										hx-ext="json-enc"
-										hx-post="/toggleAdmin"
-										hx-target="#roster"
-										hx-trigger="change"
-										hx-vals='{"id": "{{ .ID }}"}'
-										hx-swap='outerHTML'>
-								</td>
+						<td>
+							{{ if $.ActiveStaff.IsAdminRole }}
+							<select class="w-full p-1 text-sm rounded bg-gray-700 border-gray-600 text-white"
+								hx-ext="json-enc"
+								hx-post="/setRole"
+								hx-trigger="change"
+								hx-vals='js:{"id":"{{ .ID }}", "role": parseInt(event.target.value)}'
+								hx-target="#roster" hx-swap='outerHTML'>
+								<option value="0" {{ if eq .Role 0 }}selected{{ end }}>Staff</option>
+								<option value="1" {{ if eq .Role 1 }}selected{{ end }}>Manager</option>
+								<option value="2" {{ if eq .Role 2 }}selected{{ end }}>Admin</option>
+							</select>
+							{{ else }}
+							<label>{{ .RoleLabel }}</label>
+							{{ end }}
+						</td>
+
 								<td>
 									<a href="/profile?editStaffId={{ .ID }}">✏️</a>
 								</td>
