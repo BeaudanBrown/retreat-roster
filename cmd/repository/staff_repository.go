@@ -213,8 +213,9 @@ func (repo *MongoStaffRepository) DeleteLeaveReqByID(staff models.StaffMember, l
 }
 
 func (repo *MongoStaffRepository) GetStaffByLeaveReqID(leaveReqID uuid.UUID) (*models.StaffMember, error) {
+	// BSON uses lowercased field names by default, so `LeaveRequests` is stored as `leaverequests`.
 	filter := bson.M{
-		"leaveRequests": bson.M{
+		"leaverequests": bson.M{
 			"$elemMatch": bson.M{"id": leaveReqID},
 		},
 		"isdeleted": bson.M{"$ne": true},

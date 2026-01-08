@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 	"sort"
 	"strconv"
@@ -165,6 +167,7 @@ func (s *Server) HandleSubmitLeave(w http.ResponseWriter, r *http.Request) {
 	reqBody.ID = uuid.New()
 	now := time.Now()
 	reqBody.CreationDate = models.CustomDate{Time: &now}
+	reqBody.Status = models.LeavePending
 	staff := s.GetSessionUser(w, r)
 	if staff == nil {
 		return
@@ -350,9 +353,26 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
 	}
 
 	staffMember, err := s.Repos.Staff.GetStaffByID(staffID)
-	if err != nil {
+	if err != nil || staffMember == nil {
 		utils.PrintError(err, "Failed to load staff member")
 		s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *rosterWeek))
+		return
+	}
+
+	// Only admins can delete requests that are not their own
+	if thisStaff.ID != staffMember.ID && !thisStaff.IsAdminRole() {
+		w.WriteHeader(http.StatusForbidden)
+		if reqBody.Page == "root" {
+			s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *rosterWeek))
+			return
+		}
+		data := ProfileData{
+			StaffMember:  *thisStaff,
+			AdminRights:  thisStaff.IsManagerRole(),
+			DeleteRights: thisStaff.IsAdminRole(),
+			RosterLive:   rosterWeek.IsLive,
+		}
+		s.renderTemplate(w, "profile", data)
 		return
 	}
 
@@ -372,6 +392,71 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
 		}
 		s.renderTemplate(w, "profile", data)
 	}
+}
+
+type SetLeaveStatusBody struct {
+	ID     string `json:"id"`
+	Status int    `json:"status"`
+}
+
+func (s *Server) HandleSetLeaveStatus(w http.ResponseWriter, r *http.Request) {
+	var reqBody SetLeaveStatusBody
+	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
+		utils.PrintError(err, "Couldn't unmarshal leave status")
+		return
+	}
+
+	leaveID, err := uuid.Parse(reqBody.ID)
+	if err != nil {
+		utils.PrintError(err, "Invalid leaveID")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if reqBody.Status < int(models.LeaveApproved) || reqBody.Status > int(models.LeaveDenied) {
+		utils.PrintError(fmt.Errorf("invalid leave status: %d", reqBody.Status), "Invalid leave status")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	staffMember, err := s.Repos.Staff.GetStaffByLeaveReqID(leaveID)
+	if err != nil || staffMember == nil {
+		utils.PrintError(err, "Failed to load staff member by leave ID")
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	updated := false
+	for i := range staffMember.LeaveRequests {
+		if staffMember.LeaveRequests[i].ID != leaveID {
+			continue
+		}
+		staffMember.LeaveRequests[i].Status = models.LeaveStatus(reqBody.Status)
+		updated = true
+		break
+	}
+	if !updated {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if err := s.Repos.Staff.SaveStaffMember(*staffMember); err != nil {
+		utils.PrintError(err, "Failed to update leave request")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	thisStaff := s.GetSessionUser(w, r)
+	if thisStaff == nil {
+		log.Printf("Couldn't find session user")
+		return
+	}
+	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
+	if err != nil {
+		utils.PrintError(err, "Failed to load roster week")
+		return
+	}
+	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *rosterWeek))
 }
 
 type DeleteAccountBody struct {
@@ -416,6 +501,31 @@ func GetSortedLeaveReqs(allStaff []*models.StaffMember) []LeaveReqData {
 	reqs := []LeaveReqData{}
 	for _, staffMember := range allStaff {
 		for _, req := range staffMember.LeaveRequests {
+			name := staffMember.FirstName
+			if staffMember.NickName != "" {
+				name = staffMember.NickName
+			}
+			reqs = append(reqs, LeaveReqData{
+				req,
+				staffMember.ID,
+				name,
+			})
+		}
+	}
+	sort.Slice(reqs, func(i, j int) bool {
+		return reqs[i].StartDate.Before(*reqs[j].StartDate.Time)
+	})
+	return reqs
+}
+
+func GetSortedLeaveReqsByStatus(allStaff []*models.StaffMember, status int) []LeaveReqData {
+	matchStatus := models.LeaveStatus(status)
+	reqs := []LeaveReqData{}
+	for _, staffMember := range allStaff {
+		for _, req := range staffMember.LeaveRequests {
+			if req.Status != matchStatus {
+				continue
+			}
 			name := staffMember.FirstName
 			if staffMember.NickName != "" {
 				name = staffMember.NickName

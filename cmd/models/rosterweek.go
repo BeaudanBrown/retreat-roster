@@ -243,6 +243,9 @@ func assignFlags(day *RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int
 		}
 		if staff, ok := staffMap[staffID]; ok {
 			for _, req := range staff.LeaveRequests {
+				if req.Status != LeaveApproved {
+					continue
+				}
 				if !req.StartDate.After(date) && req.EndDate.After(date) {
 					return LeaveConflict
 				}

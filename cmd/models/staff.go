@@ -22,6 +22,28 @@ func (r StaffRole) String() string {
 	return [...]string{"Staff", "Manager", "Admin"}[r]
 }
 
+// LeaveStatus represents the approval state of a leave request.
+type LeaveStatus int
+
+const (
+	LeaveApproved LeaveStatus = iota
+	LeavePending
+	LeaveDenied
+)
+
+func (s LeaveStatus) String() string {
+	switch s {
+	case LeaveApproved:
+		return "Approved"
+	case LeavePending:
+		return "Pending"
+	case LeaveDenied:
+		return "Denied"
+	default:
+		return "Unknown"
+	}
+}
+
 // StaffMember represents a staff member in your application.
 type StaffMember struct {
 	ID uuid.UUID
@@ -71,9 +93,10 @@ type DayAvailability struct {
 type LeaveRequest struct {
 	ID           uuid.UUID
 	CreationDate CustomDate
-	Reason       string     `json:"reason"`
-	StartDate    CustomDate `json:"start-date"`
-	EndDate      CustomDate `json:"end-date"`
+	Reason       string      `json:"reason"`
+	StartDate    CustomDate  `json:"start-date"`
+	EndDate      CustomDate  `json:"end-date"`
+	Status       LeaveStatus `json:"status"`
 }
 
 // CustomDate wraps *time.Time to support custom unmarshalling.
@@ -110,6 +133,7 @@ func (s StaffMember) MarshalBSON() ([]byte, error) {
 			EndDate:      CustomDate{&utcEnd},
 			Reason:       leaveReq.Reason,
 			CreationDate: CustomDate{&utcCreation},
+			Status:       leaveReq.Status,
 		}
 		utcRequests = append(utcRequests, utcReq)
 	}
@@ -142,6 +166,7 @@ func (s *StaffMember) UnmarshalBSON(data []byte) error {
 			EndDate:      CustomDate{&localEnd},
 			Reason:       leaveReq.Reason,
 			CreationDate: CustomDate{&localCreation},
+			Status:       leaveReq.Status,
 		}
 		localRequests = append(localRequests, localReq)
 	}
@@ -220,6 +245,9 @@ func (staff *StaffMember) HasConflict(slot string, offset int) bool {
 
 func (staff *StaffMember) IsAway(date time.Time) bool {
 	for _, req := range staff.LeaveRequests {
+		if req.Status != LeaveApproved {
+			continue
+		}
 		if !req.StartDate.After(date) && req.EndDate.After(date) {
 			return true
 		}
