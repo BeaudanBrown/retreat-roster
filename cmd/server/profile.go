@@ -82,11 +82,15 @@ func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/landing", http.StatusSeeOther)
 		return
 	}
-	adminRights := editStaff.IsAdmin
+	adminRights := editStaff.IsManagerRole()
 
 	if r.Method == http.MethodGet {
 		editStaffIdParam := r.URL.Query().Get("editStaffId")
 		if editStaffIdParam != "" {
+			if !adminRights {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
 			editStaffId, err := uuid.Parse(editStaffIdParam)
 			if err != nil {
 				utils.PrintError(err, "Invalid UUID")
@@ -140,7 +144,7 @@ func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := ProfileData{
-		AdminRights: staff.IsAdmin,
+		AdminRights: staff.IsManagerRole(),
 		StaffMember: *staff,
 		RosterLive:  rosterWeek.IsLive,
 	}
@@ -283,7 +287,7 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 	if activeStaff == nil {
 		return
 	}
-	if activeStaff.ID != staff.ID && !activeStaff.IsAdmin {
+	if activeStaff.ID != staff.ID && !activeStaff.IsManagerRole() {
 		utils.PrintError(err, "Insufficient privilledges")
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -295,7 +299,7 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := ProfileData{
-		AdminRights:       activeStaff.IsAdmin,
+		AdminRights:       activeStaff.IsManagerRole(),
 		StaffMember:       updatedStaff,
 		RosterLive:        rosterWeek.IsLive,
 		ShowUpdateSuccess: true,
@@ -355,7 +359,7 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
 	} else {
 		data := ProfileData{
 			StaffMember: *thisStaff,
-			AdminRights: thisStaff.IsAdmin,
+			AdminRights: thisStaff.IsManagerRole(),
 			RosterLive:  rosterWeek.IsLive,
 		}
 		s.renderTemplate(w, "profile", data)

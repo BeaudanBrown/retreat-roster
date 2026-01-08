@@ -168,7 +168,7 @@ func (s *Server) HandleAddTimesheetEntry(w http.ResponseWriter, r *http.Request)
 		utils.PrintError(err, "Error loading all staff")
 		allStaff = []*models.StaffMember{}
 	}
-	data := MakeTimesheetEditModalStruct(newEntry, thisStaff.ID, allStaff, thisStaff.IsAdmin, thisStaff.IsKitchen)
+	data := MakeTimesheetEditModalStruct(newEntry, thisStaff.ID, allStaff, thisStaff.IsManagerRole(), thisStaff.IsKitchen)
 	s.renderTemplate(w, "timesheetEditModal", data)
 }
 
@@ -379,6 +379,6 @@ func (s *Server) HandleGetTimesheetEditModal(w http.ResponseWriter, r *http.Requ
 		utils.PrintError(err, "Error loading all staff")
 		allStaff = []*models.StaffMember{}
 	}
-	data := MakeTimesheetEditModalStruct(*entry, thisStaff.ID, allStaff, thisStaff.IsAdmin, thisStaff.IsKitchen)
+	data := MakeTimesheetEditModalStruct(*entry, thisStaff.ID, allStaff, thisStaff.IsManagerRole(), thisStaff.IsKitchen)
 	s.renderTemplate(w, "timesheetEditModal", data)
 }
