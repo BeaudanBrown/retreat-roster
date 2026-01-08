@@ -31,9 +31,9 @@ docker-push: build
 	docker push docker.beaudan.me/retreat-roster:latest
 
 refresh-db:
-	rm -rf ./.devenv/state/mongodb.bak
-	mv -f ./.devenv/state/mongodb ./.devenv/state/mongodb.bak
-	rsync -r --progress --exclude "journal/" --exclude "diagnostic.data" retreat:~/roster/db_bak/ ./.devenv/state/mongodb
+	-rm -rf ./.devenv/state/mongodb.bak
+	-mv -f ./.devenv/state/mongodb ./.devenv/state/mongodb.bak
+	rsync -r --progress --exclude "journal/" --exclude "diagnostic.data" roster:~/roster/db_bak/ ./.devenv/state/mongodb
 
 .PHONY: clean
 

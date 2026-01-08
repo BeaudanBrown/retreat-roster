@@ -26,8 +26,8 @@ type RootStruct struct {
 	*Server
 	ActiveStaff models.StaffMember
 	models.RosterWeek
-	Staff        []*models.StaffMember
-	StaffAtLimit map[uuid.UUID]bool
+	Staff           []*models.StaffMember
+	StaffShiftCount map[uuid.UUID]int
 }
 
 func (s *Server) MakeRootStruct(activeStaff models.StaffMember, week models.RosterWeek) RootStruct {
@@ -37,11 +37,10 @@ func (s *Server) MakeRootStruct(activeStaff models.StaffMember, week models.Rost
 		allStaff = []*models.StaffMember{}
 	}
 
-	// Calculate which staff members are at their ideal shift limit (once per week)
-	staffAtLimit := make(map[uuid.UUID]bool)
+	// Calculate shift counts for each staff member (once per week)
+	staffShiftCount := make(map[uuid.UUID]int)
 	for _, staff := range allStaff {
-		currentShifts := week.CountShiftsForStaff(staff.ID)
-		staffAtLimit[staff.ID] = currentShifts >= staff.IdealShifts
+		staffShiftCount[staff.ID] = week.CountShiftsForStaff(staff.ID)
 	}
 
 	return RootStruct{
@@ -49,7 +48,7 @@ func (s *Server) MakeRootStruct(activeStaff models.StaffMember, week models.Rost
 		activeStaff,
 		week,
 		allStaff,
-		staffAtLimit,
+		staffShiftCount,
 	}
 }
 
