@@ -9,10 +9,25 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+// StaffRole represents a user's privilege level.
+type StaffRole int
+
+const (
+	Staff StaffRole = iota
+	Manager
+	Admin
+)
+
+func (r StaffRole) String() string {
+	return [...]string{"Staff", "Manager", "Admin"}[r]
+}
+
 // StaffMember represents a staff member in your application.
 type StaffMember struct {
-	ID            uuid.UUID
+	ID uuid.UUID
+	// LegacyIsAdmin is kept for migration/back-compat with old DBs.
 	IsAdmin       bool
+	Role          StaffRole
 	IsTrial       bool
 	IsHidden      bool
 	IsKitchen     bool
@@ -210,4 +225,26 @@ func (staff *StaffMember) IsAway(date time.Time) bool {
 		}
 	}
 	return false
+}
+
+// EffectiveRole returns the role considering legacy IsAdmin for old records.
+func (s StaffMember) EffectiveRole() StaffRole {
+	if s.Role == 0 { // default zero value is Staff
+		if s.IsAdmin {
+			return Manager
+		}
+	}
+	return s.Role
+}
+
+func (s StaffMember) IsManager() bool {
+	return s.EffectiveRole() >= Manager
+}
+
+func (s StaffMember) IsAdmin() bool {
+	return s.EffectiveRole() >= Admin
+}
+
+func (s StaffMember) RoleLabel() string {
+	return s.EffectiveRole().String()
 }

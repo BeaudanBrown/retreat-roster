@@ -177,12 +177,18 @@ func (repo *MongoStaffRepository) CreateStaffMember(googleID string, token uuid.
 	if err != nil {
 		return fmt.Errorf("CreateStaffMember: %w", err)
 	}
-	isAdmin := len(allStaff) == 0
+	isFirstUser := len(allStaff) == 0
+	role := models.Staff
+	if isFirstUser {
+		role = models.Admin
+	}
 	newStaff := models.StaffMember{
-		ID:           uuid.New(),
-		GoogleID:     googleID,
-		FirstName:    "",
-		IsAdmin:      isAdmin,
+		ID:        uuid.New(),
+		GoogleID:  googleID,
+		FirstName: "",
+		// Keep legacy IsAdmin for backwards-compat until handlers/templates are updated.
+		IsAdmin:      isFirstUser,
+		Role:         role,
 		Tokens:       []uuid.UUID{token},
 		Availability: emptyAvailability(),
 		Config: models.StaffConfig{
