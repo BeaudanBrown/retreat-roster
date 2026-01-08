@@ -423,51 +423,9 @@ func (s *Server) HandleToggleKitchen(w http.ResponseWriter, r *http.Request) {
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
-type ToggleAdminBody struct {
-	ID string `json:"id"`
-}
-
 type SetRoleBody struct {
 	ID   string `json:"id"`
 	Role int    `json:"role"`
-}
-
-func (s *Server) HandleToggleAdmin(w http.ResponseWriter, r *http.Request) {
-	var reqBody ToggleAdminBody
-	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
-		return
-	}
-	accID, err := uuid.Parse(reqBody.ID)
-	if err != nil {
-		utils.PrintError(err, "Invalid accID")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	staffMember, err := s.Repos.Staff.GetStaffByID(accID)
-	if err != nil {
-		utils.PrintError(err, "failed to get staff by ID")
-	} else {
-		staffMember.IsAdmin = !staffMember.IsAdmin
-		// Keep Role in sync approximately for legacy toggle: admin checkbox == manager-or-above
-		if staffMember.IsAdmin {
-			if staffMember.Role < models.Manager {
-				staffMember.Role = models.Manager
-			}
-		} else {
-			staffMember.Role = models.Staff
-		}
-		s.Repos.Staff.SaveStaffMember(*staffMember)
-	}
-	thisStaff := s.GetSessionUser(w, r)
-	if thisStaff == nil {
-		return
-	}
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
-	if err != nil {
-		utils.PrintError(err, "Failed to load roster week")
-		return
-	}
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
 func (s *Server) HandleSetRole(w http.ResponseWriter, r *http.Request) {

@@ -10,7 +10,7 @@ import (
 )
 
 func TestMakeProfileStruct(t *testing.T) {
-	staff := models.StaffMember{ID: uuid.New(), FirstName: "Test", IsAdmin: true}
+	staff := models.StaffMember{ID: uuid.New(), FirstName: "Test", Role: models.AdminRole}
 	data := MakeProfileStruct(true, staff, false)
 	if data.StaffMember.ID != staff.ID {
 		t.Errorf("MakeProfileStruct: StaffMember.ID = %v; want %v", data.StaffMember.ID, staff.ID)
