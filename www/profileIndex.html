@@ -22,7 +22,7 @@
 				}
 		</script>
 		{{ template "header" (MakeHeaderStruct .AdminRights .RosterLive) }}
-		{{ $profileStruct := MakeProfileStruct .RosterLive .StaffMember .AdminRights }}
+		{{ $profileStruct := MakeProfileStruct .RosterLive .StaffMember .AdminRights .DeleteRights }}
 		{{ template "profile" $profileStruct }}
 	</body>
 </html>

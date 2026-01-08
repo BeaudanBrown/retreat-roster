@@ -160,6 +160,7 @@
 						{{if .IsTrial }}
 						<div class="py-2 inline-flex items-center justify-center rounded-md">
 							<label class="text-center shiftLabel">{{ .FirstName }}</label>
+							{{ if $activeStaff.IsAdminRole }}
 							<button type="button"
 								class="px-1.5 shiftButtonR"
 								hx-ext="json-enc"
@@ -169,6 +170,7 @@
 								hx-target="#roster">
 								Delete
 							</button>
+							{{ end }}
 						</div>
 						{{ end }}
 					{{ end }}
@@ -286,6 +288,7 @@
 										hx-swap='outerHTML'>
 								</td>
 								<td>
+									{{ if $.ActiveStaff.IsAdminRole }}
 									<button type="button"
 										class="buttonStyle w-full"
 										hx-ext="json-enc"
@@ -296,6 +299,7 @@
 										hx-target="#roster">
 										Delete
 									</button>
+									{{ end }}
 								</td>
 							</tr>
 							{{end}}

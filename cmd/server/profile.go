@@ -17,15 +17,17 @@ type ProfileIndexBody struct {
 }
 
 type ProfileIndexData struct {
-	CacheBust   string
-	RosterLive  bool
-	AdminRights bool
+	CacheBust    string
+	RosterLive   bool
+	AdminRights  bool
+	DeleteRights bool
 	models.StaffMember
 }
 
 type ProfileData struct {
 	models.StaffMember
 	AdminRights       bool
+	DeleteRights      bool
 	RosterLive        bool
 	ShowUpdateSuccess bool
 	ShowUpdateError   bool
@@ -33,11 +35,12 @@ type ProfileData struct {
 	ShowLeaveError    bool
 }
 
-func MakeProfileStruct(rosterLive bool, staffMember models.StaffMember, adminRights bool) ProfileData {
+func MakeProfileStruct(rosterLive bool, staffMember models.StaffMember, adminRights bool, deleteRights bool) ProfileData {
 	return ProfileData{
-		StaffMember: staffMember,
-		AdminRights: adminRights,
-		RosterLive:  rosterLive,
+		StaffMember:  staffMember,
+		AdminRights:  adminRights,
+		DeleteRights: deleteRights,
+		RosterLive:   rosterLive,
 	}
 }
 
@@ -83,6 +86,7 @@ func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	adminRights := editStaff.IsManagerRole()
+	deleteRights := editStaff.IsAdminRole()
 
 	if r.Method == http.MethodGet {
 		editStaffIdParam := r.URL.Query().Get("editStaffId")
@@ -119,10 +123,11 @@ func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := ProfileIndexData{
-		CacheBust:   s.CacheBust,
-		StaffMember: *editStaff,
-		AdminRights: adminRights,
-		RosterLive:  rosterWeek.IsLive,
+		CacheBust:    s.CacheBust,
+		StaffMember:  *editStaff,
+		AdminRights:  adminRights,
+		DeleteRights: deleteRights,
+		RosterLive:   rosterWeek.IsLive,
 	}
 
 	err = s.Templates.ExecuteTemplate(w, "profileIndex", data)
@@ -144,9 +149,10 @@ func (s *Server) HandleProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := ProfileData{
-		AdminRights: staff.IsManagerRole(),
-		StaffMember: *staff,
-		RosterLive:  rosterWeek.IsLive,
+		AdminRights:  staff.IsManagerRole(),
+		DeleteRights: staff.IsAdminRole(),
+		StaffMember:  *staff,
+		RosterLive:   rosterWeek.IsLive,
 	}
 	s.renderTemplate(w, "profile", data)
 }
@@ -300,6 +306,7 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	data := ProfileData{
 		AdminRights:       activeStaff.IsManagerRole(),
+		DeleteRights:      activeStaff.IsAdminRole(),
 		StaffMember:       updatedStaff,
 		RosterLive:        rosterWeek.IsLive,
 		ShowUpdateSuccess: true,
@@ -358,9 +365,10 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
 		s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *rosterWeek))
 	} else {
 		data := ProfileData{
-			StaffMember: *thisStaff,
-			AdminRights: thisStaff.IsManagerRole(),
-			RosterLive:  rosterWeek.IsLive,
+			StaffMember:  *thisStaff,
+			AdminRights:  thisStaff.IsManagerRole(),
+			DeleteRights: thisStaff.IsAdminRole(),
+			RosterLive:   rosterWeek.IsLive,
 		}
 		s.renderTemplate(w, "profile", data)
 	}

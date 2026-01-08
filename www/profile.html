@@ -21,19 +21,16 @@
 
   {{ template "leaveReqForm" (MakeLeaveReqStruct .StaffMember .ShowLeaveSuccess .ShowLeaveError) }}
 
-	<div class="flex align-center justify-center m-2">
-		<button class="buttonStyle"
-			hx-ext='json-enc'
-			hx-post="/deleteAcc"
-			hx-vals='js:{"ID":"{{ .ID }}"}'
-			hx-confirm=
-			{{if .AdminRights}}
-			"Are you sure you want to delete this staff member's account?"
-			{{else}}
-			"Are you sure you want to delete your account?"
-			{{end}}>
-			Delete Account
-		</button>
-	</div>
+	{{ if .DeleteRights }}
+		<div class="flex align-center justify-center m-2">
+			<button class="buttonStyle"
+				hx-ext='json-enc'
+				hx-post="/deleteAcc"
+				hx-vals='js:{"ID":"{{ .ID }}"}'
+				hx-confirm="Are you sure you want to delete this account?">
+				Delete Account
+			</button>
+		</div>
+	{{ end }}
 </div>
 {{ end }}

@@ -72,7 +72,7 @@ func main() {
 	http.HandleFunc("/toggleLive", s.VerifyManager(s.HandleToggleLive))
 	http.HandleFunc("/toggleAmelia", s.VerifyManager(s.HandleToggleAmelia))
 	http.HandleFunc("/toggleClosed", s.VerifyManager(s.HandleToggleClosed))
-	http.HandleFunc("/deleteAcc", s.VerifyManager(s.HandleDeleteAccount))
+	http.HandleFunc("/deleteAcc", s.VerifyAdmin(s.HandleDeleteAccount))
 	http.HandleFunc("/addTrial", s.VerifyManager(s.HandleAddTrial))
 	http.HandleFunc("/shiftWindow", s.VerifySession(s.HandleShiftWindow))
 	http.HandleFunc("/modifyProfile", s.VerifySession(s.HandleModifyProfile))
