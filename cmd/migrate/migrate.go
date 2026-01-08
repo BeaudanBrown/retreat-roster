@@ -53,9 +53,9 @@ func DoMigration(v models.Version, s *server.Server) error {
 
 		// Role migration: default Staff, legacy IsAdmin -> Manager, selected emails -> Admin
 		adminEmails := []string{
-			"admin1@example.com",
-			"admin2@example.com",
-			// TODO: fill in real admin emails
+			"alistair@retreathotelbrunswick.com.au",
+			"beaudan.brown@gmail.com",
+			"kerryn@retreathotelbrunswick.com.au",
 		}
 		allStaff, err = s.Repos.Staff.LoadAllStaff()
 		if err != nil {
