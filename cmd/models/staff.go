@@ -15,7 +15,7 @@ type StaffRole int
 const (
 	Staff StaffRole = iota
 	Manager
-	Admin
+	AdminRole
 )
 
 func (r StaffRole) String() string {
@@ -227,24 +227,14 @@ func (staff *StaffMember) IsAway(date time.Time) bool {
 	return false
 }
 
-// EffectiveRole returns the role considering legacy IsAdmin for old records.
-func (s StaffMember) EffectiveRole() StaffRole {
-	if s.Role == 0 { // default zero value is Staff
-		if s.IsAdmin {
-			return Manager
-		}
-	}
-	return s.Role
+func (s StaffMember) IsManagerRole() bool {
+	return s.Role >= Manager
 }
 
-func (s StaffMember) IsManager() bool {
-	return s.EffectiveRole() >= Manager
-}
-
-func (s StaffMember) IsAdmin() bool {
-	return s.EffectiveRole() >= Admin
+func (s StaffMember) IsAdminRole() bool {
+	return s.Role >= AdminRole
 }
 
 func (s StaffMember) RoleLabel() string {
-	return s.EffectiveRole().String()
+	return s.Role.String()
 }

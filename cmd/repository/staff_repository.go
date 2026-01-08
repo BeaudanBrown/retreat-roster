@@ -180,7 +180,7 @@ func (repo *MongoStaffRepository) CreateStaffMember(googleID string, token uuid.
 	isFirstUser := len(allStaff) == 0
 	role := models.Staff
 	if isFirstUser {
-		role = models.Admin
+		role = models.AdminRole
 	}
 	newStaff := models.StaffMember{
 		ID:        uuid.New(),

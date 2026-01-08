@@ -42,10 +42,21 @@ func (s *Server) renderTemplate(w http.ResponseWriter, templateName string, data
 	}
 }
 
+func (s *Server) VerifyManager(handler http.HandlerFunc) http.HandlerFunc {
+	return s.VerifySession(func(w http.ResponseWriter, r *http.Request) {
+		staff := s.GetSessionUser(w, r)
+		if staff == nil || !staff.IsManagerRole() {
+			http.Redirect(w, r, "/profile", http.StatusSeeOther)
+			return
+		}
+		handler(w, r)
+	})
+}
+
 func (s *Server) VerifyAdmin(handler http.HandlerFunc) http.HandlerFunc {
 	return s.VerifySession(func(w http.ResponseWriter, r *http.Request) {
 		staff := s.GetSessionUser(w, r)
-		if staff == nil || !staff.IsAdmin {
+		if staff == nil || !staff.IsAdminRole() {
 			http.Redirect(w, r, "/profile", http.StatusSeeOther)
 			return
 		}
