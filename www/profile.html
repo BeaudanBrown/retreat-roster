@@ -1,6 +1,8 @@
 {{ define "profile" }}
 {{ $staffID := .ID }}
 <div id="profileBody" class="px-3 w-full max-w-screen-md grid box-border">
+		{{ template "leaveReqForm" (MakeLeaveReqStruct .StaffMember .ShowLeaveSuccess .ShowLeaveError) }}
+
 	<h1 class="text-white">Update Your Profile</h1>
 	<form class="flex flex-col items-center justify-center"
 				hx-ext='json-enc' hx-post="/modifyProfile" hx-swap="outerHTML" hx-target="#profileBody">
@@ -18,8 +20,6 @@
 		<div id="success-message">Error!</div>
 		{{end}}
 	</form>
-
-  {{ template "leaveReqForm" (MakeLeaveReqStruct .StaffMember .ShowLeaveSuccess .ShowLeaveError) }}
 
 	{{ if .DeleteRights }}
 		<div class="flex align-center justify-center m-2">

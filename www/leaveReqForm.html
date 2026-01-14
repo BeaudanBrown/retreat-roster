@@ -1,7 +1,44 @@
 {{ define "leaveReqForm" }}
 {{ $staffID := .StaffMember.ID }}
 <div id="leaveReqForm">
-	<h1 class="mt-2 text-white">Request Leave</h1>
+	<h1 class="mt-2 text-white">Existing Leave Requests</h1>
+  <div class="w-full mt-2 relative overflow-x-auto shadow-md sm:rounded-lg">
+  <table class="w-full text-sm text-center text-gray-400">
+    <thead class="text-xs uppercase bg-gray-700 text-gray-400">
+      <tr>
+        <th>Created</th>
+        <th>Reason</th>
+        <th>Unavailable from</th>
+        <th>Available again</th>
+        <th>Status</th>
+        <th>Delete</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .StaffMember.LeaveRequests }}
+      <tr class="odd:bg-gray-900 even:bg-gray-800 border-gray-700">
+        <td>{{ .CreationDate.Format "02/01/06" }}</td>
+        <td>{{ .Reason }}</td>
+        <td>{{ .StartDate.Format "02/01/06" }}</td>
+        <td>{{ .EndDate.Format "02/01/06" }}</td>
+        <td>{{ .Status }}</td>
+        <td>
+          <button type="button"
+            class="buttonStyle actionBtn"
+            hx-ext="json-enc"
+            hx-post="/deleteLeaveReq"
+            hx-vals='js:{"id":"{{ .ID }}", "staffID": "{{ $staffID }}", "page":"profile"}'
+            hx-swap="outerHTML"
+            hx-target="#profileBody">
+            Delete
+          </button>
+        </td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+  </div>
+	<h1 class="mt-2 text-white">New Leave Request Form</h1>
 	<form class="flex flex-col items-center justify-center"
 		id="leaveForm" hx-ext='json-enc' hx-post="/submitLeave" hx-target="#leaveReqForm" hx-swap="outerHTML">
 		<div class="w-full">
@@ -41,42 +78,6 @@
 		</div>
 		{{end}}
 	</form>
-  <div class="w-full mt-2 relative overflow-x-auto shadow-md sm:rounded-lg">
-  <table class="w-full text-sm text-center text-gray-400">
-    <thead class="text-xs uppercase bg-gray-700 text-gray-400">
-      <tr>
-        <th>Created</th>
-        <th>Reason</th>
-        <th>Unavailable from</th>
-        <th>Available again</th>
-        <th>Status</th>
-        <th>Delete</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{ range .StaffMember.LeaveRequests }}
-      <tr class="odd:bg-gray-900 even:bg-gray-800 border-gray-700">
-        <td>{{ .CreationDate.Format "02/01/06" }}</td>
-        <td>{{ .Reason }}</td>
-        <td>{{ .StartDate.Format "02/01/06" }}</td>
-        <td>{{ .EndDate.Format "02/01/06" }}</td>
-        <td>{{ .Status }}</td>
-        <td>
-          <button type="button"
-            class="buttonStyle actionBtn"
-            hx-ext="json-enc"
-            hx-post="/deleteLeaveReq"
-            hx-vals='js:{"id":"{{ .ID }}", "staffID": "{{ $staffID }}", "page":"profile"}'
-            hx-swap="outerHTML"
-            hx-target="#profileBody">
-            Delete
-          </button>
-        </td>
-      </tr>
-      {{ end }}
-    </tbody>
-  </table>
-  </div>
 </div>
 <script>
   // Utilities for dd/mm/yyyy
