@@ -21,7 +21,7 @@
         <td>{{ .Reason }}</td>
         <td>{{ .StartDate.Format "02/01/06" }}</td>
         <td>{{ .EndDate.Format "02/01/06" }}</td>
-        <td>{{ .Status }}</td>
+        <td class="font-semibold {{ if eq .Status.String "Approved" }}bg-green-900{{ else if eq .Status.String "Denied" }}bg-red-900{{ else }}bg-gray-700{{ end }}">{{ .Status }}</td>
         <td>
           <button type="button"
             class="buttonStyle actionBtn"
