@@ -34,6 +34,32 @@
   </div>
 </div>
 
+<!-- Admin Controls (Role, Hidden, Kitchen) -->
+{{ if .AdminRights }}
+<div class="w-full grid gap-x-6 md:grid-cols-3 box-border">
+  <div>
+    <label for="role" class="block mb-2 text-sm font-medium text-white">Role</label>
+    <select id="role" name="role" class="w-full p-2 text-sm rounded bg-gray-700 border-gray-600 text-white">
+      <option value="0" {{ if eq .Role 0 }}selected{{ end }}>Staff</option>
+      <option value="1" {{ if eq .Role 1 }}selected{{ end }}>Manager</option>
+      <option value="2" {{ if eq .Role 2 }}selected{{ end }}>Admin</option>
+    </select>
+  </div>
+  <div class="flex items-end">
+    <label class="flex items-center gap-2 text-white">
+      <input type="checkbox" name="isHidden" {{ if .IsHidden }}checked{{ end }} class="w-4 h-4 rounded">
+      Hidden
+    </label>
+  </div>
+  <div class="flex items-end">
+    <label class="flex items-center gap-2 text-white">
+      <input type="checkbox" name="isKitchen" {{ if .IsKitchen }}checked{{ end }} class="w-4 h-4 rounded">
+      Kitchen
+    </label>
+  </div>
+</div>
+{{ end }}
+
 <!-- Ideal shifts -->
 <button id="shiftsDropdown" data-dropdown-toggle="ideal-shifts" class="buttonStyle" type="button">Ideal # Shifts <svg class="w-2.5 h-2.5 ms-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
     <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 4 4 4-4"/>

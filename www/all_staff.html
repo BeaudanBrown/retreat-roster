@@ -5,17 +5,9 @@
 		<thead class="text-xs uppercase bg-gray-700 text-gray-400">
 			<tr>
 				<th>Name</th>
-				<th>Email</th>
-				<th>Phone #</th>
-				<th>Contact Name</th>
-				<th>Contact Phone #</th>
 				<th>Current Shifts</th>
 				<th>Ideal Shifts</th>
-				<th>Hidden</th>
-				<th>Role</th>
-				<th>Edit</th>
-				<th>Kitchen</th>
-				<th>Delete</th>
+				<th>Profile</th>
 			</tr>
 		</thead>
 		<tbody>
@@ -27,63 +19,17 @@
 				{{else}}
 				<td>{{ .FirstName }}</td>
 				{{end}}
-				<td>{{ .Email }}</td>
-				<td>{{ .Phone }}</td>
-				<td>{{ .ContactName }}</td>
-				<td>{{ .ContactPhone }}</td>
 				<td>{{ index $.StaffShiftCount .ID }}</td>
 				<td>{{ .IdealShifts }}</td>
 				<td>
-					<input type="checkbox" {{ if .IsHidden }}checked{{ end }}
-						hx-ext="json-enc"
-						hx-post="/toggleHidden"
-						hx-target="#roster"
-						hx-trigger="change"
-						hx-vals='{"id": "{{ .ID }}"}'
-						hx-swap='outerHTML'>
-				</td>
-				<td>
-					{{ if $.ActiveStaff.IsAdminRole }}
-					<select class="w-full p-1 text-sm rounded bg-gray-700 border-gray-600 text-white"
-						hx-ext="json-enc"
-						hx-post="/setRole"
-						hx-trigger="change"
-						hx-vals='js:{"id":"{{ .ID }}", "role": parseInt(event.target.value)}'
-						hx-target="#roster" hx-swap='outerHTML'>
-						<option value="0" {{ if eq .Role 0 }}selected{{ end }}>Staff</option>
-						<option value="1" {{ if eq .Role 1 }}selected{{ end }}>Manager</option>
-						<option value="2" {{ if eq .Role 2 }}selected{{ end }}>Admin</option>
-					</select>
-					{{ else }}
-					<label>{{ .RoleLabel }}</label>
-					{{ end }}
-				</td>
-
-				<td>
-					<a href="/profile?editStaffId={{ .ID }}">✏️</a>
-				</td>
-				<td>
-					<input type="checkbox" {{ if .IsKitchen }}checked{{ end }}
-						hx-ext="json-enc"
-						hx-post="/toggleKitchen"
-						hx-target="#roster"
-						hx-trigger="change"
-						hx-vals='{"id": "{{ .ID }}"}'
-						hx-swap='outerHTML'>
-				</td>
-				<td>
-					{{ if $.ActiveStaff.IsAdminRole }}
 					<button type="button"
-						class="buttonStyle w-full"
-						hx-ext="json-enc"
-						hx-post="/deleteAcc"
-						hx-vals='js:{"id":"{{ .ID }}"}'
-						hx-swap="outerHTML"
-						hx-confirm="Are you sure you want to delete this staff member?"
-						hx-target="#roster">
-						Delete
+						class="buttonStyle"
+						hx-get="/getStaffProfileModal?editStaffId={{ .ID }}"
+						hx-swap="innerHTML"
+						hx-on="htmx:afterSwap: initFlowbite()"
+						hx-target="#staff-profile-modal-container">
+						View Profile
 					</button>
-					{{ end }}
 				</td>
 			</tr>
 			{{end}}
@@ -91,4 +37,5 @@
 		</tbody>
 	</table>
 </div>
+<div id="staff-profile-modal-container"></div>
 {{ end }}

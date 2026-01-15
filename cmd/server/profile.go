@@ -81,6 +81,50 @@ func MakeLeaveReqStruct(staffMember models.StaffMember, showLeaveSuccess bool, s
 	}
 }
 
+func (s *Server) HandleGetStaffProfileModal(w http.ResponseWriter, r *http.Request) {
+	activeStaff := s.GetSessionUser(w, r)
+	if activeStaff == nil {
+		http.Redirect(w, r, "/landing", http.StatusSeeOther)
+		return
+	}
+	adminRights := activeStaff.IsManagerRole()
+	deleteRights := activeStaff.IsAdminRole()
+
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	editStaffIdParam := r.URL.Query().Get("editStaffId")
+	if editStaffIdParam == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if !adminRights {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	editStaffId, err := uuid.Parse(editStaffIdParam)
+	if err != nil {
+		utils.PrintError(err, "Invalid UUID")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	staff, err := s.Repos.Staff.GetStaffByID(editStaffId)
+	if err != nil {
+		utils.PrintError(err, "Failed to get staff by ID")
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	data := ProfileData{
+		StaffMember:  *staff,
+		AdminRights:  adminRights,
+		DeleteRights: deleteRights,
+		RosterLive:   false,
+	}
+	s.renderTemplate(w, "staffProfileModal", data)
+}
+
 func (s *Server) HandleProfileIndex(w http.ResponseWriter, r *http.Request) {
 	editStaff := s.GetSessionUser(w, r)
 	if editStaff == nil {
@@ -196,6 +240,9 @@ type ModifyProfileBody struct {
 	Phone        string `json:"phone"`
 	ContactName  string `json:"contactName"`
 	ContactPhone string `json:"contactPhone"`
+	Role         string `json:"role"`
+	IsHidden     string `json:"isHidden"`
+	IsKitchen    string `json:"isKitchen"`
 	TuesEarly    string `json:"Tuesday-early-avail"`
 	TuesMid      string `json:"Tuesday-mid-avail"`
 	TuesLate     string `json:"Tuesday-late-avail"`
@@ -219,7 +266,7 @@ type ModifyProfileBody struct {
 	MonLate      string `json:"Monday-late-avail"`
 }
 
-func (s *Server) ApplyModifyProfileBody(reqBody ModifyProfileBody, staffMember models.StaffMember) models.StaffMember {
+func (s *Server) ApplyModifyProfileBody(reqBody ModifyProfileBody, staffMember models.StaffMember, adminRights bool) models.StaffMember {
 	staffMember.NickName = reqBody.NickName
 	staffMember.FirstName = reqBody.FirstName
 	staffMember.LastName = reqBody.LastName
@@ -229,6 +276,19 @@ func (s *Server) ApplyModifyProfileBody(reqBody ModifyProfileBody, staffMember m
 	staffMember.ContactPhone = reqBody.ContactPhone
 	// This can fail but not from me
 	staffMember.IdealShifts, _ = strconv.Atoi(reqBody.IdealShifts)
+
+	// Admin fields - only apply if user has admin rights
+	if adminRights {
+		if reqBody.Role != "" {
+			roleInt, err := strconv.Atoi(reqBody.Role)
+			if err == nil && roleInt >= 0 && roleInt <= 2 {
+				staffMember.Role = models.StaffRole(roleInt)
+				staffMember.IsAdmin = staffMember.Role >= models.Manager
+			}
+		}
+		staffMember.IsHidden = reqBody.IsHidden == "on"
+		staffMember.IsKitchen = reqBody.IsKitchen == "on"
+	}
 
 	staffMember.Availability = []models.DayAvailability{
 		{
@@ -301,21 +361,11 @@ func (s *Server) HandleModifyProfile(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	updatedStaff := s.ApplyModifyProfileBody(reqBody, *staff)
-	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(staff.Config.RosterDateOffset)
-	if err != nil {
-		utils.PrintError(err, "Failed to load roster week")
-		return
-	}
-	data := ProfileData{
-		AdminRights:       activeStaff.IsManagerRole(),
-		DeleteRights:      activeStaff.IsAdminRole(),
-		StaffMember:       updatedStaff,
-		RosterLive:        rosterWeek.IsLive,
-		ShowUpdateSuccess: true,
-	}
+	adminRights := activeStaff.IsManagerRole()
+	updatedStaff := s.ApplyModifyProfileBody(reqBody, *staff, adminRights)
 	s.Repos.Staff.SaveStaffMember(updatedStaff)
-	s.renderTemplate(w, "profile", data)
+	w.Header().Set("HX-Redirect", "/")
+	w.WriteHeader(http.StatusOK)
 }
 
 type DeleteLeaveBody struct {

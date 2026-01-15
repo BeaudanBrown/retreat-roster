@@ -214,7 +214,7 @@ func (s *Server) HandleCreateAccount(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/landing", http.StatusSeeOther)
 		return
 	}
-	updatedStaff := s.ApplyModifyProfileBody(reqBody, *thisStaff)
+	updatedStaff := s.ApplyModifyProfileBody(reqBody, *thisStaff, false)
 	if err := s.Repos.Staff.SaveStaffMember(updatedStaff); err != nil {
 		utils.PrintError(err, "Error creating staff member")
 		http.Redirect(w, r, "/landing", http.StatusSeeOther)
