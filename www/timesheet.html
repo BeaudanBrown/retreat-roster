@@ -23,10 +23,7 @@
 			document.addEventListener("DOMContentLoaded", function() {
 				document.getElementById('timesheet').addEventListener('htmx:afterSwap', function(event) {
 					if (event.detail.target.id.includes('modalDiv')) {
-						initFlowbite()
-						const button = document.getElementById('edit-modal-button');
-						button.click();
-						const modal = document.getElementById('edit-modal');
+						return;
 					} else {
 						window.location.reload();
 					}
@@ -112,7 +109,7 @@
                     {{if (DisableTimesheet $thisDate $staffMember.IsManagerRole)}}disabled{{end}}
 										hx-post='/addTimesheetEntry' hx-ext='json-enc'
 										hx-vals='js:{"staffID":"{{ $staffMember.ID }}", "dayOffset":{{$idx}}, "weekOffset":{{$config.TimesheetDateOffset}}}'
-										hx-swap='outerHTML' hx-target='#new-{{$dayName}}-modalDiv'>
+										hx-swap='innerHTML' hx-target='#new-{{$dayName}}-modalDiv'>
 										+ {{$thisDate.Format "Monday 02/01"}}
 									</button>
 								</div>
