@@ -81,6 +81,7 @@ func main() {
 	http.HandleFunc("/modifyTimeSlot", s.VerifySession(s.HandleModifyTimeSlot))
 	http.HandleFunc("/modifyDescriptionSlot", s.VerifySession(s.HandleModifyDescriptionSlot))
 	http.HandleFunc("/deleteLeaveReq", s.VerifySession(s.HandleDeleteLeaveReq))
+	http.HandleFunc("/deleteExpiredLeaveRequests", s.VerifyAdmin(s.HandleDeleteExpiredLeaveRequests))
 	http.HandleFunc("/setLeaveStatus", s.VerifyAdmin(s.HandleSetLeaveStatus))
 
 	http.HandleFunc("/shiftTimesheetWindow", s.VerifySession(s.HandleShiftTimesheetWindow))

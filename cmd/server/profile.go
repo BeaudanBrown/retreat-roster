@@ -592,3 +592,45 @@ func GetSortedLeaveReqsByStatus(allStaff []*models.StaffMember, status int) []Le
 	})
 	return reqs
 }
+
+func (s *Server) HandleDeleteExpiredLeaveRequests(w http.ResponseWriter, r *http.Request) {
+	thisStaff := s.GetSessionUser(w, r)
+	if thisStaff == nil {
+		return
+	}
+
+	allStaff, err := s.Repos.Staff.LoadAllStaff()
+	if err != nil {
+		utils.PrintError(err, "Failed to load all staff")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	now := time.Now()
+
+	for _, staff := range allStaff {
+		updatedRequests := []models.LeaveRequest{}
+		modified := false
+		for _, req := range staff.LeaveRequests {
+			if req.EndDate.After(now) {
+				updatedRequests = append(updatedRequests, req)
+			} else {
+				modified = true
+			}
+		}
+
+		if modified {
+			staff.LeaveRequests = updatedRequests
+			if err := s.Repos.Staff.SaveStaffMember(*staff); err != nil {
+				utils.PrintError(err, "Failed to save staff member")
+			}
+		}
+	}
+
+	rosterWeek, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
+	if err != nil {
+		utils.PrintError(err, "Failed to load roster week")
+		return
+	}
+	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *rosterWeek))
+}

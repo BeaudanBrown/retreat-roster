@@ -257,6 +257,18 @@
 						</tbody>
 					</table>
 				</div>
+				{{ if $activeStaff.IsAdminRole }}
+					<div class="flex justify-center mt-4">
+						<button class="buttonStyle bg-red-800 hover:bg-red-700"
+							hx-post="/deleteExpiredLeaveRequests"
+							hx-confirm="Are you sure you want to delete all expired leave requests?"
+							hx-target="#roster"
+							hx-swap="outerHTML">
+							Clear Expired
+						</button>
+					</div>
+				{{ end }}
+				</br>
 				{{ template "allStaff" . }}
 			{{ end }}
 		</div>
