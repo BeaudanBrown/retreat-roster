@@ -65,7 +65,7 @@
 			</form>
 		</div>
 
-		<div style='background-color: {{ GetHighlightCol $colour $row.Early.Flag }};' class="rosterCell staffCell">
+		<div style='background-color: {{ GetHighlightCol $colour $row.Early.Flag }};' class="rosterCell staffCell" title="{{ GetHighlightDesc $row.Early.Flag }}">
 			<form class="w-full h-full"
 				hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Early.ID }}" hx-swap='outerHTML' hx-target='#roster'>
 				<input type="hidden" name="dayID" value="{{ $dayID }}" />
@@ -112,7 +112,7 @@
 			</form>
 		</div>
 
-		<div style='background-color: {{ GetHighlightCol $colour $row.Mid.Flag }};' class="rosterCell staffCell">
+		<div style='background-color: {{ GetHighlightCol $colour $row.Mid.Flag }};' class="rosterCell staffCell" title="{{ GetHighlightDesc $row.Mid.Flag }}">
 			<form class="w-full h-full"
 				hx-post="/modifySlot"
 				hx-trigger="change from:#s-{{ $row.Mid.ID }}"
@@ -155,7 +155,7 @@
 			</form>
 		</div>
 
-		<div style='background-color: {{ GetHighlightCol $colour $row.Late.Flag }};' class="rosterCell staffCell">
+		<div style='background-color: {{ GetHighlightCol $colour $row.Late.Flag }};' class="rosterCell staffCell" title="{{ GetHighlightDesc $row.Late.Flag }}">
 			<form class="w-full h-full"
 				hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Late.ID }}" hx-swap='outerHTML' hx-target='#roster'>
 				<input type="hidden" name="dayID" value="{{ $dayID }}" />

@@ -152,6 +152,27 @@ func GetHighlightCol(defaultCol string, flag Highlight) string {
 	return defaultCol
 }
 
+func GetHighlightDesc(flag Highlight) string {
+	switch flag {
+	case Duplicate:
+		return "Duplicate shifts on this day"
+	case PrefConflict:
+		return "Conflict with staff preference"
+	case LateToEarly:
+		return "Late shift followed by early shift"
+	case LeaveConflict:
+		return "Conflict with leave request"
+	case PrefRefuse:
+		return "Staff refused this shift preference"
+	case IdealMet:
+		return "Ideal number of shifts met"
+	case IdealExceeded:
+		return "Ideal number of shifts exceeded"
+	default:
+		return ""
+	}
+}
+
 func (week *RosterWeek) CheckFlags(allStaff []*StaffMember) RosterWeek {
 	staffMap := make(map[uuid.UUID]*StaffMember, len(allStaff))
 	shiftCounts := make(map[uuid.UUID][]int, len(allStaff))

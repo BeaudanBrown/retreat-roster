@@ -139,6 +139,7 @@ func LoadServerState(d *mongo.Database, context context.Context) (*Server, error
 			"MakeHeaderStruct":           MakeHeaderStruct,
 			"MakeDayStruct":              MakeDayStruct,
 			"GetHighlightCol":            models.GetHighlightCol,
+			"GetHighlightDesc":           models.GetHighlightDesc,
 			"MakeProfileStruct":          MakeProfileStruct,
 			"MemberIsAssigned":           MemberIsAssigned,
 			"MakeTimesheetEntryStruct":   MakeTimesheetEntryStruct,
