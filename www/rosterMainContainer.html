@@ -1,0 +1,242 @@
+{{ define "rosterMainContainer" }}
+{{ $staff := .Staff }}
+{{ $isLive := .IsLive }}
+{{ $activeStaff := .ActiveStaff }}
+{{ $config := $activeStaff.Config }}
+{{ $startDate := WeekStartFromOffset $config.RosterDateOffset }}
+{{ $server := .Server }}
+<div id="roster-main-container" class="flex flex-col justify-center items-center w-full m-wi {{ if not $config.HideStaffList }}max-w-[60rem] lg:max-w-[95%]{{ else }}max-w-[60rem]{{ end }}">
+	<div class="buttons">
+		{{ if .ActiveStaff.IsManagerRole }}
+			<button class="buttonStyle"
+				hx-get="/toggleLive"
+				hx-target="#roster-main-container"
+				hx-swap='outerHTML'>
+				<input type="checkbox" {{ if $isLive }}checked{{ end }}>
+				<label>Make Public</label>
+			</button>
+			<button class="buttonStyle"
+				hx-get="/toggleHideStaffList"
+				hx-target="#roster-main-container"
+				hx-swap='outerHTML'>
+				<input type="checkbox" {{ if not $config.HideStaffList }}checked{{ end }}>
+				<label>Show Staff List</label>
+			</button>
+		{{ end }}
+	<div class="flex">
+		<button class="shiftButtonL px-2 py-1.5" hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"-"}' hx-swap='outerHTML' hx-target='#roster-main-container'>-</button>
+		<button class="shiftButtonM px-2 py-1.5" hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"0"}' hx-swap='outerHTML' hx-target='#roster-main-container'>This week</button>
+		<button class="shiftButtonR px-2 py-1.5" hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"+"}' hx-swap='outerHTML' hx-target='#roster-main-container'>+</button>
+	</div>
+		{{ if .ActiveStaff.IsManagerRole }}
+		<div>
+			<button class="buttonStyle"
+				hx-get='/importRosterWeek'
+				hx-swap='outerHTML'
+				hx-confirm="Are you sure you want to overwrite this week? CAN'T BE UNDONE"
+				hx-target='#roster-main-container'>
+				Import last week
+			</button>
+		</div>
+		{{ end }}
+	</div>
+	<div>
+		<h3 class="text-white">Week {{$startDate.Format "02/01"}} - {{(addDays $startDate 7).Format "02/01"}}</h3>
+	</div>
+	{{ if not .ActiveStaff.IsManagerRole }}
+		<div id="roster-jpg" class="w-full">
+			{{if $isLive }}
+				{{ range .Days }}
+					{{ $dayStruct := MakeDayStruct $isLive . $server $activeStaff }}
+					{{ template "rosterDayLocked" $dayStruct }}
+				{{ end }}
+			{{ else }}
+				<h1>This roster has not been made public</h1>
+			{{ end }}
+		</div>
+	{{ else }}
+		{{if not $isLive }}
+		<button id="hideDropdown" data-dropdown-toggle="hideDropdownOpts" class="buttonStyle" type="button">Hide staff with <svg class="w-2.5 h-2.5 ms-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6">
+				<path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 4 4 4-4"/>
+			</svg>
+		</button>
+		<!-- Dropdown menu -->
+		<div id="hideDropdownOpts" class="z-10 hidden w-48 divide-y rounded-lg shadow bg-gray-700 divide-gray-600">
+			<ul class="p-3 space-y-3 text-sm text-gray-200" aria-labelledby="hideDropdown">
+				<li>
+					<div class="flex items-center p-2 rounded hover:bg-gray-600">
+				<input {{ if $config.HideByIdeal }}checked{{ end }} id="hideIdeal" type="checkbox" class="w-4 h-4 rounded focus:ring-blue-600 ring-offset-gray-700 focus:ring-offset-gray-700 focus:ring-2 bg-gray-600 border-gray-500"
+					hx-get="/toggleHideByIdeal"
+					hx-target="#roster-main-container"
+					hx-swap='outerHTML'>
+						<label for="hideIdeal" class="w-full ms-2 text-sm font-medium rounded text-gray-300">Ideal # shifts</label>
+					</div>
+				</li>
+				<li>
+					<div class="flex items-center p-2 rounded hover:bg-gray-600">
+				<input {{ if $config.HideByPrefs }}checked{{ end }} id="hidePrefs" type="checkbox" class="w-4 h-4 rounded focus:ring-blue-600 ring-offset-gray-700 focus:ring-offset-gray-700 focus:ring-2 bg-gray-600 border-gray-500"
+					hx-get="/toggleHideByPreferences"
+					hx-target="#roster-main-container"
+					hx-swap='outerHTML'>
+						<label for="hidePrefs" class="w-full ms-2 text-sm font-medium rounded text-gray-300">Preference conflict</label>
+					</div>
+				</li>
+				<li>
+					<div class="flex items-center p-2 rounded hover:bg-gray-600">
+				<input {{ if $config.HideByLeave }}checked{{ end }} id="hideLeave" type="checkbox" class="w-4 h-4 rounded focus:ring-blue-600 ring-offset-gray-700 focus:ring-offset-gray-700 focus:ring-2 bg-gray-600 border-gray-500"
+					hx-get="/toggleHideByLeave"
+					hx-target="#roster-main-container"
+					hx-swap='outerHTML'>
+						<label for="hideLeave" class="w-full ms-2 text-sm font-medium rounded text-gray-300">Leave requests</label>
+					</div>
+				</li>
+			</ul>
+		</div>
+		{{ end }}
+		</br>
+		<div class="flex flex-col {{ if not $config.HideStaffList }}lg:flex-row lg:items-start{{ end }} gap-2 w-full min-w-0">
+			<div class="w-full {{ if not $config.HideStaffList }}lg:flex-[2]{{ end }} min-w-0">
+				<div id="roster-jpg">
+					{{ range .Days }}
+					{{ $dayStruct := MakeDayStruct $isLive . $server $activeStaff }}
+					{{if $isLive }}
+					{{ template "rosterDayLocked" $dayStruct }}
+					{{ else }}
+					{{ template "rosterDay" $dayStruct }}
+					{{ end }}
+					{{ end }}
+				</div>
+				{{if not $isLive }}
+					</br>
+				<div class="form-container">
+					<form id="addTrialForm" hx-post="/addTrial" hx-ext="json-enc" hx-swap="outerHTML" hx-target="#roster-main-container">
+						<label class="text-white">Add New Trial</label>
+						<div class="inline-flex rounded-md shadow-sm">
+							<input type="text" name="name" id="customStaff" value="Trial" onfocus="this.select();" onclick="this.select();" class="shiftInput" />
+							<button class="px-1.5 shiftButtonR" type="submit">+</button>
+						</div>
+					</form>
+				</div>
+					{{ range .Staff }}
+						{{if .IsTrial }}
+						<div class="py-2 flex items-center justify-center rounded-md">
+							<label class="text-center shiftLabel">{{ .FirstName }}</label>
+							{{ if $activeStaff.IsAdminRole }}
+					<button type="button"
+						class="px-1.5 shiftButtonR"
+						hx-ext="json-enc"
+						hx-post="/deleteAcc"
+						hx-vals='js:{"id":"{{ .ID }}"}'
+						hx-swap="outerHTML"
+						hx-target="#roster-main-container">
+						Delete
+					</button>
+							{{ end }}
+						</div>
+						{{ end }}
+					{{ end }}
+				{{ else }}
+					<button id="capture" class="buttonStyle mt-2" onclick="saveImage()">Save image</button>
+				{{ end }}
+			</div>
+			{{ if not $config.HideStaffList }}
+			<div class="w-full lg:flex-[1] lg:max-h-screen lg:overflow-y-auto lg:sticky lg:top-4 min-w-0">
+				{{ template "allStaff" . }}
+			</div>
+			{{ end }}
+		</div>
+		</br>
+		<h2 class="text-white">Leave Requests</h2>
+
+		{{ if $activeStaff.IsAdminRole }}
+			<h3 class="text-white mt-2">Pending Leave Requests</h3>
+			<div class="w-full relative overflow-x-auto shadow-md sm:rounded-lg">
+				<table class="w-full text-sm text-center text-gray-400">
+					<thead class="text-xs uppercase bg-gray-700 text-gray-400">
+						<tr>
+							<th>Staff</th>
+							<th>Created</th>
+							<th>Reason</th>
+							<th>Unavailable from</th>
+							<th>Available again</th>
+							<th>Action</th>
+						</tr>
+					</thead>
+					<tbody>
+						{{ $pendingReqData := GetSortedLeaveReqsByStatus $staff (LeavePendingStatus) }}
+						{{ range $pendingReqData }}
+							<tr class="odd:bg-gray-900 even:bg-gray-800 border-gray-700">
+								<th class="font-medium whitespace-nowrap text-white">{{ .StaffName }}</td>
+								<td>{{ .CreationDate.Format "02/01/06" }}</td>
+								<td>{{ .Reason }}</td>
+								<td>{{ .StartDate.Format "02/01/06" }}</td>
+								<td>{{ .EndDate.Format "02/01/06" }}</td>
+								<td>
+									<div class="inline-flex w-full">
+								<button type="button"
+									class="buttonStyle w-full"
+									hx-ext="json-enc"
+									hx-post="/setLeaveStatus"
+									hx-vals='js:{"id":"{{ .ID }}", "status": {{ LeaveApprovedStatus }} }'
+									hx-swap="outerHTML"
+									hx-target="#roster-main-container">
+									Approve
+								</button>
+								<button type="button"
+									class="buttonStyle w-full"
+									hx-ext="json-enc"
+									hx-post="/setLeaveStatus"
+									hx-vals='js:{"id":"{{ .ID }}", "status": {{ LeaveDeniedStatus }} }'
+									hx-swap="outerHTML"
+									hx-target="#roster-main-container">
+									Deny
+								</button>
+									</div>
+								</td>
+							</tr>
+						{{ end }}
+					</tbody>
+				</table>
+			</div>
+		{{ end }}
+
+		<h3 class="text-white mt-2">Approved Leave Requests</h3>
+		<div class="w-full relative overflow-x-auto shadow-md sm:rounded-lg">
+			<table class="w-full text-sm text-center text-gray-400">
+				<thead class="text-xs uppercase bg-gray-700 text-gray-400">
+					<tr>
+						<th>Staff</th>
+						<th>Created</th>
+						<th>Reason</th>
+						<th>Unavailable from</th>
+						<th>Available again</th>
+					</tr>
+				</thead>
+				<tbody>
+					{{ $approvedReqData := GetSortedLeaveReqsByStatus $staff (LeaveApprovedStatus) }}
+					{{ range $approvedReqData }}
+						<tr class="odd:bg-gray-900 even:bg-gray-800 border-gray-700">
+							<th class="font-medium whitespace-nowrap text-white">{{ .StaffName }}</td>
+							<td>{{ .CreationDate.Format "02/01/06" }}</td>
+							<td>{{ .Reason }}</td>
+							<td>{{ .StartDate.Format "02/01/06" }}</td>
+							<td>{{ .EndDate.Format "02/01/06" }}</td>
+						</tr>
+					{{ end }}
+				</tbody>
+			</table>
+		</div>
+		{{ if $activeStaff.IsAdminRole }}
+		<div class="flex justify-center mt-4">
+			<button class="buttonStyle bg-red-800 hover:bg-red-700"
+				hx-post="/deleteExpiredLeaveRequests"
+				hx-confirm="Are you sure you want to delete all expired leave requests?"
+				hx-target="#roster-main-container"
+				hx-swap="outerHTML">
+				Clear Expired
+			</button>
+		</div>
+		{{ end }}
+	{{ end }}
+</div>
+{{ end }}

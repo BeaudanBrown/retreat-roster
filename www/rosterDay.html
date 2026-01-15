@@ -25,7 +25,7 @@
 			<div class="checkLabel">
 				<input type="checkbox" {{ if $isClosed }}checked{{ end }}
 					hx-post="/toggleClosed"
-					hx-target="#roster"
+					hx-target="#roster-main-container"
 					hx-trigger="change"
 					hx-ext='json-enc'
 					hx-swap='outerHTML'
@@ -67,7 +67,7 @@
 
 		<div style='background-color: {{ GetHighlightCol $colour $row.Early.Flag }};' class="rosterCell staffCell" title="{{ GetHighlightDesc $row.Early.Flag }}">
 			<form class="w-full h-full"
-				hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Early.ID }}" hx-swap='outerHTML' hx-target='#roster'>
+				hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Early.ID }}" hx-swap='outerHTML' hx-target='#roster-main-container'>
 				<input type="hidden" name="dayID" value="{{ $dayID }}" />
 				<input type="hidden" name="slotID" value="{{ $row.Early.ID }}" />
 				<select class="rosterInput" id="s-{{ $row.Early.ID }}" name="staffID">
@@ -117,7 +117,7 @@
 				hx-post="/modifySlot"
 				hx-trigger="change from:#s-{{ $row.Mid.ID }}"
 				hx-swap='outerHTML'
-				hx-target='#roster'>
+				hx-target='#roster-main-container'>
 				<input type="hidden" name="dayID" value="{{ $dayID }}" />
 				<input type="hidden" name="slotID" value="{{ $row.Mid.ID }}" />
 				<select class="rosterInput" id="s-{{ $row.Mid.ID }}" name="staffID">
@@ -157,7 +157,7 @@
 
 		<div style='background-color: {{ GetHighlightCol $colour $row.Late.Flag }};' class="rosterCell staffCell" title="{{ GetHighlightDesc $row.Late.Flag }}">
 			<form class="w-full h-full"
-				hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Late.ID }}" hx-swap='outerHTML' hx-target='#roster'>
+				hx-post="/modifySlot" hx-trigger="change from:#s-{{ $row.Late.ID }}" hx-swap='outerHTML' hx-target='#roster-main-container'>
 				<input type="hidden" name="dayID" value="{{ $dayID }}" />
 				<input type="hidden" name="slotID" value="{{ $row.Late.ID }}" />
 				<select class="rosterInput" id="s-{{ $row.Late.ID }}" name="staffID">

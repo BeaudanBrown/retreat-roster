@@ -383,7 +383,7 @@ func (s *Server) HandleModifySlot(w http.ResponseWriter, r *http.Request) {
 	week = &checkedWeek
 
 	s.Repos.RosterWeek.SaveRosterWeek(week)
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+	s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *week))
 }
 
 // TODO: Make these toggles consolidated
@@ -420,7 +420,7 @@ func (s *Server) HandleToggleKitchen(w http.ResponseWriter, r *http.Request) {
 		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+	s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *week))
 }
 
 type SetRoleBody struct {
@@ -464,7 +464,7 @@ func (s *Server) HandleSetRole(w http.ResponseWriter, r *http.Request) {
 		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+	s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *week))
 }
 
 type ToggleHiddenBody struct {
@@ -516,7 +516,7 @@ func (s *Server) HandleToggleHidden(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.Repos.RosterWeek.SaveRosterWeek(week)
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+	s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *week))
 }
 
 func (s *Server) HandleToggleHideByIdeal(w http.ResponseWriter, r *http.Request) {
@@ -531,7 +531,7 @@ func (s *Server) HandleToggleHideByIdeal(w http.ResponseWriter, r *http.Request)
 		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+	s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *week))
 }
 
 func (s *Server) HandleToggleHideByPreferences(w http.ResponseWriter, r *http.Request) {
@@ -546,7 +546,7 @@ func (s *Server) HandleToggleHideByPreferences(w http.ResponseWriter, r *http.Re
 		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+	s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *week))
 }
 
 func (s *Server) HandleToggleHideByLeave(w http.ResponseWriter, r *http.Request) {
@@ -561,7 +561,7 @@ func (s *Server) HandleToggleHideByLeave(w http.ResponseWriter, r *http.Request)
 		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+	s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *week))
 }
 
 func (s *Server) HandleToggleHideStaffList(w http.ResponseWriter, r *http.Request) {
@@ -576,7 +576,7 @@ func (s *Server) HandleToggleHideStaffList(w http.ResponseWriter, r *http.Reques
 		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+	s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *week))
 }
 
 func (s *Server) HandleToggleLive(w http.ResponseWriter, r *http.Request) {
@@ -591,7 +591,7 @@ func (s *Server) HandleToggleLive(w http.ResponseWriter, r *http.Request) {
 	}
 	week.IsLive = !week.IsLive
 	s.Repos.RosterWeek.SaveRosterWeek(week)
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+	s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *week))
 }
 
 type ToggleClosedBody struct {
@@ -627,7 +627,7 @@ func (s *Server) HandleToggleClosed(w http.ResponseWriter, r *http.Request) {
 	}
 	day.IsClosed = !day.IsClosed
 	s.Repos.RosterWeek.SaveRosterWeek(week)
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+	s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *week))
 }
 
 type AddTrialBody struct {
@@ -651,7 +651,7 @@ func (s *Server) HandleAddTrial(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+	s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *week))
 }
 
 type ShiftWindowBody struct {
@@ -682,7 +682,7 @@ func (s *Server) HandleShiftWindow(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+	s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *week))
 }
 
 type ModifyRowsBody struct {
@@ -1245,7 +1245,7 @@ func (s *Server) HandleImportRosterWeek(w http.ResponseWriter, r *http.Request) 
 	newWeek := duplicateRosterWeek(*lastWeek, *thisWeek)
 	thisWeek = &newWeek
 	s.Repos.RosterWeek.SaveRosterWeek(thisWeek)
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *thisWeek))
+	s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *thisWeek))
 }
 
 func (s *Server) GetPayWeekForStaff(staffID uuid.UUID, weekOffset int) StaffPayData {

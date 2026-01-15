@@ -405,7 +405,7 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
 	staffMember, err := s.Repos.Staff.GetStaffByID(staffID)
 	if err != nil || staffMember == nil {
 		utils.PrintError(err, "Failed to load staff member")
-		s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *rosterWeek))
+		s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *rosterWeek))
 		return
 	}
 
@@ -413,7 +413,7 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
 	if thisStaff.ID != staffMember.ID && !thisStaff.IsAdminRole() {
 		w.WriteHeader(http.StatusForbidden)
 		if reqBody.Page == "root" {
-			s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *rosterWeek))
+			s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *rosterWeek))
 			return
 		}
 		data := ProfileData{
@@ -432,7 +432,7 @@ func (s *Server) HandleDeleteLeaveReq(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if reqBody.Page == "root" {
-		s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *rosterWeek))
+		s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *rosterWeek))
 	} else {
 		data := ProfileData{
 			StaffMember:  *thisStaff,
@@ -506,7 +506,7 @@ func (s *Server) HandleSetLeaveStatus(w http.ResponseWriter, r *http.Request) {
 		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *rosterWeek))
+	s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *rosterWeek))
 }
 
 type DeleteAccountBody struct {
@@ -632,5 +632,5 @@ func (s *Server) HandleDeleteExpiredLeaveRequests(w http.ResponseWriter, r *http
 		utils.PrintError(err, "Failed to load roster week")
 		return
 	}
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *rosterWeek))
+	s.renderTemplate(w, "rosterMainContainer", s.MakeRootStruct(*thisStaff, *rosterWeek))
 }
