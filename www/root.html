@@ -53,7 +53,7 @@
 			}
 	</script>
 		{{ template "header" (MakeHeaderStruct .ActiveStaff.IsManagerRole .IsLive) }}
-		<div class="flex flex-col max-w-[60rem] justify-center items-center w-full m-wi">
+		<div class="flex flex-col justify-center items-center w-full m-wi {{ if not $config.HideStaffList }}max-w-[60rem] lg:max-w-[95%]{{ else }}max-w-[60rem]{{ end }}">
 			<div class="buttons">
 				{{ if .ActiveStaff.IsManagerRole }}
 						<button class="buttonStyle"
@@ -142,51 +142,57 @@
 				</div>
 				{{ end }}
 				</br>
-				<div id="roster-jpg">
-					{{ range .Days }}
-					{{ $dayStruct := MakeDayStruct $isLive . $server $activeStaff }}
-					{{if $isLive }}
-					{{ template "rosterDayLocked" $dayStruct }}
-					{{ else }}
-					{{ template "rosterDay" $dayStruct }}
-					{{ end }}
-					{{ end }}
-				</div>
-				{{if not $isLive }}
-					</br>
-					<div class="form-container">
-						<form id="addTrialForm" hx-post="/addTrial" hx-ext="json-enc" hx-swap="outerHTML" hx-target="#roster">
-							<label class="text-white">Add New Trial</label>
-							<div class="inline-flex rounded-md shadow-sm">
-								<input type="text" name="name" id="customStaff" value="Trial" onfocus="this.select();" onclick="this.select();" class="shiftInput" />
-								<button class="px-1.5 shiftButtonR" type="submit">+</button>
-							</div>
-						</form>
-					</div>
-					{{ range .Staff }}
-						{{if .IsTrial }}
-						<div class="py-2 inline-flex items-center justify-center rounded-md">
-							<label class="text-center shiftLabel">{{ .FirstName }}</label>
-							{{ if $activeStaff.IsAdminRole }}
-							<button type="button"
-								class="px-1.5 shiftButtonR"
-								hx-ext="json-enc"
-								hx-post="/deleteAcc"
-								hx-vals='js:{"id":"{{ .ID }}"}'
-								hx-swap="outerHTML"
-								hx-target="#roster">
-								Delete
-							</button>
+				<div class="flex flex-col {{ if not $config.HideStaffList }}lg:flex-row lg:items-start{{ end }} gap-2 w-full min-w-0">
+					<div class="w-full {{ if not $config.HideStaffList }}lg:flex-[2]{{ end }} min-w-0">
+						<div id="roster-jpg">
+							{{ range .Days }}
+							{{ $dayStruct := MakeDayStruct $isLive . $server $activeStaff }}
+							{{if $isLive }}
+							{{ template "rosterDayLocked" $dayStruct }}
+							{{ else }}
+							{{ template "rosterDay" $dayStruct }}
+							{{ end }}
 							{{ end }}
 						</div>
+						{{if not $isLive }}
+							</br>
+							<div class="form-container">
+								<form id="addTrialForm" hx-post="/addTrial" hx-ext="json-enc" hx-swap="outerHTML" hx-target="#roster">
+									<label class="text-white">Add New Trial</label>
+									<div class="inline-flex rounded-md shadow-sm">
+										<input type="text" name="name" id="customStaff" value="Trial" onfocus="this.select();" onclick="this.select();" class="shiftInput" />
+										<button class="px-1.5 shiftButtonR" type="submit">+</button>
+									</div>
+								</form>
+							</div>
+							{{ range .Staff }}
+								{{if .IsTrial }}
+								<div class="py-2 inline-flex items-center justify-center rounded-md">
+									<label class="text-center shiftLabel">{{ .FirstName }}</label>
+									{{ if $activeStaff.IsAdminRole }}
+									<button type="button"
+										class="px-1.5 shiftButtonR"
+										hx-ext="json-enc"
+										hx-post="/deleteAcc"
+										hx-vals='js:{"id":"{{ .ID }}"}'
+										hx-swap="outerHTML"
+										hx-target="#roster">
+										Delete
+									</button>
+									{{ end }}
+								</div>
+								{{ end }}
+							{{ end }}
+						{{ else }}
+							<button id="capture" class="buttonStyle mt-2" onclick="saveImage()">Save image</button>
 						{{ end }}
-					{{ end }}
-				{{ else }}
-					<button id="capture" class="buttonStyle mt-2" onclick="saveImage()">Save image</button>
-				{{ end }}
-				{{ if not $config.HideStaffList }}
+					</div>
+					{{ if not $config.HideStaffList }}
+					<div class="w-full lg:flex-[1] lg:max-h-screen lg:overflow-y-auto lg:sticky lg:top-4 min-w-0">
 						{{ template "allStaff" . }}
-				{{ end }}
+					</div>
+					{{ end }}
+				</div>
 				</br>
 				<h2 class="text-white">Leave Requests</h2>
 
