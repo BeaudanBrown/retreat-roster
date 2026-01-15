@@ -72,6 +72,7 @@
 	</script>
 		{{ template "header" (MakeHeaderStruct .ActiveStaff.IsManagerRole .IsLive) }}
 		{{ template "rosterMainContainer" . }}
+		<div id="staff-profile-modal-container"></div>
 	</body>
 </html>
 {{ end }}
