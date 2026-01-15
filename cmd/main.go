@@ -65,6 +65,7 @@ func main() {
 	http.HandleFunc("/toggleHideByIdeal", s.VerifySession(s.HandleToggleHideByIdeal))
 	http.HandleFunc("/toggleHideByPreferences", s.VerifySession(s.HandleToggleHideByPreferences))
 	http.HandleFunc("/toggleHideByLeave", s.VerifySession(s.HandleToggleHideByLeave))
+	http.HandleFunc("/toggleHideStaffList", s.VerifyManager(s.HandleToggleHideStaffList))
 
 	http.HandleFunc("/getStaffProfileModal", s.VerifyManager(s.HandleGetStaffProfileModal))
 	http.HandleFunc("/toggleKitchen", s.VerifyManager(s.HandleToggleKitchen))

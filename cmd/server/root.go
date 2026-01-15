@@ -564,6 +564,21 @@ func (s *Server) HandleToggleHideByLeave(w http.ResponseWriter, r *http.Request)
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
 
+func (s *Server) HandleToggleHideStaffList(w http.ResponseWriter, r *http.Request) {
+	thisStaff := s.GetSessionUser(w, r)
+	if thisStaff == nil {
+		return
+	}
+	thisStaff.Config.HideStaffList = !thisStaff.Config.HideStaffList
+	s.Repos.Staff.SaveStaffMember(*thisStaff)
+	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
+	if err != nil {
+		utils.PrintError(err, "Failed to load roster week")
+		return
+	}
+	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
+}
+
 func (s *Server) HandleToggleLive(w http.ResponseWriter, r *http.Request) {
 	thisStaff := s.GetSessionUser(w, r)
 	if thisStaff == nil {

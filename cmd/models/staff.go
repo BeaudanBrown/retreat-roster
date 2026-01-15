@@ -78,6 +78,7 @@ type StaffConfig struct {
 	HideByPrefs         bool
 	HideByLeave         bool
 	HideApproved        bool
+	HideStaffList       bool
 	ShowAll             bool
 }
 

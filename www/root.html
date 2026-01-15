@@ -63,6 +63,13 @@
 							<input type="checkbox" {{ if $isLive }}checked{{ end }}>
 							<label>Make Public</label>
 						</button>
+						<button class="buttonStyle"
+							hx-get="/toggleHideStaffList"
+							hx-target="#roster"
+							hx-swap='outerHTML'>
+							<input type="checkbox" {{ if not $config.HideStaffList }}checked{{ end }}>
+							<label>Show Staff List</label>
+						</button>
 				{{ end }}
 				<div class="flex">
 					<button class="shiftButtonL px-2 py-1.5" hx-post='/shiftWindow' hx-ext='json-enc' hx-vals='js:{"action":"-"}' hx-swap='outerHTML' hx-target='#roster'>-</button>
@@ -85,7 +92,7 @@
 				<h3 class="text-white">Week {{$startDate.Format "02/01"}} - {{(addDays $startDate 7).Format "02/01"}}</h3>
 			</div>
 			{{ if not .ActiveStaff.IsManagerRole }}
-				<div id="roster-jpg">
+				<div id="roster-jpg" class="w-full">
 					{{if $isLive }}
 						{{ range .Days }}
 							{{ $dayStruct := MakeDayStruct $isLive . $server $activeStaff }}
@@ -177,6 +184,10 @@
 				{{ else }}
 					<button id="capture" class="buttonStyle mt-2" onclick="saveImage()">Save image</button>
 				{{ end }}
+				{{ if not $config.HideStaffList }}
+						{{ template "allStaff" . }}
+				{{ end }}
+				</br>
 				<h2 class="text-white">Leave Requests</h2>
 
 				{{ if $activeStaff.IsAdminRole }}
@@ -268,8 +279,6 @@
 						</button>
 					</div>
 				{{ end }}
-				</br>
-				{{ template "allStaff" . }}
 			{{ end }}
 		</div>
 	</body>
