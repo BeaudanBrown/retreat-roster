@@ -173,11 +173,10 @@ func newRosterWeek(weekOffset int) models.RosterWeek {
 
 func newRow() *models.Row {
 	return &models.Row{
-		ID:     uuid.New(),
-		Amelia: newSlot(),
-		Early:  newSlot(),
-		Mid:    newSlot(),
-		Late:   newSlot(),
+		ID:    uuid.New(),
+		Early: newSlot(),
+		Mid:   newSlot(),
+		Late:  newSlot(),
 	}
 }
 

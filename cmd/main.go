@@ -71,7 +71,6 @@ func main() {
 	http.HandleFunc("/setRole", s.VerifyAdmin(s.HandleSetRole))
 	http.HandleFunc("/toggleHidden", s.VerifyManager(s.HandleToggleHidden))
 	http.HandleFunc("/toggleLive", s.VerifyManager(s.HandleToggleLive))
-	http.HandleFunc("/toggleAmelia", s.VerifyManager(s.HandleToggleAmelia))
 	http.HandleFunc("/toggleClosed", s.VerifyManager(s.HandleToggleClosed))
 	http.HandleFunc("/deleteAcc", s.VerifyAdmin(s.HandleDeleteAccount))
 	http.HandleFunc("/addTrial", s.VerifyManager(s.HandleAddTrial))

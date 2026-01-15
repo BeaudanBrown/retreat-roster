@@ -47,8 +47,8 @@ func TestNewRosterWeek(t *testing.T) {
 
 func TestNewRowAndNewSlot(t *testing.T) {
 	row := newRow()
-	// Row should have 4 slots
-	slots := []models.Slot{row.Amelia, row.Early, row.Mid, row.Late}
+	// Row should have 3 slots
+	slots := []models.Slot{row.Early, row.Mid, row.Late}
 	for _, slot := range slots {
 		if slot.ID == uuid.Nil {
 			t.Errorf("newRow: slot has nil ID")

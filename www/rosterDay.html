@@ -6,7 +6,6 @@
 	{{ $staff := .Staff }}
 	{{ $isClosed := .IsClosed }}
 	{{ $isLive := .IsLive }}
-	{{ $ameliaOpen := .AmeliaOpen }}
 	{{ $config := .ActiveStaff.Config }}
 	{{ $hideByIdeal := $config.HideByIdeal }}
 	{{ $hideByLeave := $config.HideByLeave }}
@@ -33,21 +32,10 @@
 					hx-vals='js:{"dayID":"{{$dayID}}"}'>
 				<label>Closed</label>
 			</div>
-			{{else if eq $index 2}}
-			<div class="checkLabel">
-				<input type="checkbox" {{ if $ameliaOpen }}checked{{ end }}
-					hx-post="/toggleAmelia"
-					hx-target="#roster"
-					hx-trigger="change"
-					hx-ext='json-enc'
-					hx-swap='outerHTML'
-					hx-vals='js:{"dayID":"{{$dayID}}"}'>
-				<label>A/S</label>
-			</div>
 			{{end}}
 		</div>
 		{{end}}
-		<div style='background-color: {{ GetHighlightCol $colour $row.Amelia.Flag }};' class="rosterCell dayCell">
+		<div class="rosterCell dayCell">
 			{{if eq $index 0}}
 			{{$dayName}}
 			{{else if eq $index 1}}
@@ -55,36 +43,7 @@
 			{{else if (eq $index 2)}}
 			{{if $isClosed}}
 			CLOSED
-			{{else if $ameliaOpen}}
-			A/S
 			{{end}}
-			{{ else if and (not $isClosed) $ameliaOpen }}
-			<form hx-post="/modifySlot" hx-trigger="change from:#as-{{ $row.Amelia.ID }}" hx-swap='outerHTML' hx-target='#roster'>
-				<input type="hidden" name="dayID" value="{{ $dayID }}" />
-				<input type="hidden" name="slotID" value="{{ $row.Amelia.ID }}" />
-				<select class="rosterInput" id="as-{{ $row.Amelia.ID }}" name="staffID">
-					<option value=""></option>
-					{{ range $staff }}
-					{{ if not .IsHidden }}
-					{{ if or
-					(or (.IsTrial) ($row.Amelia.HasThisStaff .ID))
-					(and
-					(or (not $hideByIdeal) (lt (index $.StaffShiftCount .ID) .IdealShifts))
-					(or (not $hideByLeave) (not (.IsAway $date)))
-					)
-					}}
-					<option class="drop-opt" value="{{.ID}}" {{if $row.Amelia.HasThisStaff .ID}}selected{{end}}>
-						{{if .NickName}}
-						{{.NickName}}
-						{{else}}
-						{{.FirstName}}
-						{{end}}
-					</option>
-					{{ end }}
-					{{ end }}
-					{{ end }}
-				</select>
-			</form>
 			{{end}}
 		</div>
 

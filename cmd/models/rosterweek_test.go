@@ -12,7 +12,7 @@ func TestGetSlotByIDAndGetDayByID(t *testing.T) {
 	dayID := uuid.New()
 	slotID := uuid.New()
 	slot := &Slot{ID: slotID}
-	row := &Row{Amelia: *slot}
+	row := &Row{Early: *slot}
 	day := &RosterDay{ID: dayID, Rows: []*Row{row}, Offset: 0}
 	week := &RosterWeek{Days: []*RosterDay{day}}
 	// Test GetDayByID
@@ -82,9 +82,9 @@ func TestCountShifts(t *testing.T) {
 	// Two days, one staff assigned twice
 	staffID := uuid.New()
 	s := staffID
-	// day with two rows, one AmeliaOpen true
-	day := &RosterDay{Offset: 2, AmeliaOpen: true}
-	row1 := &Row{Amelia: Slot{AssignedStaff: &s}, Early: Slot{}, Mid: Slot{}, Late: Slot{AssignedStaff: &s}}
+	// day with one row, Early and Late assigned to the same staff
+	day := &RosterDay{Offset: 2}
+	row1 := &Row{Early: Slot{AssignedStaff: &s}, Mid: Slot{}, Late: Slot{AssignedStaff: &s}}
 	day.Rows = []*Row{row1}
 	counts := map[uuid.UUID][]int{staffID: make([]int, 7)}
 	day.CountShifts(counts)

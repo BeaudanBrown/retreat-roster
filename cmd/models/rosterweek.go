@@ -19,27 +19,23 @@ type RosterWeek struct {
 }
 
 type RosterDay struct {
-	ID         uuid.UUID
-	DayName    string
-	Rows       []*Row
-	Colour     string
-	Offset     int
-	IsClosed   bool
-	AmeliaOpen bool
+	ID       uuid.UUID
+	DayName  string
+	Rows     []*Row
+	Colour   string
+	Offset   int
+	IsClosed bool
 }
 
 type Row struct {
-	ID     uuid.UUID
-	Amelia Slot
-	Early  Slot
-	Mid    Slot
-	Late   Slot
+	ID    uuid.UUID
+	Early Slot
+	Mid   Slot
+	Late  Slot
 }
 
 func (r Row) GetSlot(slotName string) *Slot {
 	switch slotName {
-	case "Amelia":
-		return &r.Amelia
 	case "Early":
 		return &r.Early
 	case "Mid":
@@ -104,9 +100,6 @@ func (week *RosterWeek) GetSlotByID(slotID uuid.UUID) *Slot {
 	for _, day := range week.Days {
 		for j := range day.Rows {
 			row := day.Rows[j]
-			if row.Amelia.ID == slotID {
-				return &row.Amelia
-			}
 			if row.Early.ID == slotID {
 				return &row.Early
 			}
@@ -211,9 +204,6 @@ func (day *RosterDay) CountShifts(shiftCounts map[uuid.UUID][]int) {
 		if row == nil {
 			continue
 		}
-		if day.AmeliaOpen {
-			recordShifts(&row.Amelia)
-		}
 		recordShifts(&row.Early)
 		recordShifts(&row.Mid)
 		recordShifts(&row.Late)
@@ -271,11 +261,6 @@ func assignFlags(day *RosterDay, date time.Time, shiftCounts map[uuid.UUID][]int
 		if row == nil {
 			continue
 		} // Added nil check for row
-		if day.AmeliaOpen {
-			row.Amelia.Flag = processSlot(row, "Amelia", day.Offset)
-		} else {
-			row.Amelia.Flag = None
-		}
 		row.Early.Flag = processSlot(row, "Early", day.Offset)
 		row.Mid.Flag = processSlot(row, "Mid", day.Offset)
 		row.Late.Flag = processSlot(row, "Late", day.Offset)
@@ -315,10 +300,6 @@ func (week *RosterWeek) CountShiftsForStaff(staffID uuid.UUID) int {
 		for _, row := range day.Rows {
 			if row == nil {
 				continue
-			}
-			// Count Amelia shifts if the day has Amelia open
-			if day.AmeliaOpen && row.Amelia.AssignedStaff != nil && *row.Amelia.AssignedStaff == staffID {
-				totalShifts++
 			}
 			// Count Early, Mid, Late shifts
 			if row.Early.AssignedStaff != nil && *row.Early.AssignedStaff == staffID {

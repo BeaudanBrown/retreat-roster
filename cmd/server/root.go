@@ -500,10 +500,6 @@ func (s *Server) HandleToggleHidden(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, day := range week.Days {
 		for _, row := range day.Rows {
-			if row.Amelia.AssignedStaff != nil && *row.Amelia.AssignedStaff == accID {
-				row.Amelia.AssignedStaff = nil
-				row.Amelia.StaffString = nil
-			}
 			if row.Early.AssignedStaff != nil && *row.Early.AssignedStaff == accID {
 				row.Early.AssignedStaff = nil
 				row.Early.StaffString = nil
@@ -579,41 +575,6 @@ func (s *Server) HandleToggleLive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	week.IsLive = !week.IsLive
-	s.Repos.RosterWeek.SaveRosterWeek(week)
-	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
-}
-
-type ToggleAmeliaBody struct {
-	DayID string `json:"dayID"`
-}
-
-func (s *Server) HandleToggleAmelia(w http.ResponseWriter, r *http.Request) {
-	var reqBody ToggleAmeliaBody
-	if err := ReadAndUnmarshal(w, r, &reqBody); err != nil {
-		return
-	}
-	dayID, err := uuid.Parse(reqBody.DayID)
-	if err != nil {
-		utils.PrintError(err, "Invalid dayID")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	thisStaff := s.GetSessionUser(w, r)
-	if thisStaff == nil {
-		return
-	}
-	week, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset)
-	if err != nil {
-		utils.PrintError(err, "Failed to load roster week")
-		return
-	}
-	day := week.GetDayByID(dayID)
-	if day == nil {
-		utils.PrintError(err, "Invalid dayID")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	day.AmeliaOpen = !day.AmeliaOpen
 	s.Repos.RosterWeek.SaveRosterWeek(week)
 	s.renderTemplate(w, "root", s.MakeRootStruct(*thisStaff, *week))
 }
@@ -745,21 +706,19 @@ func duplicateRosterWeek(src models.RosterWeek, newWeek models.RosterWeek) model
 	newDays := []*models.RosterDay{}
 	for _, day := range src.Days {
 		newDay := models.RosterDay{
-			ID:         uuid.New(),
-			DayName:    day.DayName,
-			Colour:     day.Colour,
-			Offset:     day.Offset,
-			IsClosed:   day.IsClosed,
-			AmeliaOpen: day.AmeliaOpen,
-			Rows:       []*models.Row{},
+			ID:       uuid.New(),
+			DayName:  day.DayName,
+			Colour:   day.Colour,
+			Offset:   day.Offset,
+			IsClosed: day.IsClosed,
+			Rows:     []*models.Row{},
 		}
 		for _, row := range day.Rows {
 			newRow := &models.Row{
-				ID:     uuid.New(),
-				Amelia: duplicateSlot(row.Amelia),
-				Early:  duplicateSlot(row.Early),
-				Mid:    duplicateSlot(row.Mid),
-				Late:   duplicateSlot(row.Late),
+				ID:    uuid.New(),
+				Early: duplicateSlot(row.Early),
+				Mid:   duplicateSlot(row.Mid),
+				Late:  duplicateSlot(row.Late),
 			}
 			newDay.Rows = append(newDay.Rows, newRow)
 		}

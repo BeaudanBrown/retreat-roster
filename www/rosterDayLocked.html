@@ -4,7 +4,6 @@
 	{{ $dayID := .ID }}
 	{{ $date := .Date }}
 	{{ $isClosed := .IsClosed }}
-	{{ $ameliaOpen := .AmeliaOpen }}
 	{{ $activeStaff := .ActiveStaff }}
 	{{range $index, $row := .Rows}}
 	{{ if and $isClosed (gt $index 3) }}
@@ -23,21 +22,9 @@
 		<div class="rosterCell dayCell">
 			CLOSED
 		</div>
-		{{else if $ameliaOpen}}
-		<div class="rosterCell dayCell">
-			A/S
-		</div>
 		{{else}}
 		<div class="rosterCell dayCell">&nbsp;</div>
 		{{end}}
-		{{ else if and (not $isClosed) $ameliaOpen }}
-		{{ if $row.Amelia.AssignedStaff}}
-		<div class="rosterCell ameliaCell {{if (MemberIsAssigned $activeStaff.ID $row.Amelia.AssignedStaff)}}shiftHighlight{{end}}">
-			{{$row.Amelia.StaffString}}
-		</div>
-		{{ else }}
-		<div class="rosterCell ameliaCell">&nbsp;</div>
-		{{ end }}
 		{{else}}
 		<div class="rosterCell dayCell">&nbsp;</div>
 		{{end}}
