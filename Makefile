@@ -27,8 +27,8 @@ docker-run: build
 docker-push: build
 	@echo "Pushing docker image..."
 	docker build -t retreat-roster .
-	docker tag retreat-roster docker.beaudan.me/retreat-roster
-	docker push docker.beaudan.me/retreat-roster:latest
+	docker tag retreat-roster registry.bepis.lol/retreat-roster
+	docker push registry.bepis.lol/retreat-roster:latest
 
 refresh-db:
 	-rm -rf ./.devenv/state/mongodb.bak
