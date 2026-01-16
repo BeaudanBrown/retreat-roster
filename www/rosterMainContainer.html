@@ -95,7 +95,7 @@
 		{{ end }}
 		</br>
 		<div class="flex flex-col {{ if not $config.HideStaffList }}lg:flex-row lg:items-start{{ end }} gap-2 w-full min-w-0">
-			<div class="w-full {{ if not $config.HideStaffList }}lg:flex-[2]{{ end }} min-w-0">
+			<div class="w-full lg:flex-[2] min-w-0" id="roster-jpg-container">
 				<div id="roster-jpg">
 					{{ range .Days }}
 					{{ $dayStruct := MakeDayStruct $isLive . $server $activeStaff }}
@@ -140,7 +140,7 @@
 				{{ end }}
 			</div>
 			{{ if not $config.HideStaffList }}
-			<div class="w-full lg:flex-[1] lg:max-h-screen lg:overflow-y-auto lg:sticky lg:top-4 min-w-0">
+			<div id="all-staff-panel" class="w-full lg:flex-[1] lg:overflow-y-auto lg:sticky lg:top-4 min-w-0">
 				{{ template "allStaff" . }}
 			</div>
 			{{ end }}
@@ -238,5 +238,18 @@
 		</div>
 		{{ end }}
 	{{ end }}
+	<script>
+		(function() {
+			const roster = document.getElementById('roster-jpg-container');
+			const staffPanel = document.getElementById('all-staff-panel');
+			if (roster && staffPanel) {
+				const updateHeight = () => {
+					staffPanel.style.maxHeight = roster.offsetHeight + 'px';
+				};
+				updateHeight();
+				new ResizeObserver(updateHeight).observe(roster);
+			}
+		})();
+	</script>
 </div>
 {{ end }}
