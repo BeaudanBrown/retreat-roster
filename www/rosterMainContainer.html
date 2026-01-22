@@ -97,13 +97,17 @@
 		<div class="flex flex-col {{ if not $config.HideStaffList }}lg:flex-row lg:items-start{{ end }} gap-2 w-full min-w-0">
 			<div class="w-full lg:flex-[2] min-w-0" id="roster-jpg-container">
 				<div id="roster-jpg">
-					{{ range .Days }}
-					{{ $dayStruct := MakeDayStruct $isLive . $server $activeStaff }}
-					{{if $isLive }}
-					{{ template "rosterDayLocked" $dayStruct }}
+					{{ if and (not $isLive) (not .ActiveStaff.IsAdminRole) }}
+						<h1>This roster has not been made public</h1>
 					{{ else }}
-					{{ template "rosterDay" $dayStruct }}
-					{{ end }}
+						{{ range .Days }}
+						{{ $dayStruct := MakeDayStruct $isLive . $server $activeStaff }}
+						{{if $isLive }}
+						{{ template "rosterDayLocked" $dayStruct }}
+						{{ else }}
+						{{ template "rosterDay" $dayStruct }}
+						{{ end }}
+						{{ end }}
 					{{ end }}
 				</div>
 				{{if not $isLive }}
@@ -244,8 +248,13 @@
 			const staffPanel = document.getElementById('all-staff-panel');
 			if (roster && staffPanel) {
 				const updateHeight = () => {
-					staffPanel.style.maxHeight = roster.offsetHeight + 'px';
+					if (window.innerWidth >= 1024) {
+						staffPanel.style.maxHeight = roster.offsetHeight + 'px';
+					} else {
+						staffPanel.style.maxHeight = '';
+					}
 				};
+				window.addEventListener('resize', updateHeight);
 				updateHeight();
 				new ResizeObserver(updateHeight).observe(roster);
 			}
