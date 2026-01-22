@@ -958,9 +958,20 @@ func writeRecordsToCSV(staffData map[uuid.UUID]StaffPayData, allStaff []*models.
 
 func processEntries(thisStaff models.StaffMember, entries []*models.TimesheetEntry, allStaff []*models.StaffMember) map[uuid.UUID]StaffPayData {
 	staffData := map[uuid.UUID]StaffPayData{}
+
+	startOfWeekUTC := utils.WeekStartFromOffset(thisStaff.Config.TimesheetDateOffset)
+
 	for day := Tuesday; day <= 6; day++ {
-		thisOffset := thisStaff.Config.TimesheetDateOffset + int(day)
-		thisDate := utils.WeekStartFromOffset(thisOffset)
+		currentDayUTC := startOfWeekUTC.AddDate(0, 0, int(day))
+		// Convert to Local Time (00:00 Local) to ensure windows align with shifts which are stored in Local Time
+		thisDate := time.Date(
+			currentDayUTC.Year(),
+			currentDayUTC.Month(),
+			currentDayUTC.Day(),
+			0, 0, 0, 0,
+			time.Local,
+		)
+
 		for _, entry := range entries {
 			if !entry.Approved {
 				continue
@@ -1111,13 +1122,22 @@ func (s *Server) HandleExportWageReport(w http.ResponseWriter, r *http.Request) 
 	var zipBuffer bytes.Buffer
 	zipWriter := zip.NewWriter(&zipBuffer)
 
+	startOfWeekUTC := utils.WeekStartFromOffset(thisStaff.Config.TimesheetDateOffset)
+
 	for i := 0; i <= 6; i++ {
 		report := map[time.Time]ShiftHours{}
-		thisOffset := thisStaff.Config.TimesheetDateOffset + i
-		thisDate := utils.WeekStartFromOffset(thisOffset)
-		for i := 8; i <= 27; i++ {
-			windowStart := thisDate.Add(time.Duration(i) * time.Hour)
-			windowEnd := thisDate.Add(time.Duration(i+1) * time.Hour)
+		currentDayUTC := startOfWeekUTC.AddDate(0, 0, i)
+		thisDate := time.Date(
+			currentDayUTC.Year(),
+			currentDayUTC.Month(),
+			currentDayUTC.Day(),
+			0, 0, 0, 0,
+			time.Local,
+		)
+
+		for h := 8; h <= 27; h++ {
+			windowStart := thisDate.Add(time.Duration(h) * time.Hour)
+			windowEnd := thisDate.Add(time.Duration(h+1) * time.Hour)
 			for _, entry := range *entries {
 				if !entry.Approved {
 					continue
