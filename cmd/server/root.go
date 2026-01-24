@@ -854,7 +854,7 @@ func ApplyEntryToLevel(dayBreakdown DayBreakdown, thisDate time.Time, entry mode
 	eveningWindowStart := ordinaryWindowEnd
 	eveningWindowEnd := thisDate.Add(time.Duration(24) * time.Hour)
 	after12WindowStart := eveningWindowEnd
-	after12WindowEnd := thisDate.Add(time.Duration(30) * time.Hour)
+	after12WindowEnd := thisDate.Add(time.Duration(31) * time.Hour)
 
 	dayBreakdown.OrdinaryHrs += GetWorkFromEntry(ordinaryWindowStart, ordinaryWindowEnd, entry)
 	dayBreakdown.EveningHrs += GetWorkFromEntry(eveningWindowStart, eveningWindowEnd, entry)
@@ -1278,7 +1278,14 @@ func (s *Server) GetPayWeekForStaff(staffID uuid.UUID, weekOffset int) StaffPayD
 		entries = &emptyEntries
 	}
 	for day := Tuesday; day <= 6; day++ {
-		thisDate := startDate.AddDate(0, 0, int(day))
+		currentDayUTC := startDate.AddDate(0, 0, int(day))
+		thisDate := time.Date(
+			currentDayUTC.Year(),
+			currentDayUTC.Month(),
+			currentDayUTC.Day(),
+			0, 0, 0, 0,
+			time.Local,
+		)
 		for _, entry := range *entries {
 			if entry.Approved {
 				payData = AddEntryToPaydata(*entry, thisDate, day, payData)
