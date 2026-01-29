@@ -1,6 +1,9 @@
 package server
 
 import (
+	"context"
+	"html/template"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/google/uuid"
@@ -9,17 +12,25 @@ import (
 )
 
 // simple fake staff repository for testing
-// fakeStaffRepo implements repository.StaffRepository for testing, only LoadAllStaff is functional.
-type fakeStaffRepo struct{ staff []*models.StaffMember }
+// fakeStaffRepo implements repository.StaffRepository for testing
+type fakeStaffRepo struct {
+	staff       []*models.StaffMember
+	tokenToUser map[uuid.UUID]*models.StaffMember
+}
 
 func (f *fakeStaffRepo) SaveStaffMember(staff models.StaffMember) error         { return nil }
 func (f *fakeStaffRepo) SaveStaffMembers(staff []*models.StaffMember) error     { return nil }
 func (f *fakeStaffRepo) LoadAllStaff() ([]*models.StaffMember, error)           { return f.staff, nil }
 func (f *fakeStaffRepo) GetStaffByGoogleID(string) (*models.StaffMember, error) { return nil, nil }
 func (f *fakeStaffRepo) GetStaffByID(uuid.UUID) (*models.StaffMember, error)    { return nil, nil }
-func (f *fakeStaffRepo) GetStaffByToken(uuid.UUID) (*models.StaffMember, error) { return nil, nil }
-func (f *fakeStaffRepo) RefreshStaffConfig(models.StaffMember) (models.StaffMember, error) {
-	return models.StaffMember{}, nil
+func (f *fakeStaffRepo) GetStaffByToken(token uuid.UUID) (*models.StaffMember, error) {
+	if s, ok := f.tokenToUser[token]; ok {
+		return s, nil
+	}
+	return nil, nil
+}
+func (f *fakeStaffRepo) RefreshStaffConfig(s models.StaffMember) (models.StaffMember, error) {
+	return s, nil
 }
 func (f *fakeStaffRepo) UpdateStaffToken(*models.StaffMember, uuid.UUID) error       { return nil }
 func (f *fakeStaffRepo) CreateStaffMember(string, uuid.UUID) error                   { return nil }
@@ -27,6 +38,36 @@ func (f *fakeStaffRepo) DeleteLeaveReqByID(models.StaffMember, uuid.UUID) error 
 func (f *fakeStaffRepo) GetStaffByLeaveReqID(uuid.UUID) (*models.StaffMember, error) { return nil, nil }
 func (f *fakeStaffRepo) CreateTrial(string) error                                    { return nil }
 func (f *fakeStaffRepo) DeleteStaffByID(uuid.UUID) error                             { return nil }
+
+// simple fake roster week repository for testing
+type fakeRosterWeekRepo struct {
+	weeks map[int]*models.RosterWeek
+	saved []*models.RosterWeek
+}
+
+func (f *fakeRosterWeekRepo) SaveRosterWeek(week *models.RosterWeek) error {
+	f.saved = append(f.saved, week)
+	f.weeks[week.WeekOffset] = week
+	return nil
+}
+func (f *fakeRosterWeekRepo) SaveAllRosterWeeks(weeks []*models.RosterWeek) error { return nil }
+func (f *fakeRosterWeekRepo) LoadAllRosterWeeks() ([]*models.RosterWeek, error)   { return nil, nil }
+func (f *fakeRosterWeekRepo) LoadRosterWeek(weekOffset int) (*models.RosterWeek, error) {
+	if week, ok := f.weeks[weekOffset]; ok {
+		return week, nil
+	}
+	// Create a new week if it doesn't exist, like the real repository
+	newWeek := &models.RosterWeek{
+		ID:         uuid.New(),
+		WeekOffset: weekOffset,
+		Days:       []*models.RosterDay{},
+	}
+	f.weeks[weekOffset] = newWeek
+	return newWeek, nil
+}
+func (f *fakeRosterWeekRepo) ChangeDayRowCount(weekOffset int, dayID uuid.UUID, action string) (*models.RosterDay, bool, error) {
+	return nil, false, nil
+}
 
 // Test MemberIsAssigned returns true when IDs match, false otherwise.
 func TestMemberIsAssigned(t *testing.T) {
@@ -99,5 +140,111 @@ func TestMakeDayStruct(t *testing.T) {
 	}
 	if ds.ActiveStaff.ID != active.ID {
 		t.Errorf("MakeDayStruct: ActiveStaff.ID = %v; want %v", ds.ActiveStaff.ID, active.ID)
+	}
+}
+
+// Test HandleImportRosterWeek imports the immediately previous week (offset - 1), not 7 weeks ago.
+func TestHandleImportRosterWeek(t *testing.T) {
+	tests := []struct {
+		name            string
+		currentOffset   int
+		expectedPrevOff int
+	}{
+		{"import to offset 5", 5, 4},
+		{"import to offset 100", 100, 99},
+		{"import to offset 0", 0, -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create roster weeks for previous week and current week
+			prevWeekID := uuid.New()
+			currWeekID := uuid.New()
+
+			prevWeek := &models.RosterWeek{
+				ID:         prevWeekID,
+				WeekOffset: tt.expectedPrevOff,
+				Days: []*models.RosterDay{
+					{ID: uuid.New(), DayName: "Tues", Offset: 0, Rows: []*models.Row{}},
+				},
+			}
+			currWeek := &models.RosterWeek{
+				ID:         currWeekID,
+				WeekOffset: tt.currentOffset,
+				Days:       []*models.RosterDay{},
+			}
+
+			// Create active staff and session
+			sessionToken := uuid.New()
+			activeStaff := &models.StaffMember{
+				ID: uuid.New(),
+				Config: models.StaffConfig{
+					RosterDateOffset: tt.currentOffset,
+				},
+			}
+
+			// Setup fake repositories
+			fakeRosterRepo := &fakeRosterWeekRepo{
+				weeks: map[int]*models.RosterWeek{
+					tt.expectedPrevOff: prevWeek,
+					tt.currentOffset:   currWeek,
+				},
+				saved: []*models.RosterWeek{},
+			}
+			fakeStaffRepo := &fakeStaffRepo{
+				staff: []*models.StaffMember{activeStaff},
+				tokenToUser: map[uuid.UUID]*models.StaffMember{
+					sessionToken: activeStaff,
+				},
+			}
+
+			// Setup templates
+			tmpl := template.New("rosterMainContainer")
+			// Add dummy functions required by templates if necessary, or just parse an empty string
+			// The handler calls s.MakeRootStruct which calls MakeHeaderStruct etc,
+			// but s.renderTemplate just executes the template.
+			// The actual template needs valid data, but for this test we can use a dummy template
+			// that doesn't use the data.
+			tmpl.Parse("")
+
+			srv := &Server{
+				Repos: Repositories{
+					RosterWeek: fakeRosterRepo,
+					Staff:      fakeStaffRepo,
+				},
+				Templates: tmpl,
+			}
+
+			// Create request
+			req := httptest.NewRequest("POST", "/importRosterWeek", nil)
+			// Add session to context
+			ctx := context.WithValue(req.Context(), "sessionToken", sessionToken)
+			req = req.WithContext(ctx)
+
+			w := httptest.NewRecorder()
+
+			// Call the handler
+			srv.HandleImportRosterWeek(w, req)
+
+			// Verify that a week was saved (should be one call for the duplicated week)
+			if len(fakeRosterRepo.saved) != 1 {
+				t.Errorf("Expected 1 saved week, got %d", len(fakeRosterRepo.saved))
+				return
+			}
+
+			// Verify the saved week has the correct offset (current week)
+			if fakeRosterRepo.saved[0].WeekOffset != tt.currentOffset {
+				t.Errorf("Saved week offset = %d; want %d", fakeRosterRepo.saved[0].WeekOffset, tt.currentOffset)
+			}
+
+			// Verify that the previous week loaded was from offset - 1, not offset - 7
+			// We can verify this by checking if prevWeek's data (the Tues day) made it into the saved week
+			if len(fakeRosterRepo.saved[0].Days) == 0 {
+				t.Error("Expected days from previous week to be duplicated")
+			}
+			if len(fakeRosterRepo.saved[0].Days) > 0 && fakeRosterRepo.saved[0].Days[0].DayName != "Tues" {
+				t.Errorf("Expected first day to be 'Tues' from previous week, got %q", fakeRosterRepo.saved[0].Days[0].DayName)
+			}
+		})
 	}
 }

@@ -1248,7 +1248,7 @@ func (s *Server) HandleImportRosterWeek(w http.ResponseWriter, r *http.Request) 
 	if thisStaff == nil {
 		return
 	}
-	lastWeek, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset - 7)
+	lastWeek, err := s.Repos.RosterWeek.LoadRosterWeek(thisStaff.Config.RosterDateOffset - 1)
 	if err != nil {
 		utils.PrintError(err, "Couldn't load last week")
 		http.Redirect(w, r, "/", http.StatusSeeOther)
