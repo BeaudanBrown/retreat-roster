@@ -185,7 +185,7 @@ func (cd *CustomDate) UnmarshalJSON(input []byte) error {
 	}
 	// Try several expected date formats.
 	formats := []string{
-		"02/01/2006",
+		"2/1/2006",
 		"2006-01-02",
 		"2006-01-02T15:04:05Z",
 		"2006-01-02T15:04:05.999999999Z07:00",
