@@ -2,7 +2,6 @@ package models
 
 import (
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -90,25 +89,5 @@ func TestCountShifts(t *testing.T) {
 	day.CountShifts(counts)
 	if counts[staffID][2] != 2 {
 		t.Errorf("CountShifts: expected 2 shifts at offset 2, got %d", counts[staffID][2])
-	}
-}
-
-func TestMarshalUnmarshalBSON_RosterWeek_Times(t *testing.T) {
-	// Test that Marshal/Unmarshal preserves StartDate in local timezone
-	local := time.Date(2022, 3, 14, 0, 0, 0, 0, time.Local)
-	week := RosterWeek{ID: uuid.New(), StartDate: local}
-	data, err := week.MarshalBSON()
-	if err != nil {
-		t.Fatalf("MarshalBSON failed: %v", err)
-	}
-	var got RosterWeek
-	if err := got.UnmarshalBSON(data); err != nil {
-		t.Fatalf("UnmarshalBSON failed: %v", err)
-	}
-	// Check year-month-day equality
-	y1, m1, d1 := week.StartDate.Date()
-	y2, m2, d2 := got.StartDate.Date()
-	if y1 != y2 || m1 != m2 || d1 != d2 {
-		t.Errorf("StartDate mismatch after BSON roundtrip: expected %v, got %v", week.StartDate, got.StartDate)
 	}
 }

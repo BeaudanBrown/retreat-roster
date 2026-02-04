@@ -3,6 +3,8 @@ package models
 import (
 	"time"
 
+	"roster/cmd/utils"
+
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -194,9 +196,10 @@ func (week *RosterWeek) CheckFlags(allStaff []*StaffMember) RosterWeek {
 		weeklyShiftTotals[staffID] = SumArray(dailyCounts)
 	}
 
+	startDate := utils.WeekStartFromOffset(week.WeekOffset)
 	for i := range week.Days {
 		if week.Days[i] != nil {
-			assignFlags(week.Days[i], week.StartDate.AddDate(0, 0, i), shiftCounts, weeklyShiftTotals, staffMap, week.Days[i].Offset)
+			assignFlags(week.Days[i], startDate.AddDate(0, 0, i), shiftCounts, weeklyShiftTotals, staffMap, week.Days[i].Offset)
 		}
 	}
 
